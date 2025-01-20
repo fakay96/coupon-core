@@ -1,0 +1,41 @@
+
+
+FROM python:3.12-slim AS base
+
+# Environment variables for Python
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/root/.local/bin:$PATH"
+
+# Set the working directory
+WORKDIR /app
+
+# Install system dependencies, including PostgreSQL client (psql)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq-dev \
+    gcc \
+    netcat-openbsd \
+    curl \
+    awscli \
+    postgresql-client && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Install Poetry globally
+RUN curl -sSL https://install.python-poetry.org | python3 - && \
+    poetry config virtualenvs.create false
+
+# Copy only `pyproject.toml` for dependency resolution
+COPY pyproject.toml ./
+
+# Install project dependencies (cached for efficiency)
+RUN poetry install --only main --no-dev --no-interaction --no-ansi
+
+# Copy application source files
+COPY election_system/ /app/election_system/
+COPY authentication /app/authentication/
+
+COPY manage.py /app/manage.py
+
+# Copy the initialization script
+COPY Scripts/init_db.sh /app/init_db.sh
+RUN chmod +x /app/init_db.sh
