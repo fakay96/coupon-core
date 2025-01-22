@@ -53,7 +53,8 @@ class AuthenticationRouter:
             return self.db_name
         return None
 
-    def allow_relation(self, obj1: Model, obj2: Model, **hints: Any) -> Optional[bool]:
+    def allow_relation(self, obj1: Model, obj2: Model,
+                       **hints: Any) -> Optional[bool]:
         """
         Allow relations within the `authentication` app or between apps sharing the same database.
 

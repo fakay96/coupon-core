@@ -12,12 +12,10 @@ from typing import Any, Optional
 
 from django.db import IntegrityError
 from rest_framework import status
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.exceptions import ValidationError
-
-
 
 from authentication.models import CustomUser
 from authentication.v1.serializers import GuestTokenSerializer
@@ -59,7 +57,8 @@ class GuestTokenView(APIView):
         """
         try:
             # Initialize and validate the serializer with request data
-            serializer: GuestTokenSerializer = GuestTokenSerializer(data=request.data)
+            serializer: GuestTokenSerializer = GuestTokenSerializer(
+                data=request.data)
             serializer.is_valid(raise_exception=True)
 
             email: str = serializer.validated_data["email"]
@@ -96,18 +95,22 @@ class GuestTokenView(APIView):
             )
             logger.info(f"Guest token stored in Redis for email: {email}")
 
-            return Response({"guest_token": token}, status=status.HTTP_201_CREATED)
+            return Response({"guest_token": token},
+                            status=status.HTTP_201_CREATED)
 
         except IntegrityError as ie:
-            logger.warning(f"Integrity error during guest token creation: {ie}")
+            logger.warning(
+                f"Integrity error during guest token creation: {ie}")
             return Response(
                 {"error": "A user with this email already exists."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         except ValidationError as ve:
-            logger.warning(f"Validation error during guest token creation: {ve}")
-            return Response({"errors": ve.detail}, status=status.HTTP_400_BAD_REQUEST)
+            logger.warning(
+                f"Validation error during guest token creation: {ve}")
+            return Response({"errors": ve.detail},
+                            status=status.HTTP_400_BAD_REQUEST)
 
         except Exception as e:
             logger.error(

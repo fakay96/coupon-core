@@ -31,7 +31,6 @@ urlpatterns = [
 # Mapping of applications to their URL configurations
 app_urls = {
     "authentication": "authentication.v1.urls",
-   
 }
 
 # Include all app URLs
@@ -42,5 +41,7 @@ for app_name, app_url in app_urls.items():
 
 # Add static and media URL patterns for development
 if settings.DEBUG:
-    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += static(settings.STATIC_URL,
+                          document_root=settings.STATIC_ROOT)
+    urlpatterns += static(settings.MEDIA_URL,
+                          document_root=settings.MEDIA_ROOT)
