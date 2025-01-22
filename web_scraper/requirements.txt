@@ -1,0 +1,6 @@
+beautifulsoup4
+requests
+tenacity
+pyrate-limiter
+python-dotenv
+pytest
