@@ -66,7 +66,8 @@ class Role(models.Model):
         max_length=50,
         unique=True,
         validators=[
-            MinLengthValidator(3, message="Role name must be at least 3 characters.")
+            MinLengthValidator(
+                3, message="Role name must be at least 3 characters.")
         ],
         help_text="Name of the role.",
     )

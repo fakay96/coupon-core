@@ -135,5 +135,3 @@ AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL")
 AUTH_USER_MODEL = "authentication.CustomUser"
 
 PUBLIC_ENDPOINTS = ["/authentication/api/v1/guest-token/"]
-
-

@@ -4,7 +4,6 @@ FROM fakay96/coupon-core:0.0.1
 # Set working directory for the BACKEND app
 WORKDIR /app
 
-
 # Expose the application port
 EXPOSE 8000
 

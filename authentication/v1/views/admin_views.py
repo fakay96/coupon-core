@@ -122,7 +122,8 @@ class UserInfoView(APIView):
             # Validate that the user is not a guest
             if getattr(user, "is_guest", False):
                 logger.warning(
-                    f"Guest token access attempt by user: {user.id if user.id else 'unknown'}"
+                    f"Guest token access attempt by user: {
+                        user.id if user.id else 'unknown'}"
                 )
                 return Response(
                     {
@@ -137,7 +138,8 @@ class UserInfoView(APIView):
                 "username": user.username,
                 "email": user.email,
                 "role": (
-                    user.role.name if hasattr(user, "role") and user.role else "Guest"
+                    user.role.name if hasattr(
+                        user, "role") and user.role else "Guest"
                 ),
                 "is_staff": user.is_staff,
                 "is_active": user.is_active,
