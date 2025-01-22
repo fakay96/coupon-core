@@ -69,7 +69,8 @@ class TokenValidationMiddleware:
 
         except (InvalidToken, TokenError) as token_error:
             logger.error(f"Token validation failed: {str(token_error)}")
-            return JsonResponse({"error": "Invalid or expired token"}, status=401)
+            return JsonResponse(
+                {"error": "Invalid or expired token"}, status=401)
         except Exception as e:
             logger.error(f"Unexpected error during token validation: {str(e)}")
             return JsonResponse(
