@@ -27,7 +27,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from authentication.models import CustomUser, UserProfile
-from authentication.v1.serializers import RegisterSerializer, UserProfileSerializer
+from authentication.v1.serializers import (RegisterSerializer,
+                                           UserProfileSerializer)
 
 
 class UserProfileView(APIView):
