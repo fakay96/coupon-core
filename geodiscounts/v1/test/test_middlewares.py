@@ -10,7 +10,8 @@ verify that the middleware correctly handles different IP extraction scenarios.
 
 from django.test import RequestFactory, TestCase
 
-from coupon_core.custom_middlewares.userlocation_middleware import ClientIPMiddleware
+from coupon_core.custom_middlewares.userlocation_middleware import \
+    ClientIPMiddleware
 
 
 class ClientIPMiddlewareTest(TestCase):

@@ -12,11 +12,9 @@ from unittest.mock import patch
 
 from django.test import TestCase
 
-from geodiscounts.v1.utils.ip_geolocation import (
-    calculate_distance,
-    get_location_from_ip,
-    validate_max_distance,
-)
+from geodiscounts.v1.utils.ip_geolocation import (calculate_distance,
+                                                  get_location_from_ip,
+                                                  validate_max_distance)
 
 
 class UtilsTest(TestCase):
