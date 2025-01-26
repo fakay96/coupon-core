@@ -26,6 +26,7 @@ urlpatterns = [
     path(
         "api/v1/token/refresh/",
         TokenRefreshView.as_view(),
-        name="token-refresh"),
+        name="token-refresh",
+    ),
     path("api/v1/user-info/", UserInfoView.as_view(), name="user-info"),
 ]

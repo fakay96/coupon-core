@@ -44,8 +44,7 @@ class GuestTokenTestCase(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["guest_token"], "guest_token")
-        mock_set_token.assert_called_once_with(
-            "guest@example.com", "guest_token", ANY)
+        mock_set_token.assert_called_once_with("guest@example.com", "guest_token", ANY)
 
     @patch("authentication.v1.utils.redis_client.RedisClient.get_token")
     def test_guest_token_existing(self, mock_get_token):

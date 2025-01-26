@@ -27,6 +27,7 @@ beautifulsoup4 = "^4.12.3"
 tenacity = "^9.0.0"
 pyrate-limiter = "^3.7.0"
 pytest = "^8.3.4"
+geopy = "^2.4.1"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
@@ -35,3 +36,17 @@ build-backend = "poetry.core.masonry.api"
 [tool.flake8]
 max-line-length = 88
 exclude = [".venv", "venv", "migrations"]
+
+
+[tool.black]
+exclude = '''
+/(
+    \.venv
+    |venv
+    |migrations
+    |docker
+    |Scripts
+    |poetry\.lock
+)
+'''
+line-length = 88

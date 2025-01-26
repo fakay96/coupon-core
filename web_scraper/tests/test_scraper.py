@@ -1,6 +1,7 @@
 from unittest.mock import Mock, patch
 
 import pytest
+import requests
 from scraper.utils import is_valid_url, retry_request
 
 
@@ -14,9 +15,7 @@ def test_is_valid_url() -> None:
     """
     # Valid URLs
     assert is_valid_url("https://example.com") is True
-    assert is_valid_url(
-        "http://subdomain.example.com/path?query=1"
-    ) is True
+    assert is_valid_url("http://subdomain.example.com/path?query=1") is True
 
     # Invalid URLs
     assert is_valid_url("ftp://example.com") is False
@@ -48,9 +47,7 @@ def test_retry_request_failure() -> None:
     retries fail due to network errors or server unavailability.
     """
     with patch("requests.get", side_effect=requests.RequestException("Failed")):
-        with pytest.raises(
-            requests.RequestException, match="Failed"
-        ):
+        with pytest.raises(requests.RequestException, match="Failed"):
             retry_request("https://example.com")
 
 
@@ -116,9 +113,7 @@ def test_scraper_download_image_failure() -> None:
 
     with patch("requests.get", side_effect=requests.RequestException("Failed")):
         scraper = WebScraper(base_urls=[], output_dir="images")
-        with pytest.raises(
-            requests.RequestException, match="Failed"
-        ):
+        with pytest.raises(requests.RequestException, match="Failed"):
             scraper.download_image("https://example.com/image.jpg")
 
 

@@ -40,7 +40,8 @@ class TokenManager:
             access_token = str(refresh.access_token)
             logger.info(
                 f"Access token created for guest user: {
-                    guest_user.username}")
+                    guest_user.username}"
+            )
             return access_token
         except TokenError as e:
             logger.error(
@@ -76,12 +77,12 @@ class TokenManager:
             }
             logger.info(
                 f"Tokens successfully created for admin user: {
-                    user.username}")
+                    user.username}"
+            )
             return tokens
         except TokenError as e:
             logger.error(
                 f"Failed to create tokens for admin user {
                     user.username}: {str(e)}"
             )
-            raise ValueError(
-                "Unable to generate tokens for the admin user.") from e
+            raise ValueError("Unable to generate tokens for the admin user.") from e
