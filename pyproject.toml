@@ -28,6 +28,13 @@ tenacity = "^9.0.0"
 pyrate-limiter = "^3.7.0"
 pytest = "^8.3.4"
 geopy = "^2.4.1"
+pinecone-client = "^5.0.1"
+transformers = "^4.48.1"
+
+[[tool.poetry.source]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cpu"
+priority = "explicit"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

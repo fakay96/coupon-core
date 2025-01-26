@@ -137,3 +137,11 @@ AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL")
 AUTH_USER_MODEL = "authentication.CustomUser"
 
 PUBLIC_ENDPOINTS = ["/authentication/api/v1/guest-token/"]
+
+
+VECTOR_DB = {
+    "NAME": os.getenv("PICONE_DBNAME"),
+    "DIMENSION": 512,
+    "API_KEY": os.getenv("PINECONE_API_KEY", "your-pinecone-api-key"),
+    "ENVIRONMENT": os.getenv("PINECONE_ENV", "us-west1-gcp"),
+}
