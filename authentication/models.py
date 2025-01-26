@@ -5,6 +5,7 @@ This module defines a custom user model and a role model to support RBAC in the 
 """
 
 from django.contrib.auth.models import AbstractUser, Group, Permission
+from django.contrib.gis.db.models import PointField
 from django.core.validators import EmailValidator, MinLengthValidator
 from django.db import models
 
@@ -88,3 +89,53 @@ class Role(models.Model):
             str: The name of the role.
         """
         return self.name
+
+
+class UserProfile(models.Model):
+    """
+    UserProfile model for managing extended user information.
+
+    This model is linked to the CustomUser model via a One-to-One relationship and includes
+    additional fields such as user preferences and geographic location.
+    """
+
+    user = models.OneToOneField(
+        CustomUser,
+        on_delete=models.CASCADE,
+        related_name="profile",
+        help_text="The user associated with this profile.",
+    )
+    preferences = models.JSONField(
+        blank=True,
+        null=True,
+        help_text="User preferences stored as a JSON object (e.g., categories of interest).",
+    )
+    location = PointField(
+        blank=True,
+        null=True,
+        help_text="Geographic location of the user (latitude and longitude).",
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True, help_text="Timestamp when the profile was created."
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True, help_text="Timestamp when the profile was last updated."
+    )
+
+    def __str__(self) -> str:
+        """
+        Return a string representation of the UserProfile instance.
+
+        Returns:
+            str: The username of the associated user.
+        """
+        return f"Profile of {self.user.username}"
+
+    class Meta:
+        """
+        Meta options for the UserProfile model.
+        """
+
+        verbose_name = "User Profile"
+        verbose_name_plural = "User Profiles"
+        ordering = ["-created_at"]
