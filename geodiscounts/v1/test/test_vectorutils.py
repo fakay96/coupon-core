@@ -1,8 +1,11 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from geodiscounts.v1.utils.vector_utils import (delete_vector, insert_vector,
-                                                search_vectors)
+from geodiscounts.v1.utils.vector_utils import (
+    delete_vector,
+    insert_vector,
+    search_vectors,
+)
 
 
 class TestVectorUtils(unittest.TestCase):

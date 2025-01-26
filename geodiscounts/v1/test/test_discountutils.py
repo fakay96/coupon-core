@@ -3,9 +3,11 @@ from typing import Dict
 from unittest.mock import MagicMock, patch
 
 from geodiscounts.models import Discount
-from geodiscounts.v1.utils.discount_utils import (create_discount,
-                                                  delete_discount,
-                                                  get_discount_by_vector_id)
+from geodiscounts.v1.utils.discount_utils import (
+    create_discount,
+    delete_discount,
+    get_discount_by_vector_id,
+)
 
 
 class TestDiscountUtils(unittest.TestCase):
