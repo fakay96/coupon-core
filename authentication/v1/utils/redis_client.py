@@ -29,7 +29,10 @@ class RedisClient:
                 decode_responses=True,
             )
         except redis.ConnectionError as e:
-            raise ConnectionError(f"Failed to connect to Redis: {str(e)}") from e
+            raise ConnectionError(
+                f"Failed to connect to Redis: {
+                    str(e)}"
+            ) from e
 
     def set_token(self, key: str, value: Any, expiry: int) -> None:
         """
@@ -46,7 +49,10 @@ class RedisClient:
         try:
             self.client.setex(key, expiry, value)
         except redis.RedisError as e:
-            raise RuntimeError(f"Failed to set token for key '{key}': {str(e)}") from e
+            raise RuntimeError(
+                f"Failed to set token for key '{key}': {
+                    str(e)}"
+            ) from e
 
     def get_token(self, key: str) -> Optional[str]:
         """
@@ -64,4 +70,7 @@ class RedisClient:
         try:
             return self.client.get(key)
         except redis.RedisError as e:
-            raise RuntimeError(f"Failed to get token for key '{key}': {str(e)}") from e
+            raise RuntimeError(
+                f"Failed to get token for key '{key}': {
+                    str(e)}"
+            ) from e

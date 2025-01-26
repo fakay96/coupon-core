@@ -55,7 +55,10 @@ class AdminViewsTestCase(APITestCase):
             "refresh": "refresh_token",
         }
 
-        data = {"username": self.admin_user.username, "password": "password123"}
+        data = {
+            "username": self.admin_user.username,
+            "password": "password123",
+        }
         response = self.client.post(self.login_url, data)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)

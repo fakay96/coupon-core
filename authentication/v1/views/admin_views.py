@@ -74,12 +74,14 @@ class RegisterView(APIView):
                     for field, messages in serializer.errors.items()
                 }
                 return Response(
-                    {"errors": compressed_errors}, status=status.HTTP_400_BAD_REQUEST
+                    {"errors": compressed_errors},
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
 
             serializer.save()
             return Response(
-                {"message": "User created successfully"}, status=status.HTTP_201_CREATED
+                {"message": "User created successfully"},
+                status=status.HTTP_201_CREATED,
             )
 
         except IntegrityError as e:
@@ -122,7 +124,8 @@ class UserInfoView(APIView):
             # Validate that the user is not a guest
             if getattr(user, "is_guest", False):
                 logger.warning(
-                    f"Guest token access attempt by user: {user.id if user.id else 'unknown'}"
+                    f"Guest token access attempt by user: {
+                        user.id if user.id else 'unknown'}"
                 )
                 return Response(
                     {

@@ -31,7 +31,7 @@ urlpatterns = [
 # Mapping of applications to their URL configurations
 app_urls = {
     "authentication": "authentication.v1.urls",
-   
+    "geodiscounts": "geodiscounts.v1.urls",
 }
 
 # Include all app URLs

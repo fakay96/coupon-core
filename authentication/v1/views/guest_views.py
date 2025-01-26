@@ -12,12 +12,10 @@ from typing import Any, Optional
 
 from django.db import IntegrityError
 from rest_framework import status
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.exceptions import ValidationError
-
-
 
 from authentication.models import CustomUser
 from authentication.v1.serializers import GuestTokenSerializer
@@ -111,7 +109,8 @@ class GuestTokenView(APIView):
 
         except Exception as e:
             logger.error(
-                f"Unexpected error during guest token creation: {e}", exc_info=True
+                f"Unexpected error during guest token creation: {e}",
+                exc_info=True,
             )
             return Response(
                 {"error": "An unexpected error occurred. Please try again later."},

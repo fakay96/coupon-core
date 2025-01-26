@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     "rest_framework.authtoken",
     "authentication",
     "corsheaders",
+    "geodiscounts"
 ]
 
 MIDDLEWARE = [
@@ -75,6 +76,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "coupon_core.custom_middlewares.userlocation_middleware.ClientIPMiddleware",
 ]
 
 ROOT_URLCONF = "coupon_core.urls"
@@ -135,5 +137,3 @@ AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL")
 AUTH_USER_MODEL = "authentication.CustomUser"
 
 PUBLIC_ENDPOINTS = ["/authentication/api/v1/guest-token/"]
-
-

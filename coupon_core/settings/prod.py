@@ -10,6 +10,7 @@ See: https://docs.djangoproject.com/en/stable/howto/deployment/checklist/
 
 import os
 from datetime import timedelta
+
 from .base import *
 
 DEBUG = TRUE
@@ -25,7 +26,8 @@ AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME", "election-system-
 
 STATIC_URL = f"{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/static/"
 STATICFILES_STORAGE = "storages.backends.s3boto3.S3StaticStorage"
-STATIC_ROOT = f"{AWS_S3_ENDPOINT_URL_INTERNAL}/{AWS_STORAGE_BUCKET_NAME}/static/"
+STATIC_ROOT = f"{
+    AWS_S3_ENDPOINT_URL_INTERNAL}/{AWS_STORAGE_BUCKET_NAME}/static/"
 
 MEDIA_URL = f"{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/media/"
 DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
@@ -47,7 +49,6 @@ DATABASES = {
         "HOST": os.getenv("DB_HOST", "localhost"),
         "PORT": os.getenv("DB_PORT", "5432"),
     },
-
 }
 
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")

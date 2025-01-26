@@ -16,8 +16,6 @@ from datetime import timedelta
 
 from dotenv import load_dotenv
 
-from .base import *
-
 load_dotenv()
 
 # Debug
@@ -41,7 +39,8 @@ AWS_S3_CUSTOM_DOMAIN = f"{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}"
 # Static files storage (S3 via LocalStack)
 STATIC_URL = f"{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/static/"
 STATICFILES_STORAGE = "storages.backends.s3boto3.S3StaticStorage"
-STATIC_ROOT = f"{AWS_S3_ENDPOINT_URL_INTERNAL}/{AWS_STORAGE_BUCKET_NAME}/static/"
+STATIC_ROOT = f"{
+    AWS_S3_ENDPOINT_URL_INTERNAL}/{AWS_STORAGE_BUCKET_NAME}/static/"
 
 # Media files storage (S3 via LocalStack)
 MEDIA_URL = f"{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/media/"
@@ -64,7 +63,7 @@ DATABASES = {
         "PASSWORD": os.getenv("DB_PASSWORD", "password"),
         "HOST": os.getenv("DB_HOST", "localhost"),
         "PORT": os.getenv("DB_PORT", "5432"),
-    }
+    },
 }
 
 # Credentials for Redis service
@@ -131,4 +130,3 @@ DATABASE_ROUTERS = [
 # ]
 
 CORS_ALLOW_ALL_ORIGINS = True
-
