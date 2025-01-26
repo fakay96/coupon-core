@@ -74,12 +74,14 @@ class RegisterView(APIView):
                     for field, messages in serializer.errors.items()
                 }
                 return Response(
-                    {"errors": compressed_errors}, status=status.HTTP_400_BAD_REQUEST
+                    {"errors": compressed_errors},
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
 
             serializer.save()
             return Response(
-                {"message": "User created successfully"}, status=status.HTTP_201_CREATED
+                {"message": "User created successfully"},
+                status=status.HTTP_201_CREATED,
             )
 
         except IntegrityError as e:
@@ -138,8 +140,7 @@ class UserInfoView(APIView):
                 "username": user.username,
                 "email": user.email,
                 "role": (
-                    user.role.name if hasattr(
-                        user, "role") and user.role else "Guest"
+                    user.role.name if hasattr(user, "role") and user.role else "Guest"
                 ),
                 "is_staff": user.is_staff,
                 "is_active": user.is_active,

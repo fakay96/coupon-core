@@ -15,8 +15,6 @@ https://docs.djangoproject.com/en/5.1/topics/settings/
 import os
 from datetime import timedelta
 
-from .base import *
-
 # Debug
 DEBUG = False
 
@@ -31,9 +29,7 @@ AWS_S3_ENDPOINT_URL = os.getenv("LOCALSTACK_S3_ENDPOINT_EXTERNAL")
 AWS_S3_ENDPOINT_URL_INTERNAL = os.getenv("LOCALSTACK_S3_ENDPOINT")
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", "test")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "test")
-AWS_STORAGE_BUCKET_NAME = os.getenv(
-    "AWS_STORAGE_BUCKET_NAME",
-    "election-system-dev")
+AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME", "election-system-dev")
 AWS_S3_CUSTOM_DOMAIN = f"{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}"
 
 # Static files storage (S3 via LocalStack)
