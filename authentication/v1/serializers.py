@@ -1,42 +1,57 @@
 """
-Serializers for authentication-related operations.
+Serializers for authentication and user-related operations.
 
-This module includes serializers for user login, registration, and guest token generation.
+This module provides serializers for:
+1. User login validation.
+2. Admin registration.
+3. Guest token generation.
+4. User profile management.
+
+Author: Your Name
+Date: YYYY-MM-DD
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from django.contrib.auth import authenticate
 from django.contrib.auth.hashers import make_password
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
-from authentication.models import CustomUser
+from authentication.models import CustomUser, UserProfile
 
 
 class LoginSerializer(serializers.Serializer):
-    """Serializer for admin login."""
+    """
+    Serializer for user login validation.
 
-    username: str = serializers.CharField(max_length=150, required=True)
-    password: str = serializers.CharField(write_only=True, required=True)
+    Validates username and password, ensuring the user is not a guest.
+    """
+
+    username: serializers.CharField = serializers.CharField(
+        max_length=150, required=True
+    )
+    password: serializers.CharField = serializers.CharField(
+        write_only=True, required=True
+    )
 
     def validate(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Validate the username and password combination.
+        Validate the provided username and password.
 
         Args:
-            data (Dict[str, Any]): The input data containing 'username' and 'password'.
+            data (Dict[str, Any]): Input containing 'username' and 'password'.
 
         Returns:
-            Dict[str, Any]: The validated data with the user instance.
+            Dict[str, Any]: The validated data with the authenticated user instance.
 
         Raises:
-            serializers.ValidationError: If credentials are invalid or user is a guest.
+            serializers.ValidationError: If the credentials are invalid or the user is a guest.
         """
         username: str = data.get("username")
         password: str = data.get("password")
 
-        user = authenticate(username=username, password=password)
+        user: Optional[CustomUser] = authenticate(username=username, password=password)
 
         if user is None:
             raise serializers.ValidationError(_("Invalid username or password."))
@@ -51,23 +66,23 @@ class LoginSerializer(serializers.Serializer):
 
 
 class RegisterSerializer(serializers.ModelSerializer):
-    """Serializer for admin registration."""
+    """
+    Serializer for user registration.
+
+    Handles validation of email and username, and creation of new users.
+    """
 
     class Meta:
-        """Meta options for the RegisterSerializer."""
-
-        model = CustomUser
-        fields = ["username", "password", "email"]
-        extra_kwargs = {
-            "password": {"write_only": True},
-        }
+        model: type = CustomUser
+        fields: list[str] = ["username", "password", "email"]
+        extra_kwargs: Dict[str, Dict[str, Any]] = {"password": {"write_only": True}}
 
     def validate_email(self, value: str) -> str:
         """
-        Ensure the email address is not already in use.
+        Ensure the email address is unique.
 
         Args:
-            value (str): The email to validate.
+            value (str): Email to validate.
 
         Returns:
             str: The validated email.
@@ -81,10 +96,10 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def validate_username(self, value: str) -> str:
         """
-        Ensure the username is not already in use.
+        Ensure the username is unique.
 
         Args:
-            value (str): The username to validate.
+            value (str): Username to validate.
 
         Returns:
             str: The validated username.
@@ -96,49 +111,51 @@ class RegisterSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(_("Username is already taken."))
         return value
 
-    def create(self, validated_data: dict) -> CustomUser:
+    def create(self, validated_data: Dict[str, Any]) -> CustomUser:
         """
-        Create a new admin user with a hashed password.
+        Create a new user with hashed password.
 
         Args:
-            validated_data (dict): The validated data containing username, password, and email.
+            validated_data (Dict[str, Any]): Validated user data.
 
         Returns:
-            CustomUser: The newly created user instance.
+            CustomUser: Newly created user instance.
         """
         validated_data["password"] = make_password(validated_data["password"])
         return super().create(validated_data)
 
 
 class GuestTokenSerializer(serializers.Serializer):
-    """Serializer for generating guest tokens."""
+    """
+    Serializer for generating and managing guest tokens.
 
-    email: str = serializers.EmailField(required=True)
+    Ensures the email is valid and retrieves or creates a guest user.
+    """
+
+    email: serializers.EmailField = serializers.EmailField(required=True)
 
     def validate_email(self, value: str) -> str:
         """
-        Ensure the email address is valid or create a new guest user if it doesn't exist.
+        Validate or create a guest user associated with the provided email.
 
         Args:
-            value (str): The email to validate.
+            value (str): Email to validate.
 
         Returns:
-            str: The validated email after ensuring a guest user exists.
+            str: Validated email after ensuring a guest user exists.
 
         Side Effects:
-            - Creates a new guest user if one does not already exist.
+            - Creates a guest user if one doesn't exist.
         """
         user, created = CustomUser.objects.get_or_create(
             email=value,
             defaults={
-                "username": value.split("@")[
-                    0
-                ],  # Use the email's prefix as the username
-                "is_guest": True,  # Mark this user as a guest
+                "username": value.split("@")[0],  # Use email prefix as username
+                "is_guest": True,  # Mark user as a guest
             },
         )
         if created:
-            user.set_unusable_password()  # Disable login for guest accounts
+            user.set_unusable_password()  # Prevent guest users from logging in
             user.save()
         return value
 
@@ -147,13 +164,13 @@ class GuestTokenSerializer(serializers.Serializer):
         Retrieve a guest user based on their email.
 
         Args:
-            email (str): The email of the guest user to retrieve.
+            email (str): Email of the guest user to retrieve.
 
         Returns:
-            CustomUser: The `CustomUser` instance if found.
+            CustomUser: Guest user instance.
 
         Raises:
-            serializers.ValidationError: If the email does not belong to any user.
+            serializers.ValidationError: If no user exists with the provided email.
         """
         try:
             return CustomUser.objects.get(email=email)
@@ -161,3 +178,38 @@ class GuestTokenSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 _("No user found with the provided email.")
             )
+
+
+class UserSerializer(serializers.ModelSerializer):
+    """
+    Serializer for the Django CustomUser model.
+
+    Provides basic user details such as username and email.
+    """
+
+    class Meta:
+        model: type = CustomUser
+        fields: list[str] = ["id", "username", "email", "first_name", "last_name"]
+        read_only_fields: list[str] = ["id"]
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    """
+    Serializer for managing user profiles.
+
+    Includes fields for user preferences and location.
+    """
+
+    user: UserSerializer = UserSerializer(read_only=True)
+
+    class Meta:
+        model: type = UserProfile
+        fields: list[str] = [
+            "id",
+            "user",
+            "preferences",
+            "location",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields: list[str] = ["id", "created_at", "updated_at"]

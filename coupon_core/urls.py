@@ -1,18 +1,21 @@
 """
-URL configuration for coupon_core project.
+URL configuration for the coupon_core project.
 
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/5.1/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
+The `urlpatterns` list routes URLs to views. This file manages the inclusion of URLs
+from various apps and organizes them under a unified structure with the `api/` prefix.
+
+Features:
+- All app-specific URLs are included under the `api/` prefix for consistency.
+- Static and media file handling is configured for development environments.
+- Environment-specific configurations are dynamically loaded.
+
+For more information, see:
+- https://docs.djangoproject.com/en/5.1/topics/http/urls/
+
+Routes:
+- `/admin/`: Admin site for managing the project.
+- `/api/authentication/`: Routes for authentication-related operations.
+- `/api/geodiscounts/`: Routes for geodiscounts-related operations.
 """
 
 from django.conf import settings
@@ -21,11 +24,12 @@ from django.contrib import admin
 from django.urls import include, path
 from dotenv import load_dotenv
 
+# Load environment variables
 load_dotenv()
 
 # Base URL patterns
 urlpatterns = [
-    path("admin/", admin.site.urls),
+    path("admin/", admin.site.urls),  # Admin panel
 ]
 
 # Mapping of applications to their URL configurations
@@ -34,13 +38,17 @@ app_urls = {
     "geodiscounts": "geodiscounts.v1.urls",
 }
 
-# Include all app URLs
+# Dynamically include all app-specific URLs under the `api/` prefix
 for app_name, app_url in app_urls.items():
     urlpatterns += [
-        path(f"{app_name}/", include(app_url)),
+        path(f"api/{app_name}/", include(app_url)),  # Add `api/` prefix
     ]
 
-# Add static and media URL patterns for development
+# Static and media file handling for development
 if settings.DEBUG:
-    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += static(
+        settings.STATIC_URL, document_root=settings.STATIC_ROOT
+    )  # Serve static files
+    urlpatterns += static(
+        settings.MEDIA_URL, document_root=settings.MEDIA_ROOT
+    )  # Serve media files
