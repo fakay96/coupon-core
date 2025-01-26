@@ -78,9 +78,7 @@ class WebScraper:
         """
         soup = BeautifulSoup(html, "html.parser")
         img_tags = soup.find_all("img")
-        img_urls = [
-            urljoin(base_url, img.get("src", "")) for img in img_tags
-        ]
+        img_urls = [urljoin(base_url, img.get("src", "")) for img in img_tags]
         return [url for url in img_urls if is_valid_url(url)]
 
     def download_image(self, image_url: str) -> None:
@@ -95,9 +93,7 @@ class WebScraper:
         """
         try:
             response = retry_request(image_url)
-            file_name = os.path.join(
-                self.output_dir, os.path.basename(image_url)
-            )
+            file_name = os.path.join(self.output_dir, os.path.basename(image_url))
             with open(file_name, "wb") as file:
                 file.write(response)
             logging.info(f"Downloaded: {file_name}")
