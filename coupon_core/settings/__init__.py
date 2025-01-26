@@ -8,9 +8,9 @@ ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
 
 # Import environment-specific settings
 if ENVIRONMENT == "production":
-    from .prod import *
+    pass
 elif ENVIRONMENT == "staging":
-    from .staging import *
+    pass
 
 else:
-    from .dev import *
+    pass

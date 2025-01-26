@@ -80,8 +80,7 @@ class IsAuthenticatedOrGuest(BasePermission):
             validated_token: Any = auth.get_validated_token(token)
 
             # Allow if the user is authenticated or has guest access
-            if validated_token.get(
-                    "is_guest", False) or request.user.is_authenticated:
+            if validated_token.get("is_guest", False) or request.user.is_authenticated:
                 return True
 
         except (InvalidToken, TokenError, IndexError):
