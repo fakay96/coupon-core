@@ -3,15 +3,20 @@ from django.contrib.gis.db.models.functions import Distance
 from django.contrib.gis.geos import Point
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
-from rest_framework.status import (HTTP_200_OK, HTTP_400_BAD_REQUEST,
-                                   HTTP_404_NOT_FOUND,
-                                   HTTP_500_INTERNAL_SERVER_ERROR)
+from rest_framework.status import (
+    HTTP_200_OK,
+    HTTP_400_BAD_REQUEST,
+    HTTP_404_NOT_FOUND,
+    HTTP_500_INTERNAL_SERVER_ERROR,
+)
 from rest_framework.views import APIView
 
 from geodiscounts.models import Discount
 from geodiscounts.v1.serializers import DiscountSerializer
-from geodiscounts.v1.utils.ip_geolocation import (get_location_from_ip,
-                                                  validate_max_distance)
+from geodiscounts.v1.utils.ip_geolocation import (
+    get_location_from_ip,
+    validate_max_distance,
+)
 
 
 class DiscountListView(APIView):
