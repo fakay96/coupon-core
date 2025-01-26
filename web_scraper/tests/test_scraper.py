@@ -2,7 +2,8 @@ from unittest.mock import Mock, patch
 
 import pytest
 import requests
-from scraper.utils import is_valid_url, retry_request
+
+from web_scraper.scraper.utils import is_valid_url, retry_request
 
 
 def test_is_valid_url() -> None:
@@ -58,7 +59,7 @@ def test_scraper_parse_images() -> None:
     This ensures that parse_images extracts valid image URLs, handles
     relative and absolute paths, and filters out invalid paths.
     """
-    from scraper.core import WebScraper
+    from web_scraper.scraper.core import WebScraper
 
     sample_html = """
     <html>
@@ -86,7 +87,7 @@ def test_scraper_download_image_success(tmp_path) -> None:
     This ensures that download_image correctly saves the content of an
     image URL to the specified output directory.
     """
-    from scraper.core import WebScraper
+    from web_scraper.scraper.core import WebScraper
 
     mock_response = Mock()
     mock_response.iter_content = lambda chunk_size: [b"content"]
@@ -109,7 +110,7 @@ def test_scraper_download_image_failure() -> None:
     This ensures that download_image logs an error when the HTTP request
     for the image fails.
     """
-    from scraper.core import WebScraper
+    from web_scraper.scraper.core import WebScraper
 
     with patch("requests.get", side_effect=requests.RequestException("Failed")):
         scraper = WebScraper(base_urls=[], output_dir="images")
@@ -124,7 +125,7 @@ def test_scraper_scrape_all() -> None:
     This ensures that scrape_all invokes scrape_url for each URL in the
     provided list of base URLs.
     """
-    from scraper.core import WebScraper
+    from web_scraper.scraper.core import WebScraper
 
     scraper = WebScraper(
         base_urls=["https://example1.com", "https://example2.com"],
