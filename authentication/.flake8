@@ -1,4 +1,0 @@
-[flake8]
-extend-ignore = E203,D200,D104,D401,F401
-max-line-length = 99
-exclude = venv,env,.tox,*/migrations/*,*/frontend/*,build/*,.venv,.pre-commit-config.yaml
