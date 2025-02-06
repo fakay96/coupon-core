@@ -14,9 +14,14 @@ https://docs.djangoproject.com/en/5.1/topics/settings/
 import os
 from datetime import timedelta
 
+from pathlib import Path
+
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Debug
 DEBUG = True
@@ -37,14 +42,9 @@ AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME", "election-system-
 AWS_S3_CUSTOM_DOMAIN = f"{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}"
 
 # Static files storage (S3 via LocalStack)
-STATIC_URL = f"{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/static/"
-STATICFILES_STORAGE = "storages.backends.s3boto3.S3StaticStorage"
-STATIC_ROOT = f"{
-    AWS_S3_ENDPOINT_URL_INTERNAL}/{AWS_STORAGE_BUCKET_NAME}/static/"
-
-# Media files storage (S3 via LocalStack)
-MEDIA_URL = f"{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/media/"
-DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+STATIC_URL = "/static/"
+STATICFILES_DIRS = [BASE_DIR / "static"]  # Optional: additional static directories
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # PostgreSQL Database
 DATABASES = {
@@ -57,7 +57,7 @@ DATABASES = {
         "PORT": os.getenv("DB_PORT", "5432"),
     },
     "authentication_shard": {
-        "ENGINE": "django.db.backends.postgresql",
+        "ENGINE": "django.contrib.gis.db.backends.postgis",
         "NAME": "authentication_shard",
         "USER": os.getenv("DB_USER", "user"),
         "PASSWORD": os.getenv("DB_PASSWORD", "password"),
@@ -65,12 +65,12 @@ DATABASES = {
         "PORT": os.getenv("DB_PORT", "5432"),
     },
     "geodiscounts_db": {
-        "ENGINE": "django.db.backends.postgresql",
+        'ENGINE': 'django.contrib.gis.db.backends.postgis',
         "NAME": os.getenv("GEODISCOUNTS_DB_NAME", "geodiscounts_db"),
-        "USER": os.getenv("GEODISCOUNTS_DB_USER", "user"),
-        "PASSWORD": os.getenv("GEODISCOUNTS_DB_PASSWORD", "password"),
-        "HOST": os.getenv("GEODISCOUNTS_DB_HOST", "localhost"),
-        "PORT": os.getenv("GEODISCOUNTS_DB_PORT", "5432"),
+        "USER": os.getenv("DB_USER", "user"),
+        "PASSWORD": os.getenv("DB_PASSWORD", "password"),
+        "HOST": os.getenv("DB_HOST", "localhost"),
+        "PORT": os.getenv("DB_PORT", "5432"),
     },
 }
 
@@ -125,9 +125,7 @@ SIMPLE_JWT = {
 }
 
 # Database Routers
-DATABASE_ROUTERS = [
-    "authentication.routers.AuthenticationRouter",
-]
+
 
 # CORS Configuration
 # CORS_ALLOWED_ORIGINS = [

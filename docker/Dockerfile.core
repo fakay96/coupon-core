@@ -1,41 +1,49 @@
-
-
+# Use the official slim Python image
 FROM python:3.12-slim AS base
 
-# Environment variables for Python
+# Set environment variables for Python and GDAL
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PATH="/root/.local/bin:$PATH"
+    PATH="/root/.local/bin:$PATH" \
+    GDAL_LIBRARY_PATH=/usr/lib/libgdal.so
 
 # Set the working directory
 WORKDIR /app
 
-# Install system dependencies, including PostgreSQL client (psql)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq-dev \
-    gcc \
-    netcat-openbsd \
-    curl \
-    awscli \
-    postgresql-client && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+# Install system dependencies (GDAL, PostgreSQL client, build tools, etc.)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        gdal-bin \
+        libgdal-dev \
+        libpq-dev \
+        gcc \
+        netcat-openbsd \
+        curl \
+        awscli \
+        postgresql-client && \
+    rm -rf /var/lib/apt/lists/*
 
-# Install Poetry globally
+# Install Poetry globally and configure it to install packages into the container environment
 RUN curl -sSL https://install.python-poetry.org | python3 - && \
     poetry config virtualenvs.create false
 
-# Copy only `pyproject.toml` for dependency resolution
-COPY pyproject.toml ./
+# Copy dependency files first (to leverage Docker cache)
+COPY pyproject.toml poetry.lock README.md ./
 
-# Install project dependencies (cached for efficiency)
-RUN poetry install --only main --no-dev --no-interaction --no-ansi
+# Install Python dependencies (without development packages)
+RUN poetry install --no-root --no-interaction --no-ansi && \
+    pip install torch torchvision torchaudio
 
-# Copy application source files
-COPY election_system/ /app/election_system/
-COPY authentication /app/authentication/
+# Copy application source code
+COPY coupon_core/ coupon_core/
+COPY authentication/ authentication/
+COPY geodiscounts/ geodiscounts/
+COPY manage.py .
 
-COPY manage.py /app/manage.py
-
-# Copy the initialization script
+# Copy the initialization script and ensure it is executable
 COPY Scripts/init_db.sh /app/init_db.sh
 RUN chmod +x /app/init_db.sh
+
+# Expose the port your app runs on
+EXPOSE 8000
+

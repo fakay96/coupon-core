@@ -1,80 +1,92 @@
 """
-Utility module for managing vector operations in the Pinecone vector database.
+Utility module for managing vector operations in the Milvus vector database.
 
 This module provides functions to insert, search, and delete vectors in the
-Pinecone vector database. It uses a centralized `PineconeClient` to manage the
+Milvus vector database. It uses a centralized `MilvusClient` to manage the
 connection and interaction with the vector database.
 
 Functions:
-    - insert_vector: Inserts a vector into the Pinecone index.
-    - search_vectors: Searches for similar vectors in the Pinecone index.
-    - delete_vector: Deletes a vector from the Pinecone index.
+    - insert_vector: Inserts a vector into the Milvus collection.
+    - search_vectors: Searches for similar vectors in the Milvus collection.
+    - delete_vector: Deletes a vector from the Milvus collection.
 
 Dependencies:
-    - PineconeClient: A client class that initializes and manages the Pinecone connection.
-    - Pinecone Index: The index used for vector storage and retrieval.
+    - MilvusClient: A client class that initializes and manages the Milvus connection.
+    - Milvus Collection: The collection used for vector storage and retrieval.
 
-Author: Your Name
-Date: YYYY-MM-DD
+
 """
 
-from coupon_core.utils.vectordb_client import PineconeClient
+from pymilvus import Collection
+from coupon_core.utils.vectordb_client import MilvusClient
 
-# Initialize the Pinecone client
-pinecone_client = PineconeClient()
+# Initialize the Milvus client
+milvus_client = MilvusClient()
 
-
-def insert_vector(vector_id: str, values: list[float]) -> None:
+def insert_vector(vector_id: int, values: list[float]) -> None:
     """
-    Insert a vector into the Pinecone vector database.
+    Insert a vector into the Milvus collection.
 
     Args:
-        vector_id (str): The unique identifier for the vector.
+        vector_id (int): The unique identifier for the vector.
         values (list[float]): The vector's embedding values.
 
     Raises:
-        ValueError: If there is an issue with the insertion into Pinecone.
+        ValueError: If there is an issue with the insertion into Milvus.
     """
     try:
-        index = pinecone_client.get_index()
-        index.upsert([{"id": vector_id, "values": values}])
+        collection = milvus_client.get_or_create_collection()
+        # Insert vector data
+        collection.insert([{"id": vector_id, "vector": values}])
+        collection.load()
+        print(f"Vector with ID {vector_id} inserted successfully.")
     except Exception as e:
         raise ValueError(f"Failed to insert vector with ID '{vector_id}': {str(e)}")
 
 
-def search_vectors(query_vector: list[float], top_k: int = 10) -> dict:
+def search_vectors(query_vector: list[float], top_k: int = 10) -> list:
     """
-    Search for similar vectors in the Pinecone vector database.
+    Search for similar vectors in the Milvus collection.
 
     Args:
         query_vector (list[float]): The query vector for similarity search.
         top_k (int): The number of top results to return. Defaults to 10.
 
     Returns:
-        dict: The search results containing the matches, with IDs and scores.
+        list: The search results containing the matches, with IDs and scores.
 
     Raises:
-        ValueError: If there is an issue with the search operation in Pinecone.
+        ValueError: If there is an issue with the search operation in Milvus.
     """
     try:
-        index = pinecone_client.get_index()
-        return index.query(query_vector, top_k=top_k)["matches"]
+        collection = milvus_client.get_or_create_collection()
+        # Perform the search
+        results = collection.search(
+            data=[query_vector],
+            anns_field="vector",
+            param={"metric_type": "L2", "params": {"nprobe": 10}},
+            limit=top_k,
+            output_fields=["id"]
+        )
+        return [{"id": result.id, "score": result.score} for result in results[0]]
     except Exception as e:
         raise ValueError(f"Failed to search vectors: {str(e)}")
 
 
-def delete_vector(vector_id: str) -> None:
+def delete_vector(vector_id: int) -> None:
     """
-    Delete a vector from the Pinecone vector database.
+    Delete a vector from the Milvus collection.
 
     Args:
-        vector_id (str): The unique identifier of the vector to delete.
+        vector_id (int): The unique identifier of the vector to delete.
 
     Raises:
-        ValueError: If there is an issue with the deletion operation in Pinecone.
+        ValueError: If there is an issue with the deletion operation in Milvus.
     """
     try:
-        index = pinecone_client.get_index()
-        index.delete([vector_id])
+        collection = milvus_client.get_or_create_collection()
+        # Delete vector by ID
+        collection.delete(f"id == {vector_id}")
+        print(f"Vector with ID {vector_id} deleted successfully.")
     except Exception as e:
         raise ValueError(f"Failed to delete vector with ID '{vector_id}': {str(e)}")

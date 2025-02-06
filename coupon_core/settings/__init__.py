@@ -5,12 +5,12 @@ from dotenv import load_dotenv
 load_dotenv()
 # Determine environment
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
-
 # Import environment-specific settings
+from .base import *
 if ENVIRONMENT == "production":
-    pass
+    from .prod import *
 elif ENVIRONMENT == "staging":
-    pass
-
+    from .staging import *
+    
 else:
-    pass
+   from .dev import *

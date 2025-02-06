@@ -1,68 +1,73 @@
 """
-Vector database client for Pinecone.
+Vector database client for Milvus.
 
-This module initializes and manages the connection to the Pinecone vector database
+This module initializes and manages the connection to the Milvus vector database
 and provides helper functions for interacting with the index.
-
-
 """
 
-import pinecone
+from pymilvus import connections, Collection, utility, FieldSchema, CollectionSchema, DataType
 from django.conf import settings
 
 
-class PineconeClient:
+class MilvusClient:
     """
-    A client class for managing interactions with the Pinecone vector database.
+    A client class for managing interactions with the Milvus vector database.
     """
 
     def __init__(self) -> None:
         """
-        Initialize the Pinecone client with the configuration specified in settings.
+        Initialize the Milvus client with the configuration specified in settings.
 
         Raises:
-            ValueError: If Pinecone initialization fails due to invalid settings.
+            ValueError: If Milvus initialization fails due to invalid settings.
         """
         try:
-            pinecone.init(
-                api_key=settings.VECTOR_DB["API_KEY"],
-                environment=settings.VECTOR_DB["ENVIRONMENT"],
+            connections.connect(
+                alias="default",
+                host=settings.VECTOR_DB["HOST"],
+                port=settings.VECTOR_DB["PORT"],
             )
-            self.index_name = settings.VECTOR_DB["NAME"]
+            self.collection_name = settings.VECTOR_DB["NAME"]
         except Exception as e:
-            raise ValueError(f"Failed to initialize Pinecone: {str(e)}") from e
+            raise ValueError(f"Failed to initialize Milvus: {str(e)}") from e
 
-    def get_index(self) -> pinecone.Index:
+    def get_or_create_collection(self) -> Collection:
         """
-        Retrieve or create the Pinecone index specified in the settings.
+        Retrieve or create the Milvus collection specified in the settings.
 
         Returns:
-            pinecone.Index: The Pinecone index object.
+            Collection: The Milvus collection object.
 
         Raises:
-            ValueError: If the index cannot be created or accessed.
+            ValueError: If the collection cannot be created or accessed.
         """
         try:
-            if self.index_name not in pinecone.list_indexes():
-                pinecone.create_index(
-                    name=self.index_name,
-                    dimension=settings.VECTOR_DB["DIMENSION"],
-                )
-            return pinecone.Index(self.index_name)
-        except Exception as e:
-            raise ValueError(
-                f"Failed to retrieve or create Pinecone index: {str(e)}"
-            ) from e
+            if not utility.has_collection(self.collection_name):
+                # Define schema for the collection
+                fields = [
+                    FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=True),
+                    FieldSchema(name="vector", dtype=DataType.FLOAT_VECTOR, dim=settings.VECTOR_DB["DIMENSION"]),
+                ]
+                schema = CollectionSchema(fields=fields, description="Vector data collection")
+                
+                # Create the collection
+                collection = Collection(name=self.collection_name, schema=schema)
+            else:
+                collection = Collection(self.collection_name)
 
-    def delete_index(self) -> None:
+            return collection
+        except Exception as e:
+            raise ValueError(f"Failed to retrieve or create Milvus collection: {str(e)}") from e
+
+    def delete_collection(self) -> None:
         """
-        Delete the Pinecone index specified in the settings.
+        Delete the Milvus collection specified in the settings.
 
         Raises:
-            ValueError: If the index cannot be deleted.
+            ValueError: If the collection cannot be deleted.
         """
         try:
-            if self.index_name in pinecone.list_indexes():
-                pinecone.delete_index(self.index_name)
+            if utility.has_collection(self.collection_name):
+                utility.drop_collection(self.collection_name)
         except Exception as e:
-            raise ValueError(f"Failed to delete Pinecone index: {str(e)}") from e
+            raise ValueError(f"Failed to delete Milvus collection: {str(e)}") from e
