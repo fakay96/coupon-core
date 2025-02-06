@@ -21,6 +21,7 @@ DEBUG = False
 # Allowed Hosts
 ALLOWED_HOSTS = []
 
+
 # Secret Key
 SECRET_KEY = os.getenv("SECRET_KEY", "staging-secret-key")
 
@@ -59,6 +60,14 @@ DATABASES = {
         "PASSWORD": os.getenv("DB_PASSWORD", "password"),
         "HOST": os.getenv("DB_HOST", "localhost"),
         "PORT": os.getenv("DB_PORT", "5432"),
+    },
+    "geodiscounts_db": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.getenv("GEODISCOUNTS_DB_NAME", "geodiscounts_db"),
+        "USER": os.getenv("GEODISCOUNTS_DB_USER", "user"),
+        "PASSWORD": os.getenv("GEODISCOUNTS_DB_PASSWORD", "password"),
+        "HOST": os.getenv("GEODISCOUNTS_DB_HOST", "localhost"),
+        "PORT": os.getenv("GEODISCOUNTS_DB_PORT", "5432"),
     },
 }
 

@@ -1,0 +1,144 @@
+version: '3.8'
+
+services:
+
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    command: "gunicorn coupon_core.wsgi:application --bind 0.0.0.0:8000 --workers 2"
+    volumes:
+      - .:/app
+      - static_volume:/app/static
+      - media_volume:/app/media
+    ports:
+      - "8000:8000"
+    environment:
+      DB_NAME: ${DEV_DB_NAME}
+      DB_USER: ${DEV_DB_USER}
+      DB_PASSWORD: ${DEV_DB_PASSWORD}
+      DB_HOST: ${DEV_DB_HOST}
+      ENVIRONMENT: ${ENV}
+      DEV_DB_PASSWORD: ${DEV_DB_PASSWORD}
+      GDAL_LIBRARY_PATH: "/usr/lib/aarch64-linux-gnu/libgdal.so"
+      MILVUS_HOST: milvus
+      MILVUS_PORT: "19530"
+    depends_on:
+      - postgres
+      - redis
+      - milvus
+    restart: unless-stopped
+    networks:
+      - app-network
+      - service-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  postgres:
+    image: postgis/postgis:13-3.3
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DEV_DB_USER}
+      POSTGRES_PASSWORD: ${DEV_DB_PASSWORD}
+      POSTGRES_DB: ${DEV_DB_NAME}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - service-network
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - service-network
+
+  milvus:
+    image: milvusdb/milvus:v2.2.12
+    restart: unless-stopped
+    platform: linux/amd64
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+      MILVUS_LOG_LEVEL: "debug"
+    command: ["milvus", "run", "standalone"]
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    volumes:
+      - milvus-data:/var/lib/milvus
+    networks:
+      - service-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9091/healthz || exit 1"]
+      interval: 30s
+      start_period: 90s
+      timeout: 10s
+      retries: 5
+
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.16
+    container_name: milvus-etcd
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    command: etcd --advertise-client-urls=http://0.0.0.0:2379 --listen-client-urls=http://0.0.0.0:2379 --data-dir=/etcd
+    ports:
+      - "2379:2379"
+    volumes:
+      - etcd-data:/etcd
+    networks:
+      - service-network
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  minio:
+    image: minio/minio:RELEASE.2023-03-20T20-16-18Z
+    container_name: milvus-minio
+    environment:
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    command: minio server /minio_data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/minio_data
+    networks:
+      - service-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  pgdata:
+  static_volume:
+  media_volume:
+  milvus-data:
+  etcd-data:
+  minio-data:
+
+networks:
+  app-network:
+    driver: bridge
+  service-network:
+    driver: bridge

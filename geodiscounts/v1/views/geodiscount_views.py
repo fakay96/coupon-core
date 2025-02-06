@@ -1,4 +1,5 @@
-# geodiscounts/v1/views/discount_views.py
+from typing import List
+
 from django.contrib.gis.db.models.functions import Distance
 from django.contrib.gis.geos import Point
 from rest_framework.exceptions import ValidationError
@@ -13,10 +14,12 @@ from rest_framework.views import APIView
 
 from geodiscounts.models import Discount
 from geodiscounts.v1.serializers import DiscountSerializer
+from geodiscounts.v1.utils.embedding_utils import generate_embedding
 from geodiscounts.v1.utils.ip_geolocation import (
     get_location_from_ip,
     validate_max_distance,
 )
+from geodiscounts.v1.utils.vector_utils import search_vectors
 
 
 class DiscountListView(APIView):
@@ -111,6 +114,81 @@ class NearbyDiscountsView(APIView):
                 return Response(
                     {"message": "No discounts found near your location."},
                     status=HTTP_404_NOT_FOUND,
+                )
+
+            # Serialize and return results
+            serializer = DiscountSerializer(discounts, many=True)
+            return Response(serializer.data, status=HTTP_200_OK)
+
+        except ValidationError as ve:
+            return Response({"error": str(ve)}, status=HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response(
+                {"error": "An unexpected error occurred.", "details": str(e)},
+                status=HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class SearchDiscountsView(APIView):
+    """
+    API endpoint to search for discounts using a query string.
+
+    The query is embedded into a vector, which is then used to search the vector database.
+    """
+
+    def post(self, request) -> Response:
+        """
+        Handles POST requests to search for similar discounts.
+
+        Request Body:
+            - query (str): A user-provided search query (e.g., a string description or keywords).
+            - top_k (int, optional): The number of top results to retrieve (default: 10).
+
+        Returns:
+            Response: JSON response containing the top matching discounts.
+
+        Status Codes:
+            - 200: Success.
+            - 400: Validation error.
+            - 500: Internal server error.
+        """
+        try:
+            # Extract and validate the query
+            query: str = request.data.get("query")
+            if not query or not isinstance(query, str):
+                raise ValidationError(
+                    "A valid search query must be provided as a string."
+                )
+
+            # Generate embedding for the query
+            try:
+                query_vector: List[float] = generate_embedding(query)
+            except Exception as e:
+                raise ValidationError(
+                    f"Failed to generate embedding for the query: {str(e)}"
+                )
+
+            # Validate the top_k parameter
+            top_k = request.data.get("top_k", 10)
+            try:
+                top_k = int(top_k)
+                if top_k <= 0:
+                    raise ValueError()
+            except ValueError:
+                raise ValidationError("top_k must be a positive integer.")
+
+            # Search vector database
+            search_results = search_vectors(query_vector, top_k=top_k)
+
+            # Extract matching vector IDs
+            matching_ids = [result["id"] for result in search_results]
+
+            # Query matching discounts from the database
+            discounts = Discount.objects.filter(vector_id__in=matching_ids)
+            if not discounts.exists():
+                return Response(
+                    {"message": "No matching discounts found."},
+                    status=HTTP_200_OK,
                 )
 
             # Serialize and return results
