@@ -16,6 +16,9 @@ from pathlib import Path
 
 from storages.backends.s3boto3 import S3Boto3Storage
 
+GDAL_LIBRARY_PATH = os.getenv("GDAL_LIBRARY_PATH", "/usr/lib/libgdal.so")
+
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -43,14 +46,7 @@ class S3StaticStorage(S3Boto3Storage):
     file_overwrite = True
 
 
-STORAGES = {
-    "default": {
-        "BACKEND": "coupon_core.settings.S3MediaStorage",
-    },
-    "staticfiles": {
-        "BACKEND": "coupon_core.settings.S3StaticStorage",
-    },
-}
+
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -59,6 +55,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.gis",
     "rest_framework",
     "storages",
     "rest_framework.authtoken",
@@ -139,9 +136,14 @@ AUTH_USER_MODEL = "authentication.CustomUser"
 PUBLIC_ENDPOINTS = ["/authentication/api/v1/guest-token/"]
 
 
+
 VECTOR_DB = {
-    "NAME": os.getenv("PICONE_DBNAME"),
-    "DIMENSION": 512,
-    "API_KEY": os.getenv("PINECONE_API_KEY", "your-pinecone-api-key"),
-    "ENVIRONMENT": os.getenv("PINECONE_ENV", "us-west1-gcp"),
+    "NAME": os.getenv("MILVUS_COLLECTION_NAME", "default_vector_collection"),
+    "DIMENSION": int(os.getenv("VECTOR_DIMENSION", 512)),
+    "HOST": os.getenv("MILVUS_HOST", "localhost"),
+    "PORT": os.getenv("MILVUS_PORT", "19530"),
 }
+DATABASE_ROUTERS = [
+    "authentication.routers.AuthenticationRouter",
+    "geodiscounts.routers.GeoDiscountsRouter"
+]

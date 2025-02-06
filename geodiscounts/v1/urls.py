@@ -16,10 +16,11 @@ Date: YYYY-MM-DD
 
 from django.urls import path
 
-from geodiscounts.v1.views.geodiscount_views import (DiscountListView,
-                                                     NearbyDiscountsView)
-from geodiscounts.v1.views.retailer_views import (RetailerDetailView,
-                                                  RetailerListView)
+from geodiscounts.v1.views.geodiscount_views import (
+    DiscountListView,
+    NearbyDiscountsView,
+)
+from geodiscounts.v1.views.retailer_views import RetailerDetailView, RetailerListView
 
 app_name = "geodiscounts_v1"
 

@@ -21,6 +21,7 @@ DEBUG = False
 # Allowed Hosts
 ALLOWED_HOSTS = []
 
+
 # Secret Key
 SECRET_KEY = os.getenv("SECRET_KEY", "staging-secret-key")
 
