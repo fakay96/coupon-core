@@ -39,14 +39,12 @@ class TokenManager:
             refresh = RefreshToken.for_user(guest_user)
             access_token = str(refresh.access_token)
             logger.info(
-                f"Access token created for guest user: {
-                    guest_user.username}"
+                f"Access token created for guest user: {guest_user.username}"
             )
             return access_token
         except TokenError as e:
             logger.error(
-                f"Failed to create guest token for user {
-                    guest_user.username}: {str(e)}"
+                f"Failed to create guest token for user {guest_user.username}: {str(e)}"
             )
             raise ValueError("Unable to generate guest token.") from e
 
@@ -76,13 +74,11 @@ class TokenManager:
                 "refresh": str(refresh),
             }
             logger.info(
-                f"Tokens successfully created for admin user: {
-                    user.username}"
+                f"Tokens successfully created for admin user: {user.username}"
             )
             return tokens
         except TokenError as e:
             logger.error(
-                f"Failed to create tokens for admin user {
-                    user.username}: {str(e)}"
+                f"Failed to create tokens for admin user {user.username}: {str(e)}"
             )
             raise ValueError("Unable to generate tokens for the admin user.") from e
