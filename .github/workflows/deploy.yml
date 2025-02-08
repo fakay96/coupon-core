@@ -16,48 +16,38 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      # Step 1: Checkout code
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Step 2: Configure kubectl for DigitalOcean
       - name: Configure kubectl for DigitalOcean
         run: |
-          mkdir -p ~/.kube                          
+          mkdir -p ~/.kube
           echo "Creating kubeconfig from raw YAML content..."
           echo "${{ secrets.KUBECONFIG_CONTENT }}" > ~/.kube/config
-          chmod 600 ~/.kube/config                   
+          chmod 600 ~/.kube/config
 
-      # Step 3: Verify kubeconfig setup
       - name: Verify kubeconfig file and access
         run: |
           echo "Verifying kubeconfig file..."
-          cat ~/.kube/config || echo "Failed to read kubeconfig file!"
-          echo "Testing cluster access..."
           kubectl get nodes
 
-      # Step 4: Uninstall previous Helm releases (optional)
       - name: Uninstall previous Helm releases
         continue-on-error: true
         run: |
-          echo "Checking if backend-service release exists..."
-          helm status backend-service --namespace production || echo "No existing release found."
-          echo "Uninstalling backend-service if it exists..."
           helm uninstall backend-service --namespace production || echo "backend-service not installed."
 
-      # Step 5: Debug Helm chart path
       - name: Debug Helm chart path
         run: |
-          echo "Checking Helm chart directory contents..."
           ls -l ./k8s/backend
-          if [ ! -f ./k8s/backend/Chart.yaml ]; then
-            echo "Error: Chart.yaml not found in ./k8s/backend"
-            exit 1
-          fi
-          echo "Checking values directory contents..."
           ls -l ./k8s/backend/values/
 
-      # Step 6: Deploy backend service with Helm
+      - name: Debug Helm values rendering
+        run: |
+          helm template backend-service ./k8s/backend \
+            --set backend.image.repository=fakay96/backend \
+            --set backend.image.tag=${{ inputs.version_tag }} \
+            -f ./k8s/backend/values/production-values.yaml
+
       - name: Deploy backend service with Helm
         env:
           VERSION_TAG: ${{ inputs.version_tag }}
@@ -68,7 +58,6 @@ jobs:
             --namespace production --create-namespace \
             -f ./k8s/backend/values/production-values.yaml
 
-      # Step 7: Verify deployment status
       - name: Verify deployment status
         run: |
           kubectl rollout status deployment backend -n production --timeout=300s
