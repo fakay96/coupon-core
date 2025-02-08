@@ -38,7 +38,12 @@ jobs:
       - name: Debug environment (check secrets)
         run: |
           echo "Checking environment variables"
-          echo "Docker username length: ${#secrets.DOCKER_USERNAME}"
+          if [[ -n "${{ secrets.DOCKER_USERNAME }}" ]]; then
+            echo "Docker username length: $(echo -n "${{ secrets.DOCKER_USERNAME }}" | wc -c)"
+          else
+            echo "Docker username is not set!"
+          fi
+
 
             
       - name: Log in to Docker Hub
