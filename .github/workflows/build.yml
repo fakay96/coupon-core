@@ -7,6 +7,12 @@ on:
         description: 'The commit SHA to use as a tag'
         required: false
         type: string
+    secrets:
+      DOCKER_USERNAME:
+        required: true
+      DOCKER_PASSWORD:
+        required: true
+
 
 jobs:
   build:
