@@ -1,7 +1,7 @@
 name: Deploy to DigitalOcean Kubernetes
 
 on:
-  workflow_call: # Allows this workflow to be called from another workflow
+  workflow_call:
     inputs:
       version_tag:
         description: 'The version tag to deploy'
@@ -20,7 +20,7 @@ jobs:
       # Step 2: Set up kubectl for DigitalOcean Kubernetes
       - name: Configure kubectl for DigitalOcean
         run: |
-          echo "${{ secrets.KUBECONFIG_CONTENT }}" > ~/.kube/config
+          echo "${{ secrets.KUBECONFIG_CONTENT }}" | base64 -d > ~/.kube/config
 
       # Step 3: Install Helm
       - name: Install Helm
@@ -38,6 +38,8 @@ jobs:
 
           echo "CURRENT_BACKEND_IMAGE=$CURRENT_BACKEND_IMAGE" >> $GITHUB_ENV
           echo "CURRENT_WEBSCRAPER_IMAGE=$CURRENT_WEBSCRAPER_IMAGE" >> $GITHUB_ENV
+          echo "backend_image=$CURRENT_BACKEND_IMAGE" >> $GITHUB_OUTPUT
+          echo "webscraper_image=$CURRENT_WEBSCRAPER_IMAGE" >> $GITHUB_OUTPUT
 
       # Step 5: Deploy services with Helm
       - name: Deploy backend and web scraper services with Helm
@@ -57,8 +59,8 @@ jobs:
       # Step 6: Verify deployment status
       - name: Verify deployment status
         run: |
-          kubectl rollout status deployment backend-service -n production --timeout=120s
-          kubectl rollout status deployment web-scraper-service -n production --timeout=120s
+          kubectl rollout status deployment backend-service -n production --timeout=300s
+          kubectl rollout status deployment web-scraper-service -n production --timeout=300s
 
       # Step 7: Rollback on failure
       - name: Rollback to previous version
@@ -67,10 +69,3 @@ jobs:
           echo "Deployment failed. Rolling back to previous versions."
           helm rollback backend-service 1 --namespace production
           helm rollback web-scraper-service 1 --namespace production
-
-          # Alternatively, revert directly to the previous image tag
-          # kubectl set image deployment/backend-service backend=$CURRENT_BACKEND_IMAGE -n production
-          # kubectl set image deployment/web-scraper-service webscraper=$CURRENT_WEBSCRAPER_IMAGE -n production
-
-          kubectl rollout status deployment backend-service -n production --timeout=120s
-          kubectl rollout status deployment web-scraper-service -n production --timeout=120s
