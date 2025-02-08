@@ -1,0 +1,77 @@
+name: Deploy to DigitalOcean Kubernetes
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [build, test]
+
+    steps:
+      # Step 1: Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      # Step 2: Set up kubectl for DigitalOcean Kubernetes
+      - name: Configure kubectl for DigitalOcean
+        run: |
+          echo "${{ secrets.KUBECONFIG_CONTENT }}" > ~/.kube/config
+
+      # Step 3: Install Helm
+      - name: Install Helm
+        run: |
+          curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+
+      # Step 4: Capture current image tags for rollback
+      - name: Capture current image tags
+        id: capture_images
+        run: |
+          CURRENT_BACKEND_IMAGE=$(kubectl get deployment backend-service -n production \
+            -o=jsonpath='{.spec.template.spec.containers[0].image}')
+          CURRENT_WEBSCRAPER_IMAGE=$(kubectl get deployment web-scraper-service -n production \
+            -o=jsonpath='{.spec.template.spec.containers[0].image}')
+
+          echo "CURRENT_BACKEND_IMAGE=$CURRENT_BACKEND_IMAGE" >> $GITHUB_ENV
+          echo "CURRENT_WEBSCRAPER_IMAGE=$CURRENT_WEBSCRAPER_IMAGE" >> $GITHUB_ENV
+
+      # Step 5: Deploy services with Helm
+      - name: Deploy backend and web scraper services with Helm
+        env:
+          VERSION_TAG: ${{ env.VERSION_TAG }}
+        run: |
+          helm upgrade --install backend-service ./helm/backend-chart \
+            --set image.repository=fakay96/backend \
+            --set image.tag=$VERSION_TAG \
+            --namespace production --create-namespace
+
+          helm upgrade --install web-scraper-service ./helm/webscraper-chart \
+            --set image.repository=fakay96/web_scraper \
+            --set image.tag=$VERSION_TAG \
+            --namespace production --create-namespace
+
+      # Step 6: Verify deployment status
+      - name: Verify deployment status
+        run: |
+          kubectl rollout status deployment backend-service -n production --timeout=120s
+          kubectl rollout status deployment web-scraper-service -n production --timeout=120s
+
+      # Step 7: Rollback on failure
+      - name: Rollback to previous version
+        if: failure()
+        run: |
+          echo "Deployment failed. Rolling back to previous versions."
+          helm rollback backend-service 1 --namespace production
+          helm rollback web-scraper-service 1 --namespace production
+
+          # Alternatively, revert directly to the previous image tag
+          # kubectl set image deployment/backend-service backend=$CURRENT_BACKEND_IMAGE -n production
+          # kubectl set image deployment/web-scraper-service webscraper=$CURRENT_WEBSCRAPER_IMAGE -n production
+
+          kubectl rollout status deployment backend-service -n production --timeout=120s
+          kubectl rollout status deployment web-scraper-service -n production --timeout=120s

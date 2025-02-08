@@ -35,6 +35,7 @@ torch = "^2.6.0"
 pymilvus = "^2.5.4"
 drf-yasg = "^1.21.8"
 psycopg = "^3.2.4"
+confluent-kafka = "^2.8.0"
 
 [[tool.poetry.source]]
 name = "pytorch"

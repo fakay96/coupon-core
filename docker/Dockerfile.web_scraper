@@ -1,0 +1,26 @@
+# Use a slim Python image
+FROM python:3.12-slim
+
+# Set the working directory
+WORKDIR /app
+
+# Update package lists and install curl, wget, git
+RUN apt-get update && \
+    apt-get install -y curl wget git && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install Poetry and add it to PATH
+RUN curl -sSL https://install.python-poetry.org | python3 - && \
+    export PATH="/root/.local/bin:$PATH" && \
+    poetry config virtualenvs.create false
+
+# Copy the pyproject.toml and install dependencies
+COPY web_scraper/pyproject.toml .
+RUN export PATH="/root/.local/bin:$PATH" && \
+    poetry install --no-root --no-interaction --no-ansi
+
+# Copy the rest of the web_scraper files
+COPY web_scraper/ .
+
+# Command to run the web scraper
+CMD ["python", "main.py"]

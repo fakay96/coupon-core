@@ -21,12 +21,40 @@ from geodiscounts.v1.utils.ip_geolocation import (
 )
 from geodiscounts.v1.utils.vector_utils import search_vectors
 
+# drf-yasg imports for OpenAPI documentation
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
+
 
 class DiscountListView(APIView):
     """
     API endpoint to fetch all available discounts.
     """
 
+    @swagger_auto_schema(
+        operation_description="Returns a list of all discounts in the system.",
+        responses={
+            HTTP_200_OK: openapi.Response(
+                description="Success.",
+                schema=DiscountSerializer(many=True)
+            ),
+            HTTP_404_NOT_FOUND: openapi.Response(
+                description="No discounts found.",
+                examples={
+                    "application/json": {"message": "No discounts available."}
+                }
+            ),
+            HTTP_500_INTERNAL_SERVER_ERROR: openapi.Response(
+                description="Internal server error.",
+                examples={
+                    "application/json": {
+                        "error": "An unexpected error occurred.",
+                        "details": "Detailed error message..."
+                    }
+                }
+            ),
+        },
+    )
     def get(self, request) -> Response:
         """
         Returns a list of all discounts in the system.
@@ -62,6 +90,46 @@ class NearbyDiscountsView(APIView):
     Allows optional filtering by a maximum distance (in kilometers).
     """
 
+    # Define a query parameter for max_distance (optional)
+    max_distance_param = openapi.Parameter(
+        "max_distance",
+        openapi.IN_QUERY,
+        description="Maximum distance (in kilometers) for filtering discounts.",
+        type=openapi.TYPE_NUMBER,
+        required=False,
+    )
+
+    @swagger_auto_schema(
+        operation_description="Retrieve discounts near the user's location (based on IP address) with an optional max_distance filter.",
+        manual_parameters=[max_distance_param],
+        responses={
+            HTTP_200_OK: openapi.Response(
+                description="Success.",
+                schema=DiscountSerializer(many=True)
+            ),
+            HTTP_400_BAD_REQUEST: openapi.Response(
+                description="Validation error.",
+                examples={
+                    "application/json": {"error": "Detailed validation error message."}
+                }
+            ),
+            HTTP_404_NOT_FOUND: openapi.Response(
+                description="No discounts found.",
+                examples={
+                    "application/json": {"message": "No discounts found near your location."}
+                }
+            ),
+            HTTP_500_INTERNAL_SERVER_ERROR: openapi.Response(
+                description="Internal server error.",
+                examples={
+                    "application/json": {
+                        "error": "An unexpected error occurred.",
+                        "details": "Detailed error message..."
+                    }
+                }
+            ),
+        },
+    )
     def get(self, request) -> Response:
         """
         Handles GET requests to retrieve nearby discounts.
@@ -100,7 +168,7 @@ class NearbyDiscountsView(APIView):
                 except ValueError as e:
                     raise ValidationError(str(e))
 
-            # Query discounts
+            # Query discounts and annotate with distance
             discounts = Discount.objects.annotate(
                 distance=Distance("location", user_location)
             )
@@ -136,6 +204,49 @@ class SearchDiscountsView(APIView):
     The query is embedded into a vector, which is then used to search the vector database.
     """
 
+    # Define the request body schema for the search endpoint.
+    search_request_body = openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        properties={
+            "query": openapi.Schema(
+                type=openapi.TYPE_STRING,
+                description="A user-provided search query (e.g., a description or keywords).",
+                example="50% off shoes",
+            ),
+            "top_k": openapi.Schema(
+                type=openapi.TYPE_INTEGER,
+                description="The number of top results to retrieve (default: 10).",
+                example=10,
+            ),
+        },
+        required=["query"],
+    )
+
+    @swagger_auto_schema(
+        operation_description="Search for discounts based on a query string by embedding the query and searching the vector database.",
+        request_body=search_request_body,
+        responses={
+            HTTP_200_OK: openapi.Response(
+                description="Success.",
+                schema=DiscountSerializer(many=True)
+            ),
+            HTTP_400_BAD_REQUEST: openapi.Response(
+                description="Validation error.",
+                examples={
+                    "application/json": {"error": "A valid search query must be provided as a string."}
+                }
+            ),
+            HTTP_500_INTERNAL_SERVER_ERROR: openapi.Response(
+                description="Internal server error.",
+                examples={
+                    "application/json": {
+                        "error": "An unexpected error occurred.",
+                        "details": "Detailed error message..."
+                    }
+                }
+            ),
+        },
+    )
     def post(self, request) -> Response:
         """
         Handles POST requests to search for similar discounts.

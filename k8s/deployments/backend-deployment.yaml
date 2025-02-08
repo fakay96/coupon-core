@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: {{ .Values.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: "{{ .Values.image.backend }}:{{ .Values.image.tag | default 'latest' }}"
+          ports:
+            - containerPort: 8000
+          resources:
+            requests:
+              memory: "{{ .Values.resources.requests.memory | default '128Mi' }}"
+              cpu: "{{ .Values.resources.requests.cpu | default '100m' }}"
+            limits:
+              memory: "{{ .Values.resources.limits.memory | default '256Mi' }}"
+              cpu: "{{ .Values.resources.limits.cpu | default '500m' }}"

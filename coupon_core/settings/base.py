@@ -62,6 +62,8 @@ INSTALLED_APPS = [
     "authentication",
     "corsheaders",
     "geodiscounts",
+    "drf_yasg",
+
 ]
 
 MIDDLEWARE = [
