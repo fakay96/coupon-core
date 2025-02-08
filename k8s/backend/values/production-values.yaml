@@ -1,27 +1,27 @@
 backend:
   replicaCount: 1
 
-  image:
-    repository: my-backend-image
-    tag: ""
-    pullPolicy: Always
+image:
+  repository: fakay96/backend  # Use the default repository here if needed
+  tag: ""                      # Empty by default, overridden by Helm --set
+  pullPolicy: Always
 
-  service:
-    type: ClusterIP
-    port: 8000
+service:
+  type: ClusterIP
+  port: 8000
 
-  resources:
-    requests:
-      memory: "128Mi"
-      cpu: "100m"
-    limits:
-      memory: "256Mi"
-      cpu: "500m"
+resources:
+  requests:
+    memory: "128Mi"
+    cpu: "100m"
+  limits:
+    memory: "256Mi"
+    cpu: "500m"
 
-  env:
-    environment: production
-    logLevel: debug
+env:
+  environment: production
+  logLevel: debug
 
-  nodeSelector: {}
-  tolerations: []
-  affinity: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
