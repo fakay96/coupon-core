@@ -32,8 +32,8 @@ jobs:
         env:
           VERSION_TAG: ${{ env.VERSION_TAG }}
         run: |
-          sudo docker build -t fakay96/backend:${VERSION_TAG} -f docker/Docker.backend .
-          sudo docker build -t fakay96/web_scraper:${VERSION_TAG} -f docker/Docker.web_scraper .
+          docker build -t fakay96/backend:${VERSION_TAG} -f docker/Docker.backend .
+          docker build -t fakay96/web_scraper:${VERSION_TAG} -f docker/Docker.web_scraper .
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
@@ -45,8 +45,8 @@ jobs:
         env:
           VERSION_TAG: ${{ env.VERSION_TAG }}
         run: |
-          sudo docker push fakay96/backend:${VERSION_TAG}
-          sudo docker push fakay96/web_scraper:${VERSION_TAG}
+          docker push fakay96/backend:${VERSION_TAG}
+          docker push fakay96/web_scraper:${VERSION_TAG}
 
       - name: Save version tag to file
         run: echo "${VERSION_TAG}" > version.txt
