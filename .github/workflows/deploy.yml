@@ -14,10 +14,6 @@ on:
 jobs:
   deploy:
     runs-on: self-hosted
-
-    env:
-          VERSION_TAG: ${{ inputs.version_tag }}
-
     steps:
       # Step 1: Checkout code
       - name: Checkout code
@@ -72,7 +68,7 @@ jobs:
         run: |
           helm upgrade --install backend-service ./k8s/backend \
             --set image.repository=fakay96/backend \
-            --set image.tag=$VERSION_TAG \
+            --set image.tag=${VERSION_TAG} \
             --namespace production --create-namespace \
             -f ./k8s/backend/values/production-values.yaml
 
