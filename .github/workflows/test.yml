@@ -5,7 +5,7 @@ on:
 
 jobs:
   test:
-    runs-on: self-hosted
+    runs-on: ubuntu-c-2-fra1-01
     strategy:
       matrix:
         python-version: ['3.8', '3.10', '3.12']
