@@ -25,7 +25,7 @@ jobs:
       version_tag: ${{ needs.build.outputs.version_tag }}
 
   notify_failure:
-    runs-on: ubuntu-c-2-fra1-01
+    runs-on: self-hosted
     if: failure()
     steps:
       - name: Notify about failure
