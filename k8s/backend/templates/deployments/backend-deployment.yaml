@@ -14,13 +14,19 @@ spec:
     spec:
       containers:
         - name: backend
-          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag}}"
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag | default 'latest' }}"
+          imagePullPolicy: "{{ .Values.backend.image.pullPolicy | default 'IfNotPresent' }}"
           ports:
-            - containerPort: 8000
+            - containerPort: {{ .Values.backend.service.port | default 8000 }}
           resources:
             requests:
-              memory: "{{ .Values.backend.resources.requests.memory}}"
-              cpu: "{{ .Values.backend.resources.requests.cpu}}"
+              memory: "{{ .Values.backend.resources.requests.memory }}"
+              cpu: "{{ .Values.backend.resources.requests.cpu }}"
             limits:
-              memory: "{{ .Values.backend.resources.limits.memory}}"
-              cpu: "{{ .Values.backend.resources.limits.cpu}}"
+              memory: "{{ .Values.backend.resources.limits.memory }}"
+              cpu: "{{ .Values.backend.resources.limits.cpu }}"
+          env:
+            - name: ENVIRONMENT
+              value: "{{ .Values.backend.env.environment }}"
+            - name: LOG_LEVEL
+              value: "{{ .Values.backend.env.logLevel }}"
