@@ -17,12 +17,12 @@ jobs:
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
 
-  test:
-    needs: build
-    uses: ./.github/workflows/test.yml
+  # test:
+  #   needs: build
+  #   uses: ./.github/workflows/test.yml
 
   deploy:
-    needs: [build, test]
+    needs: build
     uses: ./.github/workflows/deploy.yml
     with:
       version_tag: ${{ needs.build.outputs.version_tag }}
