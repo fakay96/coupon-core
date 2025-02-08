@@ -8,8 +8,8 @@ WORKDIR /app
 EXPOSE 8000
 
 # Add an entrypoint script for initialization
-COPY Scripts/entryfile_backend.sh /backend-entrypoint.sh
-RUN ls -l /backend-entrypoint.sh
+COPY Scripts/entryfile_backend.sh /app/backend-entrypoint.sh
+RUN ls -l /app
 
 RUN chmod +x /backend-entrypoint.sh
 
