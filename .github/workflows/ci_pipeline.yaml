@@ -26,6 +26,8 @@ jobs:
     uses: ./.github/workflows/deploy.yml
     with:
       version_tag: ${{ needs.build.outputs.version_tag }}
+    secrets:
+      KUBECONFIG: ${{ secrets.KUBECONFIG }}
 
   notify_failure:
     runs-on: self-hosted
