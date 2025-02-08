@@ -10,7 +10,7 @@ on:
 
 jobs:
   deploy:
-    runs-on: ubuntu-c-2-fra1-01
+    runs-on: self-hosted
     steps:
       - name: Checkout code
         uses: actions/checkout@v3

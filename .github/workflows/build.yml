@@ -10,7 +10,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-c-2-fra1-01
+    runs-on: self-hosted
     outputs:
       version_tag: ${{ steps.set_output.outputs.version_tag }}
     steps:
