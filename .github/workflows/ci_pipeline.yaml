@@ -27,7 +27,7 @@ jobs:
     with:
       version_tag: ${{ needs.build.outputs.version_tag }}
     secrets:
-      KUBECONFIG: ${{ secrets.KUBECONFIG }}
+      KUBECONFIG_CONTENT: ${{ secrets.KUBECONFIG_CONTENT }}
 
   notify_failure:
     runs-on: self-hosted
