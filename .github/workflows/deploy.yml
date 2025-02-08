@@ -8,24 +8,31 @@ on:
         required: true
         type: string
     secrets:
-      KUBECONFIG:
+      KUBECONFIG_CONTENT:
         required: true
 
 jobs:
   deploy:
     runs-on: self-hosted
+
     steps:
+      # Step 1: Checkout code
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Step 2: Configure kubectl for DigitalOcean
       - name: Configure kubectl for DigitalOcean
         run: |
+          mkdir -p ~/.kube                            # Ensure .kube directory exists
           echo "${{ secrets.KUBECONFIG_CONTENT }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config                    # Secure the kubeconfig file
 
+      # Step 3: Install Helm
       - name: Install Helm
         run: |
-          curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+          curl -fsSL https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
 
+      # Step 4: Capture current image tags for rollback (optional)
       - name: Capture current image tags
         id: capture_images
         run: |
@@ -33,12 +40,13 @@ jobs:
             -o=jsonpath='{.spec.template.spec.containers[0].image}')
           CURRENT_WEBSCRAPER_IMAGE=$(kubectl get deployment web-scraper-service -n production \
             -o=jsonpath='{.spec.template.spec.containers[0].image}')
-          
+
           echo "CURRENT_BACKEND_IMAGE=$CURRENT_BACKEND_IMAGE" >> "$GITHUB_ENV"
           echo "CURRENT_WEBSCRAPER_IMAGE=$CURRENT_WEBSCRAPER_IMAGE" >> "$GITHUB_ENV"
           echo "backend_image=$CURRENT_BACKEND_IMAGE" >> "$GITHUB_OUTPUT"
           echo "webscraper_image=$CURRENT_WEBSCRAPER_IMAGE" >> "$GITHUB_OUTPUT"
 
+      # Step 5: Deploy backend and web scraper services with Helm
       - name: Deploy services with Helm
         env:
           VERSION_TAG: ${{ inputs.version_tag }}
@@ -53,11 +61,13 @@ jobs:
             --set image.tag=$VERSION_TAG \
             --namespace production --create-namespace
 
+      # Step 6: Verify deployment status
       - name: Verify deployment status
         run: |
           kubectl rollout status deployment backend-service -n production --timeout=300s
           kubectl rollout status deployment web-scraper-service -n production --timeout=300s
 
+      # Step 7: Rollback on failure (optional)
       - name: Rollback to previous version on failure
         if: failure()
         run: |
