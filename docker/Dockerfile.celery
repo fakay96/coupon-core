@@ -8,7 +8,7 @@ WORKDIR /app
 EXPOSE 8000
 
 # Add an entrypoint script for initialization
-COPY ./Scripts/init_celery.sh /entrypoint.sh
+COPY Scripts/init_celery.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Use the entrypoint script for initialization
