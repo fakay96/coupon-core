@@ -1,0 +1,34 @@
+name: CI Pipeline for Digital Ocean with Rollback
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+    with:
+      tag: ${{ github.sha }}
+
+  test:
+    uses: ./.github/workflows/test.yml
+    with:
+      branch: ${{ github.ref_name }}
+
+  deploy:
+    needs: [build, test]
+    uses: ./.github/workflows/deploy.yml
+    with:
+      tag: ${{ github.sha }}
+
+  notify_failure:
+    runs-on: self-hosted
+    if: failure()
+    steps:
+      - name: Notify about failure
+        run: |
+          echo "CI Pipeline failed. Check logs for more details."

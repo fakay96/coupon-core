@@ -22,6 +22,10 @@ from authentication.v1.serializers import GuestTokenSerializer
 from authentication.v1.utils.redis_client import RedisClient
 from authentication.v1.utils.token_manager import TokenManager
 
+# drf-yasg imports for OpenAPI documentation
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
+
 logger = logging.getLogger(__name__)
 
 
@@ -37,6 +41,58 @@ class GuestTokenView(APIView):
 
     permission_classes = [AllowAny]
 
+    # Schema for a successful guest token response.
+    guest_token_response_schema = openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        properties={
+            "guest_token": openapi.Schema(
+                type=openapi.TYPE_STRING,
+                description="Generated guest token",
+                example="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+            )
+        },
+        required=["guest_token"],
+    )
+
+    # Schema for an error response.
+    error_response_schema = openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        properties={
+            "error": openapi.Schema(
+                type=openapi.TYPE_STRING,
+                description="Error message",
+                example="An unexpected error occurred. Please try again later."
+            ),
+            "errors": openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                description="Validation errors",
+                nullable=True
+            )
+        }
+    )
+
+    @swagger_auto_schema(
+        operation_description="Handle POST requests to create or retrieve a guest token.",
+        request_body=GuestTokenSerializer,
+        responses={
+            200: openapi.Response(
+                description="Existing guest token returned.",
+                schema=guest_token_response_schema
+            ),
+            201: openapi.Response(
+                description="New guest token created and returned.",
+                schema=guest_token_response_schema
+            ),
+            400: openapi.Response(
+                description="Validation error or a user with this email already exists.",
+                schema=error_response_schema
+            ),
+            500: openapi.Response(
+                description="Unexpected error during guest token creation.",
+                schema=error_response_schema
+            ),
+        },
+    )
     def post(self, request: Any) -> Response:
         """
         Handle POST requests to create or retrieve a guest token.
@@ -51,31 +107,27 @@ class GuestTokenView(APIView):
         Returns:
             Response: A Django REST Framework Response object containing the guest token
                       or error messages.
-
-        Raises:
-            None: All exceptions are handled within the method.
         """
         try:
-            # Initialize and validate the serializer with request data
+            # Initialize and validate the serializer with request data.
             serializer: GuestTokenSerializer = GuestTokenSerializer(data=request.data)
             serializer.is_valid(raise_exception=True)
 
             email: str = serializer.validated_data["email"]
             redis_client: RedisClient = RedisClient()
 
-            logger.debug(
-                f"Attempting to create/retrieve guest token for email: {email}"
-            )
+            logger.debug(f"Attempting to create/retrieve guest token for email: {email}")
 
-            # Check if a token already exists for the given email
+            # Check if a token already exists for the given email.
             existing_token: Optional[str] = redis_client.get_token(email)
             if existing_token:
                 logger.info(f"Existing guest token found for email: {email}")
                 return Response(
-                    {"guest_token": existing_token}, status=status.HTTP_200_OK
+                    {"guest_token": existing_token},
+                    status=status.HTTP_200_OK
                 )
 
-            # Retrieve or create an abstract user associated with the email
+            # Retrieve or create an abstract user associated with the email.
             user: Optional[CustomUser] = serializer.get_abstract_user(email)
             if not user:
                 logger.warning(f"No user found or created for email: {email}")
@@ -84,13 +136,15 @@ class GuestTokenView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # Generate a new guest token
+            # Generate a new guest token.
             token: str = TokenManager.create_guest_token(user)
             logger.debug(f"Generated new guest token for email: {email}")
 
-            # Store the token in Redis with a 1-hour expiration
+            # Store the token in Redis with a 1-hour expiration.
             redis_client.set_token(
-                email, token, int(datetime.timedelta(hours=1).total_seconds())
+                email,
+                token,
+                int(datetime.timedelta(hours=1).total_seconds())
             )
             logger.info(f"Guest token stored in Redis for email: {email}")
 
@@ -105,7 +159,10 @@ class GuestTokenView(APIView):
 
         except ValidationError as ve:
             logger.warning(f"Validation error during guest token creation: {ve}")
-            return Response({"errors": ve.detail}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"errors": ve.detail},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         except Exception as e:
             logger.error(

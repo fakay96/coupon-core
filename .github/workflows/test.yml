@@ -1,0 +1,49 @@
+name: Run Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      # Step 1: Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      # Step 2: Set up Python environment
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.12'
+
+      # Step 3: Install dependencies
+      - name: Install dependencies
+        run: |
+          pip install poetry
+          poetry install
+
+      # Step 4: Run tests and save report
+      - name: Run tests and generate report
+        run: |
+          pytest --junitxml=report.xml
+
+      # Step 5: Upload test report (optional for debugging purposes)
+      - name: Upload test report
+        uses: actions/upload-artifact@v2
+        with:
+          name: test-report
+          path: report.xml
+
+      # Step 6: Fail-safe notification
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "Tests failed! Check the test report for details."

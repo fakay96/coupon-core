@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "web_scraper"
+version = "0.1.0"
+description = "A web scraper for extracting discount data."
+authors = ["Your Name <you@example.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+beautifulsoup4 = "^4.10.0"
+requests = "^2.26.0"
+pyrate-limiter = "^3.7.0"
+python-dotenv = ">=1.0.1,<2.0.0"
+tenacity = "^9.0.0"
+confluent-kafka = "^2.8.0"
+
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

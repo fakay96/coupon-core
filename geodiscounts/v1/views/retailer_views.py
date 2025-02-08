@@ -9,12 +9,40 @@ from rest_framework.views import APIView
 from geodiscounts.models import Retailer
 from geodiscounts.v1.serializers import RetailerSerializer
 
+# drf-yasg imports for OpenAPI documentation
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
+
 
 class RetailerListView(APIView):
     """
     API endpoint to fetch all retailers.
     """
 
+    @swagger_auto_schema(
+        operation_description="Returns a list of all retailers.",
+        responses={
+            HTTP_200_OK: openapi.Response(
+                description="Success.",
+                schema=RetailerSerializer(many=True)
+            ),
+            HTTP_404_NOT_FOUND: openapi.Response(
+                description="No retailers available.",
+                examples={
+                    "application/json": {"message": "No retailers available."}
+                }
+            ),
+            HTTP_500_INTERNAL_SERVER_ERROR: openapi.Response(
+                description="Internal server error.",
+                examples={
+                    "application/json": {
+                        "error": "An unexpected error occurred.",
+                        "details": "Detailed error message..."
+                    }
+                }
+            ),
+        },
+    )
     def get(self, request) -> Response:
         """
         Returns a list of all retailers.
@@ -48,6 +76,30 @@ class RetailerDetailView(APIView):
     API endpoint to fetch a specific retailer by ID.
     """
 
+    @swagger_auto_schema(
+        operation_description="Returns details of a specific retailer by their ID.",
+        responses={
+            HTTP_200_OK: openapi.Response(
+                description="Success.",
+                schema=RetailerSerializer()
+            ),
+            HTTP_404_NOT_FOUND: openapi.Response(
+                description="Retailer not found.",
+                examples={
+                    "application/json": {"message": "Retailer not found."}
+                }
+            ),
+            HTTP_500_INTERNAL_SERVER_ERROR: openapi.Response(
+                description="Internal server error.",
+                examples={
+                    "application/json": {
+                        "error": "An unexpected error occurred.",
+                        "details": "Detailed error message..."
+                    }
+                }
+            ),
+        },
+    )
     def get(self, request, retailer_id: int) -> Response:
         """
         Returns details of a specific retailer by their ID.

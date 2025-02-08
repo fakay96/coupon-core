@@ -29,6 +29,27 @@ from rest_framework.views import APIView
 from authentication.models import CustomUser, UserProfile
 from authentication.v1.serializers import RegisterSerializer, UserProfileSerializer
 
+# drf-yasg imports for OpenAPI documentation
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
+
+# Define common response schema for error responses.
+error_response_schema = openapi.Schema(
+    type=openapi.TYPE_OBJECT,
+    properties={
+        "error": openapi.Schema(
+            type=openapi.TYPE_STRING,
+            description="Error message",
+            example="Profile not found."
+        ),
+        "details": openapi.Schema(
+            type=openapi.TYPE_STRING,
+            description="Detailed error message",
+            example="Field 'email' is required."
+        ),
+    }
+)
+
 
 class UserProfileView(APIView):
     """
@@ -44,6 +65,23 @@ class UserProfileView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        operation_description="Retrieve the profile of the authenticated user.",
+        responses={
+            200: openapi.Response(
+                description="Successfully retrieved profile details.",
+                schema=UserProfileSerializer()
+            ),
+            404: openapi.Response(
+                description="Profile not found.",
+                schema=error_response_schema
+            ),
+            500: openapi.Response(
+                description="Internal server error.",
+                schema=error_response_schema
+            ),
+        },
+    )
     def get(self, request: Any) -> Response:
         """
         Retrieve the profile of the authenticated user.
@@ -54,7 +92,7 @@ class UserProfileView(APIView):
             - 500: Internal server error.
         """
         try:
-            profile = request.user.profile  # Assuming a One-to-One relationship
+            profile = request.user.profile  # Assuming a One-to-One relationship exists.
             serializer = UserProfileSerializer(profile)
             return Response(serializer.data, status=status.HTTP_200_OK)
         except UserProfile.DoesNotExist:
@@ -67,6 +105,28 @@ class UserProfileView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+    @swagger_auto_schema(
+        operation_description="Update the profile of the authenticated user.",
+        request_body=UserProfileSerializer,
+        responses={
+            200: openapi.Response(
+                description="Successfully updated profile details.",
+                schema=UserProfileSerializer()
+            ),
+            400: openapi.Response(
+                description="Validation errors.",
+                schema=error_response_schema
+            ),
+            404: openapi.Response(
+                description="Profile not found.",
+                schema=error_response_schema
+            ),
+            500: openapi.Response(
+                description="Internal server error.",
+                schema=error_response_schema
+            ),
+        },
+    )
     def put(self, request: Any) -> Response:
         """
         Update the profile of the authenticated user.
@@ -81,10 +141,10 @@ class UserProfileView(APIView):
             - 500: Internal server error.
         """
         try:
-            profile = request.user.profile  # Fetch the authenticated user's profile
+            profile = request.user.profile  # Fetch the authenticated user's profile.
             serializer = UserProfileSerializer(profile, data=request.data, partial=True)
             if serializer.is_valid():
-                serializer.save()  # Save the updated profile data
+                serializer.save()  # Save the updated profile data.
                 return Response(serializer.data, status=status.HTTP_200_OK)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except UserProfile.DoesNotExist:
@@ -112,6 +172,52 @@ class UserRegistrationView(APIView):
 
     permission_classes = [AllowAny]
 
+    # Define a response schema for successful registration.
+    register_success_schema = openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        properties={
+            "message": openapi.Schema(
+                type=openapi.TYPE_STRING, example="User registered successfully."
+            ),
+            "user": openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                description="Registered user details."
+            ),
+        },
+    )
+
+    @swagger_auto_schema(
+        operation_description="Register a new user or upgrade a guest user to a regular user.",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                "email": openapi.Schema(
+                    type=openapi.TYPE_STRING, format="email", description="User email."
+                ),
+                "password": openapi.Schema(
+                    type=openapi.TYPE_STRING, format="password", description="User password."
+                ),
+                "confirm_password": openapi.Schema(
+                    type=openapi.TYPE_STRING, format="password", description="Password confirmation."
+                ),
+            },
+            required=["email", "password", "confirm_password"],
+        ),
+        responses={
+            201: openapi.Response(
+                description="User successfully registered or upgraded.",
+                schema=register_success_schema,
+            ),
+            400: openapi.Response(
+                description="Validation errors or missing fields.",
+                schema=error_response_schema,
+            ),
+            500: openapi.Response(
+                description="Internal server error.",
+                schema=error_response_schema,
+            ),
+        },
+    )
     def post(self, request: Any) -> Response:
         """
         Register a new user or upgrade a guest user to a regular user.
@@ -125,15 +231,15 @@ class UserRegistrationView(APIView):
             - 500: Internal server error.
         """
         try:
-            # Check if the user is authenticated
+            # Check if the user is authenticated.
             if request.user.is_authenticated:
-                # Check if the user is a guest user
+                # Check if the user is a guest user.
                 if request.user.is_guest:
-                    # Fetch the password and confirm password
+                    # Fetch the password and confirm password.
                     password = request.data.get("password")
                     confirm_password = request.data.get("confirm_password")
 
-                    # Validate the password inputs
+                    # Validate the password inputs.
                     if not password or not confirm_password:
                         return Response(
                             {"error": "Password and confirm password are required."},
@@ -145,7 +251,7 @@ class UserRegistrationView(APIView):
                             status=status.HTTP_400_BAD_REQUEST,
                         )
 
-                    # Upgrade the guest user to a regular user
+                    # Upgrade the guest user to a regular user.
                     request.user.is_guest = False
                     request.user.role = "user"
                     request.user.password = make_password(password)
@@ -161,12 +267,12 @@ class UserRegistrationView(APIView):
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 
-            # For new user registration
+            # For new user registration.
             email = request.data.get("email")
             password = request.data.get("password")
             confirm_password = request.data.get("confirm_password")
 
-            # Validate input
+            # Validate input.
             if not email or not password or not confirm_password:
                 return Response(
                     {"error": "Email, password, and confirm password are required."},
@@ -179,7 +285,7 @@ class UserRegistrationView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # Use the serializer to validate and create the user
+            # Use the serializer to validate and create the user.
             serializer = RegisterSerializer(
                 data={
                     "email": email,
