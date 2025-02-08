@@ -1,7 +1,7 @@
 name: Run Tests
 
 on:
-  workflow_call: # Allows this workflow to be called from another workflow
+  workflow_call:
 
 jobs:
   test:
@@ -9,19 +9,15 @@ jobs:
     strategy:
       matrix:
         python-version: ['3.8', '3.10', '3.12']
-
     steps:
-      # Step 1: Checkout code
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # Step 2: Set up Python environment
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
 
-      # Step 3: Cache dependencies
       - name: Cache dependencies
         uses: actions/cache@v3
         with:
@@ -30,25 +26,20 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-poetry-
 
-      # Step 4: Install dependencies
       - name: Install dependencies
         run: |
           pip install poetry
           poetry install
 
-      # Step 5: Run tests and save report
       - name: Run tests and generate report
-        run: |
-          poetry run pytest --junitxml=report.xml
+        run: poetry run pytest --junitxml=report.xml
 
-      # Step 6: Upload test report (optional for debugging purposes)
       - name: Upload test report
         uses: actions/upload-artifact@v3
         with:
           name: test-report
           path: report.xml
 
-      # Step 7: Annotate failed tests (optional)
       - name: Annotate failed tests
         if: ${{ failure() }}
         uses: dorny/test-reporter@v1
@@ -57,8 +48,6 @@ jobs:
           path: report.xml
           format: junit
 
-      # Step 8: Fail-safe notification
       - name: Notify on failure
         if: ${{ failure() }}
-        run: |
-          echo "Tests failed! Check the test report for details."
+        run: echo "Tests failed! Check the test report for details."

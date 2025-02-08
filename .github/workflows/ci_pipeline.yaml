@@ -1,3 +1,5 @@
+name: CI Pipeline
+
 on:
   push:
     branches:
@@ -13,20 +15,18 @@ jobs:
       tag: ${{ github.sha }}
 
   test:
+    needs: build
     uses: ./.github/workflows/test.yml
-    with:
-      branch: ${{ github.ref_name }}
 
   deploy:
     needs: [build, test]
     uses: ./.github/workflows/deploy.yml
     with:
-      tag: ${{ github.sha }}
+      version_tag: ${{ jobs.build.outputs.version_tag }}
 
   notify_failure:
     runs-on: self-hosted
     if: failure()
     steps:
       - name: Notify about failure
-        run: |
-          echo "CI Pipeline failed. Check logs for more details."
+        run: echo "CI Pipeline failed. Check logs for more details."
