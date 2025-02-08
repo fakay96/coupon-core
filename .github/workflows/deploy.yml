@@ -51,19 +51,39 @@ jobs:
           echo "webscraper_image=$CURRENT_WEBSCRAPER_IMAGE" >> "$GITHUB_OUTPUT"
 
       # Step 5: Deploy backend and web scraper services with Helm
-      - name: Deploy services with Helm
+            # Step 5: Deploy backend and web scraper services with Helm
+      - name: Debug Helm chart path
+        run: |
+          echo "Checking Helm chart directory contents..."
+          ls -l ./k8s/backend
+          if [ ! -f ./k8s/backend/Chart.yaml ]; then
+            echo "Error: Chart.yaml not found in ./k8s/backend"
+            exit 1
+          fi
+          echo "Checking values directory contents..."
+          ls -l ./values/
+
+      - name: Deploy backend service with Helm
         env:
           VERSION_TAG: ${{ inputs.version_tag }}
         run: |
-          helm upgrade --install backend-service ./k8s/backend \         # Path to directory containing Chart.yaml
+          helm upgrade --install backend-service ./k8s/backend \
             --set image.repository=fakay96/backend \
             --set image.tag=$VERSION_TAG \
-            --namespace production --create-namespace
+            --namespace production --create-namespace \
+            -f ./values/production-values.yaml
 
-          # helm upgrade --install web-scraper-service ./k8s/webscraper \  # Path to Chart.yaml for web scraper
-          #   --set image.repository=fakay96/web_scraper \
-          #   --set image.tag=$VERSION_TAG \
-          #   --namespace production --create-namespace
+      # - name: Deploy web scraper service with Helm
+      #   env:
+      #     VERSION_TAG: ${{ inputs.version_tag }}
+      #   run: |
+      #     helm upgrade --install web-scraper-service ./k8s/webscraper \
+      #       --set image.repository=fakay96/web_scraper \
+      #       --set image.tag=$VERSION_TAG \
+      #       --namespace production --create-namespace \
+      #       -f ./values/production-values.yaml
+
+
 
       # Step 6: Verify deployment status
       - name: Verify deployment status
