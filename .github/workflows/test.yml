@@ -6,6 +6,9 @@ on:
 jobs:
   test:
     runs-on: self-hosted
+    strategy:
+      matrix:
+        python-version: ['3.8', '3.10', '3.12']
 
     steps:
       # Step 1: Checkout code
@@ -16,27 +19,45 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.12'
+          python-version: ${{ matrix.python-version }}
 
-      # Step 3: Install dependencies
+      # Step 3: Cache dependencies
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pypoetry
+          key: ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-poetry-
+
+      # Step 4: Install dependencies
       - name: Install dependencies
         run: |
           pip install poetry
           poetry install
 
-      # Step 4: Run tests and save report
+      # Step 5: Run tests and save report
       - name: Run tests and generate report
         run: |
-          pytest --junitxml=report.xml
+          poetry run pytest --junitxml=report.xml
 
-      # Step 5: Upload test report (optional for debugging purposes)
+      # Step 6: Upload test report (optional for debugging purposes)
       - name: Upload test report
         uses: actions/upload-artifact@v3
         with:
           name: test-report
           path: report.xml
 
-      # Step 6: Fail-safe notification
+      # Step 7: Annotate failed tests (optional)
+      - name: Annotate failed tests
+        if: ${{ failure() }}
+        uses: dorny/test-reporter@v1
+        with:
+          name: pytest
+          path: report.xml
+          format: junit
+
+      # Step 8: Fail-safe notification
       - name: Notify on failure
         if: ${{ failure() }}
         run: |

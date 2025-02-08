@@ -16,7 +16,7 @@ jobs:
       - name: Get version information
         id: get_version
         run: |
-          VERSION_TAG=$(date +%Y%m%d)-${{ github.sha::0:7 }}
+          VERSION_TAG=$(date +%Y%m%d)-$(echo "${GITHUB_SHA}" | cut -c1-7)
           echo "VERSION_TAG=${VERSION_TAG}" >> $GITHUB_ENV
 
       # Step 3: Build Docker images with version tag
