@@ -6,7 +6,7 @@ metadata:
     app: {{ .Chart.Name }}
     release: {{ .Release.Name }}
 spec:
-  type: "{{ .Values.service.type}}"
+  type: "{{ .Values.backend.service.type }}"
   ports:
     - port: 8000
       targetPort: 8000
