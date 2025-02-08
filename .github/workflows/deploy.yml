@@ -71,7 +71,7 @@ jobs:
       # Step 7: Verify deployment status
       - name: Verify deployment status
         run: |
-          kubectl rollout status deployment backend-service -n production --timeout=300s
+          kubectl rollout status deployment backend -n production --timeout=300s
 
       # Step 8: Rollback on failure (optional)
       - name: Rollback to previous version on failure
