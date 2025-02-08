@@ -20,23 +20,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Step 2: Configure kubectl for DigitalOcean
+      # Step 2: Configure kubectl for DigitalOcean (using raw YAML)
       - name: Configure kubectl for DigitalOcean
         run: |
           mkdir -p ~/.kube                            # Ensure .kube directory exists
-          echo "Decoding kubeconfig content..."
-          echo "${{ secrets.KUBECONFIG_CONTENT }}" | base64 -d > ~/.kube/config
-          if [ $? -ne 0 ]; then
-            echo "Failed to decode KUBECONFIG_CONTENT. Ensure it is valid base64."
-            exit 1
-          fi
+          echo "Creating kubeconfig from raw YAML content..."
+          echo "${{ secrets.KUBECONFIG_CONTENT }}" > ~/.kube/config
           chmod 600 ~/.kube/config                    # Secure the kubeconfig file
 
       # Step 3: Verify kubeconfig setup
-      - name: Verify kubeconfig file
+      - name: Verify kubeconfig file and access
         run: |
           echo "Verifying kubeconfig file..."
           cat ~/.kube/config || echo "Failed to read kubeconfig file!"
+          echo "Testing cluster access..."
+          kubectl get nodes
 
       # Step 4: Install Helm
       - name: Install Helm
