@@ -61,7 +61,7 @@ jobs:
             exit 1
           fi
           echo "Checking values directory contents..."
-          ls -l ./values/
+          ls -l ./k8s/backend/values/
 
       - name: Deploy backend service with Helm
         env:
@@ -71,7 +71,7 @@ jobs:
             --set image.repository=fakay96/backend \
             --set image.tag=$VERSION_TAG \
             --namespace production --create-namespace \
-            -f ./values/production-values.yaml
+            -f ./k8s/backend/values/production-values.yaml
 
       # - name: Deploy web scraper service with Helm
       #   env:
