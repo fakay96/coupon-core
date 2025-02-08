@@ -15,6 +15,9 @@ jobs:
   deploy:
     runs-on: self-hosted
 
+    env:
+          VERSION_TAG: ${{ inputs.version_tag }}
+
     steps:
       # Step 1: Checkout code
       - name: Checkout code
@@ -23,10 +26,10 @@ jobs:
       # Step 2: Configure kubectl for DigitalOcean (using raw YAML)
       - name: Configure kubectl for DigitalOcean
         run: |
-          mkdir -p ~/.kube                            # Ensure .kube directory exists
+          mkdir -p ~/.kube                          
           echo "Creating kubeconfig from raw YAML content..."
           echo "${{ secrets.KUBECONFIG_CONTENT }}" > ~/.kube/config
-          chmod 600 ~/.kube/config                    # Secure the kubeconfig file
+          chmod 600 ~/.kube/config                   
 
       # Step 3: Verify kubeconfig setup
       - name: Verify kubeconfig file and access
@@ -89,7 +92,7 @@ jobs:
       - name: Verify deployment status
         run: |
           kubectl rollout status deployment backend-service -n production --timeout=300s
-          kubectl rollout status deployment web-scraper-service -n production --timeout=300s
+          
 
       # Step 7: Rollback on failure (optional)
       - name: Rollback to previous version on failure
