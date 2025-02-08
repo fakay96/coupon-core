@@ -55,15 +55,15 @@ jobs:
         env:
           VERSION_TAG: ${{ inputs.version_tag }}
         run: |
-          helm upgrade --install backend-service ./helm/backend-chart \
+          helm upgrade --install backend-service ./k8s/backend \         # Path to directory containing Chart.yaml
             --set image.repository=fakay96/backend \
             --set image.tag=$VERSION_TAG \
             --namespace production --create-namespace
 
-          helm upgrade --install web-scraper-service ./helm/webscraper-chart \
-            --set image.repository=fakay96/web_scraper \
-            --set image.tag=$VERSION_TAG \
-            --namespace production --create-namespace
+          # helm upgrade --install web-scraper-service ./k8s/webscraper \  # Path to Chart.yaml for web scraper
+          #   --set image.repository=fakay96/web_scraper \
+          #   --set image.tag=$VERSION_TAG \
+          #   --namespace production --create-namespace
 
       # Step 6: Verify deployment status
       - name: Verify deployment status
