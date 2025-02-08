@@ -1,63 +1,62 @@
-name: Deploy to DigitalOcean Kubernetes
+name: Build Docker Images
 
 on:
   workflow_call:
     inputs:
-      version_tag:
-        description: 'The version tag to deploy'
-        required: true
+      tag:
+        description: 'The commit SHA to use as a tag'
+        required: false
         type: string
 
 jobs:
-  deploy:
+  build:
     runs-on: self-hosted
+    outputs:
+      version_tag: ${{ steps.set_output.outputs.version_tag }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Configure kubectl for DigitalOcean
+      - name: Get version information
+        id: get_version
         run: |
-          echo "${{ secrets.KUBECONFIG_CONTENT }}" | base64 -d > ~/.kube/config
+          if [ -n "${{ inputs.tag }}" ]; then
+            TAG=${{ inputs.tag }}
+          else
+            TAG=$(date +%Y%m%d)-$(echo "${GITHUB_SHA}" | cut -c1-7)
+          fi
+          echo "VERSION_TAG=${TAG}" >> "$GITHUB_ENV"
+          echo "version_tag=${TAG}" >> "$GITHUB_OUTPUT"
 
-      - name: Install Helm
-        run: |
-          curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
-
-      - name: Capture current image tags
-        id: capture_images
-        run: |
-          CURRENT_BACKEND_IMAGE=$(kubectl get deployment backend-service -n production \
-            -o=jsonpath='{.spec.template.spec.containers[0].image}')
-          CURRENT_WEBSCRAPER_IMAGE=$(kubectl get deployment web-scraper-service -n production \
-            -o=jsonpath='{.spec.template.spec.containers[0].image}')
-          
-          echo "CURRENT_BACKEND_IMAGE=$CURRENT_BACKEND_IMAGE" >> "$GITHUB_ENV"
-          echo "CURRENT_WEBSCRAPER_IMAGE=$CURRENT_WEBSCRAPER_IMAGE" >> "$GITHUB_ENV"
-          echo "backend_image=$CURRENT_BACKEND_IMAGE" >> "$GITHUB_OUTPUT"
-          echo "webscraper_image=$CURRENT_WEBSCRAPER_IMAGE" >> "$GITHUB_OUTPUT"
-
-      - name: Deploy services with Helm
+      - name: Build Docker images
         env:
-          VERSION_TAG: ${{ inputs.version_tag }}
+          VERSION_TAG: ${{ env.VERSION_TAG }}
         run: |
-          helm upgrade --install backend-service ./helm/backend-chart \
-            --set image.repository=fakay96/backend \
-            --set image.tag=$VERSION_TAG \
-            --namespace production --create-namespace
+          docker build -t fakay96/backend:${VERSION_TAG} -f docker/Docker.backend .
+          docker build -t fakay96/web_scraper:${VERSION_TAG} -f docker/Docker.web_scraper .
 
-          helm upgrade --install web-scraper-service ./helm/webscraper-chart \
-            --set image.repository=fakay96/web_scraper \
-            --set image.tag=$VERSION_TAG \
-            --namespace production --create-namespace
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Verify deployment status
+      - name: Push Docker images
+        env:
+          VERSION_TAG: ${{ env.VERSION_TAG }}
         run: |
-          kubectl rollout status deployment backend-service -n production --timeout=300s
-          kubectl rollout status deployment web-scraper-service -n production --timeout=300s
+          docker push fakay96/backend:${VERSION_TAG}
+          docker push fakay96/web_scraper:${VERSION_TAG}
 
-      - name: Rollback to previous version on failure
-        if: failure()
-        run: |
-          echo "Deployment failed. Rolling back to previous versions."
-          helm rollback backend-service 1 --namespace production
-          helm rollback web-scraper-service 1 --namespace production
+      - name: Save version tag to file
+        run: echo "${VERSION_TAG}" > version.txt
+
+      - name: Upload version file as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: version-file
+          path: version.txt
+
+      - name: Set version tag as output
+        id: set_output
+        run: echo "version_tag=${VERSION_TAG}" >> "$GITHUB_OUTPUT"
