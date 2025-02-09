@@ -43,19 +43,25 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-     
-
       - name: Build and push the backend image
         env:
           VERSION_TAG: ${{ env.VERSION_TAG }}
         run: |
-          docker build -t fakay96/backend:${VERSION_TAG} --push --no-cache -f docker/Dockerfile.backend .
+          docker build -t fakay96/backend:${VERSION_TAG} --push -f docker/Dockerfile.backend .
+
+      - name: Prune Docker resources after backend build
+        run: |
+          docker system prune --force --volumes
 
       - name: Build and push the web scraper image
         env:
           VERSION_TAG: ${{ env.VERSION_TAG }}
         run: |
-          docker build -t fakay96/web_scraper:${VERSION_TAG} --push --no-cache -f docker/Dockerfile.web_scraper .
+          docker build -t fakay96/web_scraper:${VERSION_TAG} --push -f docker/Dockerfile.web_scraper .
+
+      - name: Prune Docker resources after web scraper build
+        run: |
+          docker system prune --force --volumes
 
       - name: Save version tag to file
         run: echo "${{ env.VERSION_TAG }}" > version.txt
@@ -65,7 +71,3 @@ jobs:
         with:
           name: version-file
           path: version.txt
-
-
-
-
