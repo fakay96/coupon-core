@@ -1,0 +1,35 @@
+name: Docker Cleanup
+
+on:
+  # Trigger this workflow on a schedule (e.g., once a day or week)
+  schedule:
+    - cron: '0 2 * * *'  # Runs every day at 02:00 UTC
+
+  # Allow manual trigger for on-demand cleanup
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: self-hosted
+
+    steps:
+      - name: Log Docker disk usage before cleanup
+        run: docker system df
+
+      - name: Remove unused containers
+        run: docker container prune -f
+
+      - name: Remove unused images
+        run: docker image prune -f
+
+      - name: Remove unused volumes
+        run: docker volume prune -f
+
+      - name: Remove unused networks
+        run: docker network prune -f
+
+      - name: Remove all dangling images, containers, and cache
+        run: docker system prune -af
+
+      - name: Log Docker disk usage after cleanup
+        run: docker system df

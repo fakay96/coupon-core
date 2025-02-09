@@ -1,4 +1,4 @@
-# Use the official Ubuntu slim image
+# Use the official Python slim image as base
 FROM python:3.12-slim as BASE
 
 # Set environment variables for Python and GDAL
@@ -10,38 +10,33 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Set the working directory
 WORKDIR /app
 
-# Install required packages
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        postgresql-client \
-        curl \
-        gdal-bin \
-        python3-pip && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# Install system dependencies in one step and clean up to minimize layers
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    postgresql-client \
+    curl \
+    gdal-bin \
+    python3-pip && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install Poetry using pip and configure it
-RUN pip install --no-cache-dir poetry && \
-    poetry config virtualenvs.create false
+# Install Poetry globally without cache
+RUN pip install --no-cache-dir poetry
 
-# Copy dependency files first (to leverage Docker cache)
-COPY pyproject.toml ./
+# Copy only dependency files first for Docker cache optimization
+COPY pyproject.toml poetry.lock ./
 
-# Install Python dependencies without dev packages
-RUN poetry install --no-root --no-interaction --no-ansi && \
-    pip install torch torchvision torchaudio
+# Install only production dependencies (avoid installing dev dependencies)
+RUN poetry install --no-root --no-dev --no-interaction --no-ansi
 
-# Copy application source code
+# Install additional Python packages directly using pip to minimize Dockerfile complexity
+RUN pip install torch torchvision torchaudio --no-cache-dir
+
+# Copy the rest of the application code
 COPY coupon_core/ coupon_core/
 COPY authentication/ authentication/
 COPY geodiscounts/ geodiscounts/
 COPY manage.py .
 
-# Copy the initialization script and ensure it is executable
+# Copy and set permissions for the initialization script
 COPY Scripts/entryfile_backend.sh /app/init_db.sh
 RUN chmod +x /app/init_db.sh
-
-# Expose the port your app runs on
-EXPOSE 8000
-
 
