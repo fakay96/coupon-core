@@ -79,6 +79,3 @@ else
   echo "Environment is not development. Skipping collectstatic."
 fi
 
-# Start the Django application using Gunicorn
-echo "Starting Gunicorn server..."
-exec gunicorn coupon_core.wsgi:application --bind 0.0.0.0:8000
