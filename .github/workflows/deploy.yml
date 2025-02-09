@@ -30,7 +30,7 @@ jobs:
         run: kubectl get nodes
 
       - name: Debug version tag
-        run: echo "The version tag being used for deployment is: ${{ inputs.version_tag }}"
+        run: 'echo "The version tag being used for deployment is: ${{ inputs.version_tag }}"'
 
       - name: Deploy backend service with Helm
         run: |

@@ -23,7 +23,7 @@ jobs:
     runs-on: self-hosted
     steps:
       - name: Debug version tag output
-        run: echo "Version tag from build output: ${{ needs.build.outputs.version_tag }}"
+        run: 'echo "Version tag from build output: ${{ needs.build.outputs.version_tag }}"'
 
   deploy:
     needs: build
