@@ -20,7 +20,7 @@ jobs:
   # Debug added to confirm version_tag output from build
   debug_build_output:
     needs: build
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - name: Debug version tag output
         run: 'echo "Version tag from build output: ${{ needs.build.outputs.version_tag }}"'
@@ -35,7 +35,7 @@ jobs:
       KUBERNETES_SECRETS: ${{ secrets.KUBERNETES_SECRETS}}
 
   notify_failure:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     if: failure()
     steps:
       - name: Notify about failure
