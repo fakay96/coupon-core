@@ -43,9 +43,7 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and push the base image
-        run: |
-          docker build -t fakay96/coupon-core:0.0.1 --push --no-cache -f docker/Dockerfile.core .
+     
 
       - name: Build and push the backend image
         env:
@@ -67,3 +65,5 @@ jobs:
         with:
           name: version-file
           path: version.txt
+
+
