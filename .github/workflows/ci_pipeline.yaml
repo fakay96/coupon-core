@@ -17,13 +17,7 @@ jobs:
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
 
-  # Debug added to confirm version_tag output from build
-  debug_build_output:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Debug version tag output
-        run: 'echo "Version tag from build output: ${{ needs.build.outputs.version_tag }}"'
+
 
   deploy:
     needs: build
