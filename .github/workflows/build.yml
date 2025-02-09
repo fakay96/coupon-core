@@ -41,7 +41,7 @@ jobs:
         env:
           VERSION_TAG: ${{ env.VERSION_TAG }}
         run: |
-          docker build --platform=linux/amd64 -t fakay96/backend:${VERSION_TAG}  --no-cache -f docker/Dockerfile.backend .
+          docker buildx build --platform linux/amd64 -t fakay96/backend:${VERSION_TAG} --no-cache -f docker/Dockerfile.backend .
           docker build --platform=linux/amd64 -t fakay96/web_scraper:${VERSION_TAG} -f docker/Dockerfile.web_scraper .
 
       - name: Log in to Docker Hub
