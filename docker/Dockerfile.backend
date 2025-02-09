@@ -23,16 +23,17 @@ RUN apt-get update && \
         postgresql-client && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Poetry globally and configure it to install packages into the container environment
+# Install Poetry globally (pinning a specific version) and configure it
 RUN curl -sSL https://install.python-poetry.org | python3 - && \
-    poetry config virtualenvs.create false
+    poetry config virtualenvs.create false && \
+    poetry self update 1.6.1  # Pinning to a stable version
 
 # Copy dependency files first (to leverage Docker cache)
 COPY pyproject.toml poetry.lock README.md ./
 
 # Install Python dependencies (without development packages)
 RUN poetry install --no-root --no-interaction --no-ansi && \
-    pip install torch torchvision torchaudio
+    pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2  # Specify compatible versions
 
 # Copy application source code
 COPY coupon_core/ coupon_core/
@@ -40,9 +41,9 @@ COPY authentication/ authentication/
 COPY geodiscounts/ geodiscounts/
 COPY manage.py .
 
-
 # Expose the port your app runs on
 EXPOSE 8000
+
 # Add an entrypoint script for initialization
 COPY Scripts/entryfile_backend.sh /app/backend-entrypoint.sh
 
