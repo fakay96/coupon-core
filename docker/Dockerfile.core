@@ -10,21 +10,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Set the working directory
 WORKDIR /app
 
-# Install required system dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        software-properties-common \
-        gdal-bin \
-        libgdal-dev \
-        libpq-dev \
-        gcc \
-        netcat-openbsd \
-        curl \
-        postgresql-client && \
-    add-apt-repository ppa:deadsnakes/ppa && \
-    apt-get update && \
-    apt-get install -y python3.12 python3-pip python3-venv && \
-    rm -rf /var/lib/apt/lists/*
+
 
 # Install Poetry globally and configure it to install packages into the container environment
 RUN curl -sSL https://install.python-poetry.org | python3 - && \
