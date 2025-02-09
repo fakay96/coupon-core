@@ -1,5 +1,5 @@
 # Start from the base image created earlier
-FROM fakay96/coupon-core:0.0.1 as RUNNER
+FROM fakay96/coupon-core:0.0.1 as runner
 
 # Set environment variables for Python
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -11,7 +11,7 @@ WORKDIR /app
 # Copy only the necessary runtime components from the base stage
 # This assumes everything is already built in fakay96/coupon-core:0.0.1
 COPY --from=BASE /root/.local /root/.local
-COPY --from=BASE /app /app
+
 
 # Expose the port if needed
 EXPOSE 8000
