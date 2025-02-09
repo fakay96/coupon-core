@@ -52,6 +52,8 @@ jobs:
 
       # Step 7: Deploy backend service with Helm
       - name: Deploy backend service with Helm
+        env:
+            VERSION_TAG: ${{ env.VERSION_TAG }}
         run: |
           echo "Deploying with image tag: ${VERSION_TAG}"
           helm upgrade --install backend-service ./k8s/backend \
