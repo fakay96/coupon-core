@@ -66,4 +66,4 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: MILVUS_PORT
-        - name: MILVUS_USER
+       
