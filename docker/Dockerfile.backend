@@ -10,10 +10,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # Ensure reliable mirrors and install certificates
-RUN sed -i 's|http://deb.debian.org|http://ftp.us.debian.org|g' /etc/apt/sources.list && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates && \
-    apt-get update && \
+# Install system dependencies (GDAL, PostgreSQL client, build tools, etc.)
+RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         gdal-bin \
         libgdal-dev \
