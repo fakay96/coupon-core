@@ -1,58 +1,15 @@
-FROM python:3.12-slim as BASE
+# Start from the base image built from Dockerfile.base
+FROM fakay96/coupon-core:0.0.1
 
-# Set environment variables for Python
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PATH="/root/.local/bin:$PATH"
-
-# Set the working directory
+# Set working directory for the CELERY app
 WORKDIR /app
 
-# Install system dependencies and clean up to minimize image size
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    postgresql-client \
-    curl \
-    python3-pip && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Install Poetry globally
-RUN pip install --no-cache-dir poetry
-
-# Copy dependency management files (e.g., pyproject.toml) and install dependencies
-COPY pyproject.toml  ./
-RUN poetry install --no-root --no-interaction --no-ansi
-
-# Install additional Python libraries (e.g., PyTorch)
-RUN pip install torch torchvision torchaudio
-
-# ===========================
-# Runner Stage: Runtime Setup
-# ===========================
-FROM python:3.12-slim as RUNNER
-
-# Set environment variables for Python
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PATH="/root/.local/bin:$PATH"
-
-# Set the working directory
-WORKDIR /app
-
-# Copy only necessary files from the base stage
-COPY --from=BASE /root/.cache /root/.cache
-COPY --from=BASE /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
-COPY --from=BASE /root/.local /root/.local
-
-# Copy application source code into the runner stage
-COPY coupon_core/ coupon_core/
-COPY authentication/ authentication/
-COPY geodiscounts/ geodiscounts/
-COPY manage.py .
-COPY Scripts/entryfile_backend.sh /app/init_db.sh
-
-# Expose any required ports (e.g., 8000 for Django)
+# Expose the application port
 EXPOSE 8000
 
-# Set entrypoint script as executable and define default command
-RUN chmod +x /app/init_db.sh
-ENTRYPOINT ["/app/init_db.sh"]
+# Add an entrypoint script for initialization
+COPY Scripts/entryfile_backend.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+# Use the entrypoint script for initialization
+ENTRYPOINT ["/app/entrypoint.sh"]
