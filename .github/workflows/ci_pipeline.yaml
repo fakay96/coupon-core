@@ -40,3 +40,4 @@ jobs:
     steps:
       - name: Notify about failure
         run: echo "CI Pipeline failed. Check logs for more details."
+
