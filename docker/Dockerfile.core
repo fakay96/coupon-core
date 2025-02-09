@@ -41,7 +41,7 @@ COPY geodiscounts/ geodiscounts/
 COPY manage.py .
 
 # Copy the initialization script and ensure it is executable
-COPY Scripts/init_db.sh /app/init_db.sh
+COPY Scripts/entryfile_backend.sh /app/init_db.sh
 RUN chmod +x /app/init_db.sh
 
 # Expose the port your app runs on
