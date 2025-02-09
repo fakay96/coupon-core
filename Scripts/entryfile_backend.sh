@@ -2,7 +2,7 @@
 
 # Wait for the database to be ready
 echo "Waiting for the database..."
-while ! nc -z "$DB_HOST" 5432; do
+while ! nc -z "$DB_HOST" "$DB_PORT"; do
   sleep 1
 done
 echo "Database is ready."
