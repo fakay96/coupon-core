@@ -22,7 +22,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN pip install --no-cache-dir poetry
 
 # Copy only dependency files first for Docker cache optimization
-COPY pyproject.toml poetry.lock ./
+COPY pyproject.toml  ./
 # Install Python dependencies without dev packages
 RUN poetry install --no-root --no-interaction --no-ansi && \
     pip install torch torchvision torchaudio
