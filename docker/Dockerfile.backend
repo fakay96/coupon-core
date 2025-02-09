@@ -39,7 +39,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # Copy only necessary files from the base stage
-COPY --from=BASE /root/.cache /root/.cache  # Poetry cache (optional, speeds up builds)
+COPY --from=BASE /root/.cache /root/.cache
 COPY --from=BASE /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=BASE /root/.local /root/.local
 
