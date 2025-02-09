@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       tag:
-        description: 'The commit SHA to use as a tag'
+        description: 'The commit SHA to use as a tag (use "latest" to tag as latest)'
         required: false
         type: string
     secrets:
@@ -31,6 +31,14 @@ jobs:
           else
             TAG=$(date +%Y%m%d)-$(echo "${GITHUB_SHA}" | cut -c1-7)
           fi
+
+          # Use "latest" tag if it is explicitly provided
+          if [ "$TAG" = "latest" ]; then
+            echo "Using 'latest' tag for Docker images."
+          else
+            echo "Using generated version tag: $TAG"
+          fi
+
           echo "VERSION_TAG=${TAG}" >> "$GITHUB_ENV"
           echo "version_tag=${TAG}" >> "$GITHUB_OUTPUT"
 
