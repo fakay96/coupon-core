@@ -14,10 +14,10 @@ spec:
     spec:
       containers:
         - name: backend
-          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag}}"
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
           imagePullPolicy: "{{ .Values.backend.image.pullPolicy }}"
           ports:
-            - containerPort: {{ .Values.backend.service.port  }}
+            - containerPort: {{ .Values.backend.service.port }}
           resources:
             requests:
               memory: "{{ .Values.backend.resources.requests.memory }}"
@@ -66,5 +66,12 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: MILVUS_PORT
-       
-       
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              gunicorn coupon-core.wsgi:application \
+              --bind 0.0.0.0:{{ .Values.backend.service.port }} \
+              --workers 3 \
+              --timeout 120 \
+              --access-logfile '-' \
+              --error-logfile '-'

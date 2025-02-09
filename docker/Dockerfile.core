@@ -1,43 +1,35 @@
-# Use the official Python slim image as base
+# Base stage to build dependencies and setup environment
 FROM python:3.12-slim as BASE
 
-# Set environment variables for Python and GDAL
+# Set environment variables for Python
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PATH="/root/.local/bin:$PATH" \
-    GDAL_LIBRARY_PATH=/usr/lib/libgdal.so
+    PATH="/root/.local/bin:$PATH"
 
 # Set the working directory
 WORKDIR /app
 
-# Install system dependencies in one step and clean up to minimize layers
+# Install system dependencies and clean up to minimize image size
 RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
     curl \
-    gdal-bin \
     python3-pip && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install Poetry globally without cache
+# Install Poetry globally
 RUN pip install --no-cache-dir poetry
 
-# Copy only dependency files first for Docker cache optimization
+# Copy dependency management files and install dependencies
 COPY pyproject.toml  ./
-# Install Python dependencies without dev packages
-RUN poetry install --no-root --no-interaction --no-ansi && \
-    pip install torch torchvision torchaudio
+RUN poetry install --no-root --no-interaction --no-ansi
+
+# Install additional Python libraries (e.g., PyTorch)
+RUN pip install torch torchvision torchaudio
 
 # Copy application source code
 COPY coupon_core/ coupon_core/
 COPY authentication/ authentication/
 COPY geodiscounts/ geodiscounts/
 COPY manage.py .
-
-# Copy the initialization script and ensure it is executable
 COPY Scripts/entryfile_backend.sh /app/init_db.sh
-RUN chmod +x /app/init_db.sh
-
-# Expose the port your app runs on
-EXPOSE 8000
-
 

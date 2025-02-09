@@ -1,11 +1,20 @@
-# Start from the base image built from Dockerfile.base
-FROM fakay96/coupon-core:0.0.1
+# Start from the base image created earlier
+FROM fakay96/coupon-core:0.0.1 as RUNNER
 
-# Set working directory for the CELERY app
+# Set environment variables for Python
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+# Set the working directory
 WORKDIR /app
 
-# Expose the application port
+# Copy only the necessary runtime components from the base stage
+# This assumes everything is already built in fakay96/coupon-core:0.0.1
+COPY --from=BASE /root/.local /root/.local
+COPY --from=BASE /app /app
+
+# Expose the port if needed
 EXPOSE 8000
 
-# Keep the container running by using a simple sleep command
-CMD ["tail", "-f", "/dev/null"]
+# Placeholder CMD (replace with actual Celery or Django command later)
+ENTRYPOINT ["/app/init_db.sh"]
