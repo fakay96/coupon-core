@@ -1,5 +1,5 @@
 # Use the official Ubuntu slim image
-FROM ubuntu:22.04 AS base
+FROM python:3.12-slim as BASE
 
 # Set environment variables for Python and GDAL
 ENV PYTHONDONTWRITEBYTECODE=1 \
