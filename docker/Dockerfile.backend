@@ -10,3 +10,4 @@ EXPOSE 8000
 # Add an entrypoint script for initialization
 
 # Use the entrypoint script for initialization
+ENTRYPOINT ["/app/init_db.sh"]
