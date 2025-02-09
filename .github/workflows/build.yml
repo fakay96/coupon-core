@@ -35,7 +35,7 @@ jobs:
           echo "version_tag=${TAG}" >> "$GITHUB_OUTPUT"
 
       - name: Debug version tag
-        run: 'echo "Generated version tag is: ${{ env.VERSION_TAG }}"'
+        run: echo "Generated version tag is: ${{ env.VERSION_TAG }}"
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
@@ -45,22 +45,19 @@ jobs:
 
       - name: Build and push the base image
         run: |
-          docker buildx build --platform linux/amd64,linux/arm64 \
-            -t fakay96/coupon-core:0.0.1 --push --no-cache -f docker/Dockerfile.base .
+          docker build -t fakay96/coupon-core:0.0.1 --push --no-cache -f docker/Dockerfile.base .
 
       - name: Build and push the backend image
         env:
           VERSION_TAG: ${{ env.VERSION_TAG }}
         run: |
-          docker buildx build --platform linux/amd64 \
-            -t fakay96/backend:${VERSION_TAG} --push --no-cache -f docker/Dockerfile.backend .
+          docker build -t fakay96/backend:${VERSION_TAG} --push --no-cache -f docker/Dockerfile.backend .
 
       - name: Build and push the web scraper image
         env:
           VERSION_TAG: ${{ env.VERSION_TAG }}
         run: |
-          docker buildx build --platform linux/amd64 \
-            -t fakay96/web_scraper:${VERSION_TAG} --push --no-cache -f docker/Dockerfile.web_scraper .
+          docker build -t fakay96/web_scraper:${VERSION_TAG} --push --no-cache -f docker/Dockerfile.web_scraper .
 
       - name: Save version tag to file
         run: echo "${{ env.VERSION_TAG }}" > version.txt
