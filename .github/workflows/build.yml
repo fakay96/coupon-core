@@ -45,7 +45,7 @@ jobs:
 
       - name: Build and push the base image
         run: |
-          docker build -t fakay96/coupon-core:0.0.1 --push --no-cache -f docker/Dockerfile.base .
+          docker build -t fakay96/coupon-core:0.0.1 --push --no-cache -f docker/Dockerfile.core .
 
       - name: Build and push the backend image
         env:
