@@ -32,6 +32,7 @@ jobs:
       version_tag: ${{ needs.build.outputs.version_tag }}
     secrets:
       KUBECONFIG_CONTENT: ${{ secrets.KUBECONFIG_CONTENT }}
+      KUBERNETES_SECRET: ${{ secrets.KUBERNETES_SECRETS}}
 
   notify_failure:
     runs-on: self-hosted
