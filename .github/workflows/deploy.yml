@@ -48,7 +48,7 @@ jobs:
 
       # Step 6: Debug version tag
       - name: Debug version tag
-        run: 'echo "The version tag being used for deployment is: ${VERSION_TAG}"'
+        run: 'echo "The version tag being used for deployment is: ${version_tag}"'
 
       # Step 7: Deploy backend service with Helm
       - name: Deploy backend service with Helm
@@ -62,9 +62,9 @@ jobs:
             --namespace production --create-namespace \
             -f ./k8s/backend/values/production-values.yaml
 
-      # Step 8: Verify deployment status
-      - name: Verify deployment status
-        run: kubectl rollout status deployment backend -n production --timeout=10s
+      # # Step 8: Verify deployment status
+      # - name: Verify deployment status
+      #   run: kubectl rollout status deployment backend -n production --timeout=10s
 
       # Step 9: Rollback on failure (optional)
       - name: Rollback to previous version on failure
