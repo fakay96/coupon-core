@@ -1,3 +1,4 @@
+# Use a base Python image (consolidating from Dockerfile.core)
 FROM python:3.12-slim AS base
 
 # Set environment variables for Python and GDAL
@@ -9,7 +10,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Set working directory for the BACKEND app
 WORKDIR /app
 
-RUN apt-get --allow-releaseinfo-change update && \
+# Install system dependencies
+RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         gdal-bin \
         libgdal-dev \
@@ -20,7 +22,6 @@ RUN apt-get --allow-releaseinfo-change update && \
         awscli \
         postgresql-client && \
     rm -rf /var/lib/apt/lists/*
-
 
 # Install Poetry and configure it to install packages globally
 RUN curl -sSL https://install.python-poetry.org | python3 - && \
