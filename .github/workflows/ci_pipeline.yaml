@@ -13,8 +13,7 @@ jobs:
     uses: ./.github/workflows/build.yml
     with:
       tag: ${{ github.sha }}
-    outputs:
-    version_tag: ${{ steps.get_version.outputs.version_tag }}
+      
     secrets:
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}

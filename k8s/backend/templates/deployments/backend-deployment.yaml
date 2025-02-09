@@ -14,10 +14,10 @@ spec:
     spec:
       containers:
         - name: backend
-          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag | default 'latest' }}"
-          imagePullPolicy: "{{ .Values.backend.image.pullPolicy | default 'IfNotPresent' }}"
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag}}"
+          imagePullPolicy: "{{ .Values.backend.image.pullPolicy }}"
           ports:
-            - containerPort: {{ .Values.backend.service.port | default 8000 }}
+            - containerPort: {{ .Values.backend.service.port  }}
           resources:
             requests:
               memory: "{{ .Values.backend.resources.requests.memory }}"
