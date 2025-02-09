@@ -16,11 +16,9 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      # Step 1: Checkout code
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Step 2: Configure kubectl for DigitalOcean
       - name: Configure kubectl for DigitalOcean
         run: |
           mkdir -p ~/.kube
@@ -28,53 +26,19 @@ jobs:
           echo "${{ secrets.KUBECONFIG_CONTENT }}" > ~/.kube/config
           chmod 600 ~/.kube/config
 
-      # Step 3: Verify kubeconfig setup
       - name: Verify kubeconfig file and access
-        run: |
-          echo "Verifying kubeconfig file..."
-          kubectl get nodes
+        run: kubectl get nodes
 
-      # Step 4: Uninstall previous Helm releases (optional)
-      - name: Uninstall previous Helm releases
-        continue-on-error: true
-        run: |
-          helm uninstall backend-service --namespace production || echo "backend-service not installed."
+      - name: Debug version tag
+        run: echo "The version tag being used for deployment is: ${{ inputs.version_tag }}"
 
-      # Step 5: Debug Helm chart path
-      - name: Debug Helm chart path
-        run: |
-          echo "Checking Helm chart directory contents..."
-          ls -l ./k8s/backend
-          if [ ! -f ./k8s/backend/Chart.yaml ]; then
-            echo "Error: Chart.yaml not found in ./k8s/backend"
-            exit 1
-          fi
-          echo "Checking values directory contents..."
-          ls -l ./k8s/backend/values/
-
-      # Step 6: Print version tag
-      - name: Print version tag
-        run: |
-          echo "The version tag being used for deployment is: ${{ inputs.version_tag }}"  # CORRECTED LINE
-
-      # Step 7: Deploy backend service with Helm
       - name: Deploy backend service with Helm
         run: |
-          echo "Deploying with image tag: ${{ inputs.version_tag }}" # CORRECTED LINE
           helm upgrade --install backend-service ./k8s/backend \
             --set backend.image.repository=fakay96/backend \
-            --set backend.image.tag=${{ inputs.version_tag }} \  # CORRECTED LINE
+            --set backend.image.tag=${{ inputs.version_tag }} \
             --namespace production --create-namespace \
             -f ./k8s/backend/values/production-values.yaml
 
-      # Step 8: Verify deployment status
       - name: Verify deployment status
-        run: |
-          kubectl rollout status deployment backend -n production --timeout=10s
-
-      # Step 9: Rollback on failure (optional)
-      - name: Rollback to previous version on failure
-        if: failure()
-        run: |
-          echo "Deployment failed. Rolling back to previous versions."
-          helm rollback backend-service 1 --namespace production
+        run: kubectl rollout status deployment backend -n production --timeout=10s

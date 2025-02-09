@@ -1,78 +1,41 @@
-name: Build Docker Images
+name: CI Pipeline
 
 on:
-  workflow_call:
-    inputs:
-      tag:
-        description: 'The commit SHA to use as a tag'
-        required: false
-        type: string
-    secrets:
-      DOCKER_USERNAME:
-        required: true
-      DOCKER_PASSWORD:
-        required: true
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   build:
+    uses: ./.github/workflows/build.yml
+    with:
+      tag: ${{ github.sha }}
+    secrets:
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+
+  # Debug added to confirm version_tag output from build
+  debug_build_output:
+    needs: build
     runs-on: self-hosted
-    outputs:
-      version_tag: ${{ steps.get_version.outputs.version_tag }}  # Corrected line
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Debug version tag output
+        run: echo "Version tag from build output: ${{ needs.build.outputs.version_tag }}"
 
-      - name: Get version information
-        id: get_version
-        run: |
-          if [ -n "${{ inputs.tag }}" ]; then
-            TAG=${{ inputs.tag }}
-          else
-            TAG=$(date +%Y%m%d)-$(echo "${GITHUB_SHA}" | cut -c1-7)
-          fi
-          echo "VERSION_TAG=${TAG}" >> "$GITHUB_ENV"
-          echo "version_tag=${TAG}" >> "$GITHUB_OUTPUT"
+  deploy:
+    needs: build
+    uses: ./.github/workflows/deploy.yml
+    with:
+      version_tag: ${{ needs.build.outputs.version_tag }}
+    secrets:
+      KUBECONFIG_CONTENT: ${{ secrets.KUBECONFIG_CONTENT }}
 
-      - name: Build Docker images
-        env: 
-          VERSION_TAG: ${{ env.VERSION_TAG }}
-        run: |
-          docker build --platform=linux/amd64 -t fakay96/backend:${VERSION_TAG} -f docker/Dockerfile.backend .
-          docker build --platform=linux/amd64 -t fakay96/web_scraper:${VERSION_TAG} -f docker/Dockerfile.web_scraper .
-
-      - name: Debug environment (check secrets)
-        run: |
-          echo "Checking environment variables"
-          if [[ -n "${{ secrets.DOCKER_USERNAME }}" ]]; then
-            echo "Docker username length: $(echo -n "${{ secrets.DOCKER_USERNAME }}" | wc -c)"
-          else
-            echo "Docker username is not set!"
-          fi
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Push Docker images
-        env:
-          VERSION_TAG: ${{ env.VERSION_TAG }}
-        run: |
-          docker push fakay96/backend:${VERSION_TAG}
-          docker push fakay96/web_scraper:${VERSION_TAG}
-
-      - name: Save version tag to file
-        run: echo "${VERSION_TAG}" > version.txt
-
-      - name: Upload version file as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: version-file
-          path: version.txt
-
-      #- name: Set version tag as output   # Removed this entire block
-      #  id: set_output
-      #  run: echo "version_tag=${VERSION_TAG}" >> "$GITHUB_OUTPUT"
-
+  notify_failure:
+    runs-on: self-hosted
+    if: failure()
+    steps:
+      - name: Notify about failure
+        run: echo "CI Pipeline failed. Check logs for more details."
