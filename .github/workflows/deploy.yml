@@ -63,7 +63,7 @@ jobs:
 
       # Step 8: Debug version tag
       - name: Debug version tag
-        run: echo "The version tag being used for deployment is: ${VERSION_TAG}"
+        run: 'echo "The version tag being used for deployment is: ${VERSION_TAG}"'
 
       # Step 9: Deploy backend service with Helm
       - name: Deploy backend service with Helm
