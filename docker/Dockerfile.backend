@@ -7,11 +7,7 @@ WORKDIR /app
 # Expose the application port
 EXPOSE 8000
 
-# Add an entrypoint script for initialization
-COPY Scripts/entryfile_backend.sh /app/backend-entrypoint.sh
 
-# Ensure the entrypoint script has execution permissions
-RUN chmod +x /app/backend-entrypoint.sh
 
 # Use the entrypoint script for initialization
-ENTRYPOINT ["/app/backend-entrypoint.sh"]
+ENTRYPOINT ["/app/init_db.sh"]
