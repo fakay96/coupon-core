@@ -9,9 +9,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Set working directory for the BACKEND app
 WORKDIR /app
 
-# Ensure reliable mirrors and install certificates
-# Install system dependencies (GDAL, PostgreSQL client, build tools, etc.)
-RUN apt-get update && \
+RUN apt-get --allow-releaseinfo-change update && \
     apt-get install -y --no-install-recommends \
         gdal-bin \
         libgdal-dev \
@@ -22,6 +20,7 @@ RUN apt-get update && \
         awscli \
         postgresql-client && \
     rm -rf /var/lib/apt/lists/*
+
 
 # Install Poetry and configure it to install packages globally
 RUN curl -sSL https://install.python-poetry.org | python3 - && \
