@@ -48,53 +48,57 @@ jobs:
       - name: Verify kubeconfig file and access
         run: kubectl get nodes
 
-      # Step 6: Decode and apply Kubernetes secrets
+      # Step 6: Ensure namespace exists before applying secrets
+      - name: Create namespace if not exists
+        run: |
+          echo "Ensuring production namespace exists..."
+          kubectl create namespace production || echo "Namespace 'production' already exists."
+
+      # Step 7: Decode and apply Kubernetes secrets
       - name: Apply Kubernetes secrets
         run: |
           echo "Applying Kubernetes secrets..."
           echo "${{ secrets.KUBERNETES_SECRETS }}" > secrets.yaml
           kubectl apply -f secrets.yaml --namespace production
 
-      # Step 7: Debug version tag
+      # Step 8: Debug version tag
       - name: Debug version tag
-        run: 'echo "The version tag being used for deployment is: ${version_tag}"'
+        run: echo "The version tag being used for deployment is: ${VERSION_TAG}"
 
-      # Step 8: Deploy backend service with Helm
+      # Step 9: Deploy backend service with Helm
       - name: Deploy backend service with Helm
         env:
           VERSION_TAG: ${{ env.VERSION_TAG }}
         run: |
-          echo "Deploying with Helm using image tag: ${version_tag}"
+          echo "Deploying with Helm using image tag: ${VERSION_TAG}"
           helm upgrade --install backend-service ./k8s/backend \
             --set backend.image.repository=fakay96/backend \
-            --set backend.image.tag=${version_tag} \
+            --set backend.image.tag=${VERSION_TAG} \
             --namespace production --create-namespace \
             -f ./k8s/backend/values/production-values.yaml \
             --history-max 10
 
-  
-
-      # Step 12: Verify service endpoints (optional)
+      # Step 10: Verify service endpoints
       - name: Verify service endpoints
         run: |
           echo "Verifying if service endpoints are available..."
           kubectl get endpoints backend-service -n production
 
-      # Step 13: Debug pod logs on failure (optional)
+      # Step 11: Debug pod logs on failure
       - name: Debug pod logs on failure
         if: failure()
         run: |
           echo "Fetching logs from backend pods for debugging..."
           kubectl logs -l app=backend -n production --tail=50
 
-      # Step 14: Scale down deployment instead of uninstalling (best practice)
+      # Step 12: Scale down deployment on failure
       - name: Scale down deployment on failure
         if: failure()
         run: |
           echo "Scaling down the deployment to 0 replicas to minimize resource usage..."
           kubectl scale deployment backend --replicas=0 -n production
 
-      # Step 15: Rollback to previous version
+      # Step 13: Rollback to previous version on failure
       - name: Rollback to previous version on failure
         if: failure()
         run: |
