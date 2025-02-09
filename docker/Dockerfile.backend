@@ -7,8 +7,5 @@ WORKDIR /app
 # Expose the application port
 EXPOSE 8000
 
-RUN chmod +x /app/init_db.sh
-
-# Use the entrypoint script for initialization
-ENTRYPOINT ["/app/init_db.sh"]
-
+# Keep the container running by using a simple sleep command
+CMD ["tail", "-f", "/dev/null"]
