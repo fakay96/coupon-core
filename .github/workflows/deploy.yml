@@ -51,8 +51,8 @@ jobs:
       # Step 6: Decode and apply Kubernetes secrets
       - name: Apply Kubernetes secrets
         run: |
-          echo "Decoding and applying Kubernetes secrets..."
-          echo "${{ secrets.KUBERNETES_SECRETS }}" | base64 --decode > secrets.yaml
+          echo "Applying Kubernetes secrets..."
+          echo "${{ secrets.KUBERNETES_SECRETS }}" > secrets.yaml
           kubectl apply -f secrets.yaml --namespace production
 
       # Step 7: Debug version tag
