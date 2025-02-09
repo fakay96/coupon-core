@@ -1,17 +1,14 @@
-# Start from the base image
+# Start from the base image built from Dockerfile.base
 FROM fakay96/coupon-core:0.0.1
 
-# Set working directory for the app
+# Set working directory for the CELERY app
 WORKDIR /app
 
 # Expose the application port
 EXPOSE 8000
 
-# Copy the script from the base image (if it exists in a known location)
-COPY --from=fakay96/coupon-core:0.0.1 /app/init_db.sh /app/init_db.sh
-
-# Ensure the script is executable
 RUN chmod +x /app/init_db.sh
 
-# Use the script as the entry point
+# Use the entrypoint script for initialization
 ENTRYPOINT ["/app/init_db.sh"]
+
