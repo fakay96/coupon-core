@@ -33,9 +33,9 @@ jobs:
           fi
           echo "VERSION_TAG=${TAG}" >> "$GITHUB_ENV"
           echo "version_tag=${TAG}" >> "$GITHUB_OUTPUT"
-        # Debug to verify version tag
+
       - name: Debug version tag
-        run: echo "Generated version tag: ${{ steps.get_version.outputs.version_tag }}"
+        run: 'echo "Generated version tag is: ${{ env.VERSION_TAG }}"'  # Single quotes prevent YAML parsing issues
 
       - name: Build Docker images
         env:
@@ -57,8 +57,10 @@ jobs:
           docker push fakay96/backend:${VERSION_TAG}
           docker push fakay96/web_scraper:${VERSION_TAG}
 
+      - name: Save version tag to file
+        run: 'echo "${VERSION_TAG}" > version.txt'
+
       - name: Upload version file as artifact
-        run: echo "${VERSION_TAG}" > version.txt
         uses: actions/upload-artifact@v4
         with:
           name: version-file
