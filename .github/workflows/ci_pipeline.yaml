@@ -35,7 +35,7 @@ jobs:
           echo "version_tag=${TAG}" >> "$GITHUB_OUTPUT"
 
       - name: Build Docker images
-        env:
+        env: 
           VERSION_TAG: ${{ env.VERSION_TAG }}
         run: |
           docker build --platform=linux/amd64 -t fakay96/backend:${VERSION_TAG} -f docker/Dockerfile.backend .
