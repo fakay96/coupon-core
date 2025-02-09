@@ -55,7 +55,7 @@ jobs:
         env:
           VERSION_TAG: ${{ env.VERSION_TAG }}
         run: |
-          docker build -t fakay96/backend:${VERSION_TAG} --push -f docker/Dockerfile.backend .
+          docker buildx build --platform linux/amd64 -t fakay96/backend:${VERSION_TAG} --push -f docker/Dockerfile.backend .
 
       - name: Prune Docker resources after backend build
         run: |
