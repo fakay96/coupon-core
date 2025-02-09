@@ -23,10 +23,10 @@ jobs:
       # Step 2: Configure kubectl for DigitalOcean
       - name: Configure kubectl for DigitalOcean
         run: |
-          mkdir -p ~/.kube                          
+          mkdir -p ~/.kube
           echo "Creating kubeconfig from raw YAML content..."
           echo "${{ secrets.KUBECONFIG_CONTENT }}" > ~/.kube/config
-          chmod 600 ~/.kube/config                   
+          chmod 600 ~/.kube/config
 
       # Step 3: Verify kubeconfig setup
       - name: Verify kubeconfig file and access
@@ -55,17 +55,15 @@ jobs:
       # Step 6: Print version tag
       - name: Print version tag
         run: |
-          echo "The version tag being used for deployment is: ${VERSION_TAG}"
+          echo "The version tag being used for deployment is: ${{ inputs.version_tag }}"  # CORRECTED LINE
 
       # Step 7: Deploy backend service with Helm
       - name: Deploy backend service with Helm
-        env:
-          VERSION_TAG: ${{ inputs.version_tag }}
         run: |
-          echo "Deploying with image tag: ${VERSION_TAG}"
+          echo "Deploying with image tag: ${{ inputs.version_tag }}" # CORRECTED LINE
           helm upgrade --install backend-service ./k8s/backend \
             --set backend.image.repository=fakay96/backend \
-            --set backend.image.tag=${VERSION_TAG} \
+            --set backend.image.tag=${{ inputs.version_tag }} \  # CORRECTED LINE
             --namespace production --create-namespace \
             -f ./k8s/backend/values/production-values.yaml
 
