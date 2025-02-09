@@ -4,10 +4,9 @@ FROM fakay96/coupon-core:0.0.1
 # Set working directory for the BACKEND app
 WORKDIR /app
 
-# Expose the application port
-EXPOSE 8000
 
 
+RUN chmod +x /app/init_db.sh
 
 # Use the entrypoint script for initialization
 ENTRYPOINT ["/app/init_db.sh"]
