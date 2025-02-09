@@ -26,7 +26,44 @@ spec:
               memory: "{{ .Values.backend.resources.limits.memory }}"
               cpu: "{{ .Values.backend.resources.limits.cpu }}"
           env:
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: DB_NAME
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: DB_PASSWORD
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: DB_HOST
             - name: ENVIRONMENT
-              value: "{{ .Values.backend.env.environment }}"
-            - name: LOG_LEVEL
-              value: "{{ .Values.backend.env.logLevel }}"
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: ENVIRONMENT
+            - name: GDAL_LIBRARY_PATH
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: GDAL_LIBRARY_PATH
+            - name: MILVUS_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: MILVUS_HOST
+            - name: MILVUS_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: MILVUS_PORT
+        - name: MILVUS_USER

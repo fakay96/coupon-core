@@ -10,6 +10,8 @@ on:
     secrets:
       KUBECONFIG_CONTENT:
         required: true
+      KUBERNETES_SECRETS:
+        required: true
 
 jobs:
   deploy:
@@ -46,29 +48,77 @@ jobs:
       - name: Verify kubeconfig file and access
         run: kubectl get nodes
 
-      # Step 6: Debug version tag
-      - name: Debug version tag
-        run: 'echo "The version tag being used for deployment is: ${version_tag}"'
+      # Step 6: Decode and apply Kubernetes secrets
+      - name: Apply Kubernetes secrets
+        run: |
+          echo "Decoding and applying Kubernetes secrets..."
+          echo "${{ secrets.KUBERNETES_SECRETS }}" | base64 --decode > secrets.yaml
+          kubectl apply -f secrets.yaml --namespace production
 
-      # Step 7: Deploy backend service with Helm
+      # Step 7: Debug version tag
+      - name: Debug version tag
+        run: echo "The version tag being used for deployment is: ${version_tag}"
+
+      # Step 8: Deploy backend service with Helm
       - name: Deploy backend service with Helm
         env:
-            VERSION_TAG: ${{ env.VERSION_TAG }}
+          VERSION_TAG: ${{ env.VERSION_TAG }}
         run: |
-          echo "Deploying with image tag: ${version_tag}"
+          echo "Deploying with Helm using image tag: ${version_tag}"
           helm upgrade --install backend-service ./k8s/backend \
             --set backend.image.repository=fakay96/backend \
             --set backend.image.tag=${version_tag} \
             --namespace production --create-namespace \
             -f ./k8s/backend/values/production-values.yaml
 
-      # # Step 8: Verify deployment status
-      # - name: Verify deployment status
-      #   run: kubectl rollout status deployment backend -n production --timeout=10s
+      # Step 9: Check pod status before rollout verification
+      - name: Check pod status before rollout verification
+        run: |
+          echo "Checking initial pod status..."
+          kubectl get pods -n production
+          NOT_RUNNING_PODS=$(kubectl get pods -n production --field-selector=status.phase!=Running --no-headers | wc -l)
+          if [ "$NOT_RUNNING_PODS" -ne 0 ]; then
+            echo "Warning: Some pods are not in Running state. Please investigate."
+            kubectl get pods -n production --field-selector=status.phase!=Running
+          fi
 
-      # Step 9: Rollback on failure (optional)
+      # Step 10: Verify deployment status with a longer timeout
+      - name: Verify deployment status
+        run: |
+          echo "Verifying rollout status for deployment 'backend'..."
+          kubectl rollout status deployment backend -n production --timeout=300s
+
+      # Step 11: Check if pods are ready after rollout
+      - name: Check if pods are ready after rollout
+        run: |
+          echo "Checking if all pods are ready..."
+          POD_READY_COUNT=$(kubectl get pods -n production -l app=backend -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}' | grep -c True)
+          TOTAL_PODS=$(kubectl get pods -n production -l app=backend --no-headers | wc -l)
+          
+          if [ "$POD_READY_COUNT" -lt "$TOTAL_PODS" ]; then
+            echo "Error: Not all pods are ready after deployment."
+            kubectl describe pods -n production -l app=backend
+            exit 1
+          else
+            echo "All pods are ready."
+          fi
+
+      # Step 12: Verify service endpoints (optional)
+      - name: Verify service endpoints
+        run: |
+          echo "Verifying if service endpoints are available..."
+          kubectl get endpoints backend-service -n production
+
+      # Step 13: Debug pod logs on failure (optional)
+      - name: Debug pod logs on failure
+        if: failure()
+        run: |
+          echo "Fetching logs from backend pods for debugging..."
+          kubectl logs -l app=backend -n production --tail=50
+
+      # Step 14: Rollback to previous version on failure
       - name: Rollback to previous version on failure
         if: failure()
         run: |
-          echo "Deployment failed. Rolling back to previous versions."
+          echo "Deployment failed. Rolling back to previous version."
           helm rollback backend-service 1 --namespace production
