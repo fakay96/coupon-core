@@ -28,7 +28,7 @@ jobs:
         with:
           name: version-file
 
-      # Step 3: Read the version tag from the artifact and set it as an environment variable
+      # Step 3: Read the version tag from artifact and set it as an environment variable
       - name: Read version from artifact
         id: read_version
         run: |
@@ -69,7 +69,8 @@ jobs:
             --set backend.image.repository=fakay96/backend \
             --set backend.image.tag=${version_tag} \
             --namespace production --create-namespace \
-            -f ./k8s/backend/values/production-values.yaml
+            -f ./k8s/backend/values/production-values.yaml \
+            --history-max 10
 
       # Step 9: Check pod status before rollout verification
       - name: Check pod status before rollout verification
@@ -94,7 +95,7 @@ jobs:
           echo "Checking if all pods are ready..."
           POD_READY_COUNT=$(kubectl get pods -n production -l app=backend -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}' | grep -c True)
           TOTAL_PODS=$(kubectl get pods -n production -l app=backend --no-headers | wc -l)
-          
+
           if [ "$POD_READY_COUNT" -lt "$TOTAL_PODS" ]; then
             echo "Error: Not all pods are ready after deployment."
             kubectl describe pods -n production -l app=backend
@@ -116,7 +117,14 @@ jobs:
           echo "Fetching logs from backend pods for debugging..."
           kubectl logs -l app=backend -n production --tail=50
 
-      # Step 14: Rollback to previous version on failure
+      # Step 14: Scale down deployment instead of uninstalling (best practice)
+      - name: Scale down deployment on failure
+        if: failure()
+        run: |
+          echo "Scaling down the deployment to 0 replicas to minimize resource usage..."
+          kubectl scale deployment backend --replicas=0 -n production
+
+      # Step 15: Rollback to previous version
       - name: Rollback to previous version on failure
         if: failure()
         run: |
