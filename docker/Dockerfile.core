@@ -19,7 +19,6 @@ RUN apt-get update && \
         gcc \
         netcat-openbsd \
         curl \
-        awscli \
         postgresql-client && \
     rm -rf /var/lib/apt/lists/*
 
