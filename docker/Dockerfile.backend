@@ -8,10 +8,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Set the working directory
 WORKDIR /app
 
-# Copy only the necessary runtime components from the base stage
-# This assumes everything is already built in fakay96/coupon-core:0.0.1
-COPY --from=RUNNER /root/.local /root/.local
-COPY --from=RUNNER /app /app
+# Copy only the necessary runtime components from the base stag
 
 # Expose the port if needed
 EXPOSE 8000
