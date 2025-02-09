@@ -13,12 +13,12 @@ on:
       DOCKER_PASSWORD:
         required: true
 
-
 jobs:
   build:
     runs-on: self-hosted
     outputs:
-      version_tag: ${{ steps.set_output.outputs.version_tag }}
+      version_tag: ${{ steps.get_version.outputs.version_tag }}  # Changed to use get_version
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -33,13 +33,17 @@ jobs:
           fi
           echo "VERSION_TAG=${TAG}" >> "$GITHUB_ENV"
           echo "version_tag=${TAG}" >> "$GITHUB_OUTPUT"
+        # The get_version step generates the version tag and sets it as an output
+        # We tell the job that this step contains the version tag
+        # Then we can access the version tag output elsewhere by referencing this step and the tag like this
+        # ${{ steps.get_version.outputs.version_tag }}
 
       - name: Build Docker images
         env:
           VERSION_TAG: ${{ env.VERSION_TAG }}
         run: |
-          docker build  --platform=linux/amd64  -t fakay96/backend:${VERSION_TAG} -f docker/Dockerfile.backend .
-          docker build  --platform=linux/amd64  -t fakay96/web_scraper:${VERSION_TAG} -f docker/Dockerfile.web_scraper .
+          docker build --platform=linux/amd64 -t fakay96/backend:${VERSION_TAG} -f docker/Dockerfile.backend .
+          docker build --platform=linux/amd64 -t fakay96/web_scraper:${VERSION_TAG} -f docker/Dockerfile.web_scraper .
 
       - name: Debug environment (check secrets)
         run: |
@@ -50,8 +54,6 @@ jobs:
             echo "Docker username is not set!"
           fi
 
-
-            
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
@@ -74,6 +76,7 @@ jobs:
           name: version-file
           path: version.txt
 
-      - name: Set version tag as output
-        id: set_output
-        run: echo "version_tag=${VERSION_TAG}" >> "$GITHUB_OUTPUT"
+      # - name: Set version tag as output   # REMOVED redundant code
+      #   id: set_output                  # REMOVED redundant code
+      #   run: echo "version_tag=${VERSION_TAG}" >> "$GITHUB_OUTPUT"  # REMOVED redundant code
+
