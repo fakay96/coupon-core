@@ -1,53 +1,17 @@
-# Use a base Python image (consolidating from Dockerfile.core)
-FROM python:3.12-slim AS base
-
-# Set environment variables for Python and GDAL
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PATH="/root/.local/bin:$PATH" \
-    GDAL_LIBRARY_PATH=/usr/lib/libgdal.so
+# Start from the base image built from Dockerfile.base
+FROM fakay96/coupon-core:0.0.1
 
 # Set working directory for the BACKEND app
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        gdal-bin \
-        libgdal-dev \
-        libpq-dev \
-        gcc \
-        netcat-openbsd \
-        curl \
-        awscli \
-        postgresql-client && \
-    rm -rf /var/lib/apt/lists/*
+# Expose the application port
+EXPOSE 8000
 
-# Install Poetry and configure it to install packages globally
-RUN curl -sSL https://install.python-poetry.org | python3 - && \
-    poetry config virtualenvs.create false
-
-# Copy dependency files (to leverage Docker caching)
-COPY pyproject.toml  README.md ./
-
-# Install Python dependencies
-RUN poetry install --no-root --no-interaction --no-ansi && \
-    pip install torch torchvision torchaudio
-
-# Copy application source code
-COPY coupon_core/ coupon_core/
-COPY authentication/ authentication/
-COPY geodiscounts/ geodiscounts/
-COPY manage.py .
-
-# Add the entrypoint script for initialization
+# Add an entrypoint script for initialization
 COPY Scripts/entryfile_backend.sh /app/backend-entrypoint.sh
 
 # Ensure the entrypoint script has execution permissions
 RUN chmod +x /app/backend-entrypoint.sh
 
-# Expose the application port
-EXPOSE 8000
-
-# Use the entrypoint script for initialization and server startup
+# Use the entrypoint script for initialization
 ENTRYPOINT ["/app/backend-entrypoint.sh"]
