@@ -51,3 +51,4 @@ EXPOSE 8000
 
 # Use the entrypoint script for initialization and server startup
 ENTRYPOINT ["/app/backend-entrypoint.sh"]
+
