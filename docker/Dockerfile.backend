@@ -13,3 +13,4 @@ COPY Scripts/entryfile_backend.sh /app/backend-entrypoint.sh
 
 # Use the entrypoint script for initialization
 ENTRYPOINT ["/backend-entrypoint.sh"]
+
