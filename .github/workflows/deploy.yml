@@ -55,10 +55,10 @@ jobs:
         env:
             VERSION_TAG: ${{ env.VERSION_TAG }}
         run: |
-          echo "Deploying with image tag: ${VERSION_TAG}"
+          echo "Deploying with image tag: ${version_tag}"
           helm upgrade --install backend-service ./k8s/backend \
             --set backend.image.repository=fakay96/backend \
-            --set backend.image.tag=${VERSION_TAG} \
+            --set backend.image.tag=${version_tag} \
             --namespace production --create-namespace \
             -f ./k8s/backend/values/production-values.yaml
 
