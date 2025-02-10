@@ -1,5 +1,4 @@
-# Base stage to build dependencies and setup environment
-FROM python:3.12-slim as BASE
+FROM python:3.12-slim
 
 # Set environment variables for Python
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -9,29 +8,23 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Set the working directory
 WORKDIR /app
 
-# Install system dependencies and clean up to minimize image size
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    postgresql-client \
-    curl \
-    python3-pip && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+# Install system dependencies, Poetry, and additional Python packages in a single RUN command
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      postgresql-client \
+      curl \
+      netcat-openbsd && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* && \
+    pip install --no-cache-dir poetry && \
+    pip install torch torchvision torchaudio
 
-# Install Poetry globally
-RUN pip install --no-cache-dir poetry
+# Copy the entire project (ensure you have a proper .dockerignore to exclude unneeded files)
+COPY . .
 
-# Copy dependency management files and install dependencies
-COPY pyproject.toml  ./
-RUN poetry install --no-root --no-interaction --no-ansi
+# Install Python dependencies with Poetry, then prepare the entrypoint script in one RUN layer
+RUN poetry install --no-root --no-interaction --no-ansi && \
+    chmod +x /app/Scripts/entryfile_backend.sh && \
+    mv /app/Scripts/entryfile_backend.sh /app/init_db.sh
 
-# Install additional Python libraries (e.g., PyTorch)
-RUN pip install torch torchvision torchaudio
-
-# Copy application source code
-COPY coupon_core/ coupon_core/
-COPY authentication/ authentication/
-COPY geodiscounts/ geodiscounts/
-COPY manage.py .
-COPY Scripts/entryfile_backend.sh /app/init_db.sh
-
-RUN chmod +x /app/init_db.sh
+# Set the entrypoint
 ENTRYPOINT ["/app/init_db.sh"]
