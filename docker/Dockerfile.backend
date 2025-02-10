@@ -1,39 +1,15 @@
-FROM python:3.12-slim
+# Start from the base image built from Dockerfile.base
+FROM fakay96/coupon-core:0.0.1
 
-# Set environment variables for Python
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PATH="/root/.local/bin:$PATH"
-
-# Set the working directory
+# Set working directory for the BACKEND app
 WORKDIR /app
 
-# Install system dependencies, Poetry, and additional Python packages in a single RUN command
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-      postgresql-client \
-      curl \
-      netcat-openbsd && \
-    apt-get clean && rm -rf /var/lib/apt/lists/* && \
-    pip install --no-cache-dir poetry && \
-    pip install torch torchvision torchaudio
+# Expose the application port
+EXPOSE 8000
 
+# Add an entrypoint script for initialization
+COPY ./Scripts/init_db.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
-COPY pyproject.toml  ./
-
-# Install Python dependencies with Poetry, then prepare the entrypoint script in one RUN layer
-RUN poetry install --no-root --no-interaction --no-ansi 
-
-
-# Copy application source code
-COPY coupon_core/ coupon_core/
-COPY authentication/ authentication/
-COPY geodiscounts/ geodiscounts/
-COPY manage.py .
-
-# Copy entrypoint script and set execution permission
-COPY Scripts/entryfile_backend.sh /app/init_db.sh
-RUN chmod +x /app/init_db.sh
-
-# Set the entrypoint
-ENTRYPOINT ["/app/init_db.sh"]
+# Use the entrypoint script for initialization
+ENTRYPOINT ["/entrypoint.sh"]
