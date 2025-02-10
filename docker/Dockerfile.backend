@@ -8,8 +8,8 @@ WORKDIR /app
 EXPOSE 8000
 
 # Add an entrypoint script for initialization
-COPY ./Scripts/init_db.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+
+RUN chmod +x /app/init_db.sh
 
 # Use the entrypoint script for initialization
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/app/init_db.sh"]
