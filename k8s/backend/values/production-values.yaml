@@ -4,7 +4,7 @@ backend:
   image:
     repository: fakay96/backend  
     tag: ""
-    pullPolicy: IfNotPresent
+    pullPolicy: Always
 
   service:
     type: ClusterIP
