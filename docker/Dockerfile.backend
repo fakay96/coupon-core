@@ -22,9 +22,18 @@ RUN apt-get update && \
 COPY . .
 
 # Install Python dependencies with Poetry, then prepare the entrypoint script in one RUN layer
-RUN poetry install --no-root --no-interaction --no-ansi && \
-    chmod +x /app/Scripts/entryfile_backend.sh && \
-    mv /app/Scripts/entryfile_backend.sh /app/init_db.sh
+RUN poetry install --no-root --no-interaction --no-ansi 
+
+
+# Copy application source code
+COPY coupon_core/ coupon_core/
+COPY authentication/ authentication/
+COPY geodiscounts/ geodiscounts/
+COPY manage.py .
+
+# Copy entrypoint script and set execution permission
+COPY Scripts/entryfile_backend.sh /app/init_db.sh
+RUN chmod +x /app/init_db.sh
 
 # Set the entrypoint
 ENTRYPOINT ["/app/init_db.sh"]
