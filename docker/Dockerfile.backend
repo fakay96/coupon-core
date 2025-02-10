@@ -18,8 +18,8 @@ RUN apt-get update && \
     pip install --no-cache-dir poetry && \
     pip install torch torchvision torchaudio
 
-# Copy the entire project (ensure you have a proper .dockerignore to exclude unneeded files)
-COPY . .
+
+COPY pyproject.toml  ./
 
 # Install Python dependencies with Poetry, then prepare the entrypoint script in one RUN layer
 RUN poetry install --no-root --no-interaction --no-ansi 
