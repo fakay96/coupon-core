@@ -71,15 +71,7 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: MILVUS_PORT
-          command: ["/bin/sh", "-c"]
-          args:
-            - |
-              gunicorn coupon-core.wsgi:application \
-              --bind 0.0.0.0:{{ .Values.backend.service.port }} \
-              --workers 3 \
-              --timeout 120 \
-              --access-logfile '-' \
-              --error-logfile '-'
+          
           readinessProbe:
             httpGet:
               path: /   # Adjust to your health check endpoint
