@@ -10,13 +10,13 @@ backend:
     type: ClusterIP
     port: 8000
 
-resources:
-  requests:
-    memory: "256Mi"   # increased from 128Mi
-    cpu: "200m"       # increased from 100m
-  limits:
-    memory: "512Mi"   # increased from 256Mi
-    cpu: "1000m"      # increased from 500m
+  resources:
+    requests:
+      memory: "256Mi"   # increased from 128Mi
+      cpu: "200m"       # increased from 100m
+    limits:
+      memory: "512Mi"   # increased from 256Mi
+      cpu: "1000m"      # increased from 500m
 
 
   env:
