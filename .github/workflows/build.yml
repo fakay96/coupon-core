@@ -32,7 +32,6 @@ jobs:
             TAG=$(date +%Y%m%d)-$(echo "${GITHUB_SHA}" | cut -c1-7)
           fi
 
-          # Use "latest" tag if it is explicitly provided
           if [ "$TAG" = "latest" ]; then
             echo "Using 'latest' tag for Docker images."
           else
@@ -43,7 +42,7 @@ jobs:
           echo "version_tag=${TAG}" >> "$GITHUB_OUTPUT"
 
       - name: Debug version tag
-        run: 'echo "Generated version tag is: ${{ env.VERSION_TAG }}"'
+        run: echo "Generated version tag is: ${{ env.VERSION_TAG }}"
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
@@ -51,25 +50,35 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      # Use Buildx action with cache export/import for the backend image
       - name: Build and push the backend image
-        env:
-          VERSION_TAG: ${{ env.VERSION_TAG }}
-        run: |
-          docker buildx build --platform linux/amd64 -t fakay96/backend:${VERSION_TAG} --push -f docker/Dockerfile.backend .
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          file: docker/Dockerfile.backend
+          push: true
+          tags: fakay96/backend:${{ env.VERSION_TAG }}
+          platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Prune Docker resources after backend build
-        run: |
-          docker system prune --force --volumes
+        run: docker system prune --force --volumes
 
+      # Use Buildx action with cache export/import for the web scraper image
       - name: Build and push the web scraper image
-        env:
-          VERSION_TAG: ${{ env.VERSION_TAG }}
-        run: |
-          docker build -t fakay96/web_scraper:${VERSION_TAG} --push -f docker/Dockerfile.web_scraper .
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          file: docker/Dockerfile.web_scraper
+          push: true
+          tags: fakay96/web_scraper:${{ env.VERSION_TAG }}
+          platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Prune Docker resources after web scraper build
-        run: |
-          docker system prune --force --volumes
+        run: docker system prune --force --volumes
 
       - name: Save version tag to file
         run: echo "${{ env.VERSION_TAG }}" > version.txt
