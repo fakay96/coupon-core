@@ -31,7 +31,6 @@ COPY coupon_core/ coupon_core/
 COPY authentication/ authentication/
 COPY geodiscounts/ geodiscounts/
 COPY manage.py .
-COPY Scripts/entryfile_backend.sh /app/init_db.sh
 
 
 
