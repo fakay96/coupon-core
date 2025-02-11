@@ -59,7 +59,7 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           context: .
-          file: docker/Dockerfile.backend
+          file: docker/Dockerfile.core
           push: true
           tags: fakay96/coupon-core:${{ env.VERSION_TAG }}
           platforms: linux/amd64
