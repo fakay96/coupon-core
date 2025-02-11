@@ -2,15 +2,11 @@
 FROM --platform=linux/arm64 fakay96/coupon-core:0.0.1 as base
 
 # Set working directory for the BACKEND app
-WORKDIR /app
+COPY --from=BASE /app /app
 
 # Expose the application port
 EXPOSE 8000
 
-COPY --from=base /app/init_db.sh /app/entrypoint.sh
+# Set entrypoint to initialize databases and run the application
+ENTRYPOINT ["/app/init_db.sh"]
 
-RUN chmod +x /app/entrypoint.sh
-
-
-# Use the entrypoint script for initialization
-ENTRYPOINT ["/app/entrypoint.sh"]
