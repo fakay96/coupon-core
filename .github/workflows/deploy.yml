@@ -72,7 +72,7 @@ jobs:
         run: |
           echo "Deploying with Helm using image tag: ${version_tag}"
           helm upgrade --install backend-service ./k8s/backend \
-            --set backend.image.repository=fakay96/backend \
+            --set backend.image.repository=fakay96/coupon-core \
             --set backend.image.tag=${version_tag} \
             --namespace production --create-namespace \
             -f ./k8s/backend/values/production-values.yaml \
