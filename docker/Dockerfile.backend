@@ -12,4 +12,4 @@ COPY Scripts/entryfile_backend.sh /app/init_dbs.sh
 RUN chmod +x /app/init_dbs.sh
 
 # Use the entrypoint script for initialization
-ENTRYPOINT ["/app/init_dbs.sh"]
+ENTRYPOINT ["/app/init_db.sh"]
