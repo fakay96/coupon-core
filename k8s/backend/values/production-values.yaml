@@ -2,7 +2,7 @@ backend:
   replicaCount: 1
 
   image:
-    repository: fakay96/backend  
+    repository: fakay96/coupon-core 
     tag: ""
     pullPolicy: Always
 

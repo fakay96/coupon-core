@@ -61,7 +61,7 @@ jobs:
           context: .
           file: docker/Dockerfile.backend
           push: true
-          tags: fakay96/backend:${{ env.VERSION_TAG }}
+          tags: fakay96/coupon-core:${{ env.VERSION_TAG }}
           platforms: linux/amd64
           cache-from: type=gha
           cache-to: type=gha,mode=max

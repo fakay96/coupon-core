@@ -1,15 +1,15 @@
 # Base stage to build dependencies and setup environment
-FROM python:3.12-slim as BASE
+FROM python:3.12-slim AS base
 
-# Set environment variables for Python
+# Set environment variables to optimize Python behavior
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/root/.local/bin:$PATH"
 
-# Set the working directory
+# Set working directory
 WORKDIR /app
 
-# Install system dependencies and clean up to minimize image size
+# Install system dependencies and Python package manager
 RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
     curl \
@@ -19,14 +19,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install Poetry globally
 RUN pip install --no-cache-dir poetry
 
-# Copy dependency management files and install dependencies
-COPY pyproject.toml  ./
+# Copy dependency files (order matters for caching)
+COPY pyproject.toml poetry.lock ./
+
+# Install Python dependencies
 RUN poetry install --no-root --no-interaction --no-ansi
 
-# Install additional Python libraries (e.g., PyTorch)
-RUN pip install torch torchvision torchaudio
+# Build stage to install additional libraries (e.g., PyTorch)
+RUN pip install --no-cache-dir torch torchvision torchaudio
 
-# Copy application source code
+# Copy application source code (placed last to maximize caching efficiency)
 COPY coupon_core/ coupon_core/
 COPY authentication/ authentication/
 COPY geodiscounts/ geodiscounts/
@@ -34,3 +36,27 @@ COPY manage.py .
 
 
 
+# Final build stage to produce minimal runtime image
+FROM python:3.12-slim as final
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/root/.local/bin:$PATH"
+
+# Set working directory
+WORKDIR /app
+
+# Copy dependencies and libraries from the base stage
+COPY --from=base /root/.local /root/.local
+COPY --from=base /app /app
+
+# Expose the application port
+EXPOSE 8000
+
+# Add the entrypoint script for initialization
+COPY Scripts/entryfile_backend.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+# Set entrypoint to initialize databases and run the application
+ENTRYPOINT ["/app/entrypoint.sh"]
