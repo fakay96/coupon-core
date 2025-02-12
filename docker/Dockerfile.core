@@ -1,62 +1,67 @@
-# Base stage to build dependencies and setup environment
-FROM python:3.12-slim AS base
+# syntax=docker/dockerfile:1
 
-# Set environment variables to optimize Python behavior
+# ARG TARGETPLATFORM is automatically defined by buildx
+ARG TARGETPLATFORM
+ARG VARIANT=slim
+
+FROM python:3.12-${VARIANT} AS builder
+
+# Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PATH="/root/.local/bin:$PATH"
+    PATH="/root/.local/bin:$PATH" \
+    POETRY_VIRTUALENVS_CREATE=false
 
-# Set working directory
-WORKDIR /app
-
-# Install system dependencies and Python package manager
+# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
     curl \
     python3-pip && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install Poetry globally
-RUN pip install --no-cache-dir poetry
+# Install Poetry (recommended method)
+RUN curl -sSL https://install.python-poetry.org | python3 - && \
+    ln -s /root/.local/bin/poetry /usr/local/bin/poetry
 
-# Copy dependency files (order matters for caching)
+# Set working directory
+WORKDIR /app
+
+# Copy dependency files
 COPY pyproject.toml poetry.lock ./
 
-# Install Python dependencies
+# Install dependencies
 RUN poetry install --no-root --no-interaction --no-ansi
 
-# Build stage to install additional libraries (e.g., PyTorch)
-RUN pip install --no-cache-dir torch torchvision torchaudio
-
-# Copy application source code (placed last to maximize caching efficiency)
+# Copy application source code
 COPY coupon_core/ coupon_core/
 COPY authentication/ authentication/
 COPY geodiscounts/ geodiscounts/
 COPY manage.py .
 
+# --- Final Stage ---
+FROM python:3.12-${VARIANT}
 
-
-# Final build stage to produce minimal runtime image
-FROM python:3.12-slim as final
+# Copy Poetry binary from builder
+COPY --from=builder /root/.local /root/.local
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PATH="/root/.local/bin:$PATH"
+    PATH="/root/.local/bin:$PATH" \
+    POETRY_VIRTUALENVS_CREATE=false
 
 # Set working directory
 WORKDIR /app
 
-# Copy dependencies and libraries from the base stage
-COPY --from=base /root/.local /root/.local
-COPY --from=base /app /app
+# Copy application from builder
+COPY --from=builder /app /app
 
 # Expose the application port
 EXPOSE 8000
 
-# Add the entrypoint script for initialization
+# Add the entrypoint script
 COPY Scripts/entryfile_backend.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
-# Set entrypoint to initialize databases and run the application
+# Set entrypoint
 ENTRYPOINT ["/app/entrypoint.sh"]
