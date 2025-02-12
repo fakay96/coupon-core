@@ -32,7 +32,7 @@ WORKDIR /app
 # Copy dependency files
 COPY pyproject.toml poetry.lock ./
 
-# Install dependencies
+# Install dependencies in the builder stage
 RUN poetry install --no-root --no-interaction --no-ansi
 
 # Copy application source code
@@ -52,12 +52,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgdal-dev && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Copy GDAL from builder
-COPY --from=builder /usr/lib/libgdal.so /usr/lib/libgdal.so
-COPY --from=builder /usr/include/gdal /usr/include/gdal
-
 # Copy Poetry binary from builder
 COPY --from=builder /root/.local /root/.local
+
+# Ensure Poetry is available in PATH
+RUN ln -s /root/.local/bin/poetry /usr/local/bin/poetry
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -71,6 +70,9 @@ WORKDIR /app
 
 # Copy application from builder
 COPY --from=builder /app /app
+
+# Ensure Poetry installs dependencies in the final stage
+RUN poetry install --no-root --no-interaction --no-ansi
 
 # Expose the application port
 EXPOSE 8000
