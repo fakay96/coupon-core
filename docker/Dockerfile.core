@@ -12,12 +12,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PATH="/root/.local/bin:$PATH" \
     POETRY_VIRTUALENVS_CREATE=false
 
-# Install system dependencies
+# Install system dependencies, including GDAL
 RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
     curl \
     python3-pip \
-    netcat-traditional && \  
+    netcat-traditional \
+    gdal-bin \
+    libgdal-dev && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install Poetry (recommended method)
@@ -42,11 +44,17 @@ COPY manage.py .
 # --- Final Stage ---
 FROM python:3.12-${VARIANT}
 
-# Install system dependencies
+# Install system dependencies, including GDAL
 RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
-    netcat-traditional && \
+    netcat-traditional \
+    gdal-bin \
+    libgdal-dev && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Copy GDAL from builder
+COPY --from=builder /usr/lib/libgdal.so /usr/lib/libgdal.so
+COPY --from=builder /usr/include/gdal /usr/include/gdal
 
 # Copy Poetry binary from builder
 COPY --from=builder /root/.local /root/.local
@@ -55,7 +63,8 @@ COPY --from=builder /root/.local /root/.local
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/root/.local/bin:$PATH" \
-    POETRY_VIRTUALENVS_CREATE=false
+    POETRY_VIRTUALENVS_CREATE=false \
+    GDAL_LIBRARY_PATH="/usr/lib/libgdal.so"
 
 # Set working directory
 WORKDIR /app
