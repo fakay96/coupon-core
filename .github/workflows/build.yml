@@ -63,8 +63,9 @@ jobs:
           push: true
           tags: fakay96/coupon-core:${{ env.VERSION_TAG }}
           platforms: linux/amd64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          no-cache: true
+
+          
 
       - name: Prune Docker resources after backend build
         run: docker system prune --force --volumes
