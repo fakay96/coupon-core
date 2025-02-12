@@ -32,6 +32,6 @@ jobs:
     runs-on: ubuntu-latest
     if: failure()
     steps:
-      - name: Notify about failure
+      - name: Notify about failure 
         run: echo "CI Pipeline failed. Check logs for more details."
 
