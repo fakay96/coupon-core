@@ -1,18 +1,15 @@
 # syntax=docker/dockerfile:1
 
-# ARG TARGETPLATFORM is automatically defined by buildx
 ARG TARGETPLATFORM
 ARG VARIANT=slim
 
 FROM python:3.12-${VARIANT} AS builder
 
-# Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/root/.local/bin:$PATH" \
     POETRY_VIRTUALENVS_CREATE=false
 
-# Install system dependencies, including GDAL
 RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
     curl \
@@ -22,20 +19,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgdal-dev && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install Poetry (recommended method)
 RUN curl -sSL https://install.python-poetry.org | python3 - && \
     ln -s /root/.local/bin/poetry /usr/local/bin/poetry
 
-# Set working directory
 WORKDIR /app
 
-# Copy dependency files
 COPY pyproject.toml poetry.lock ./
-
-# Install dependencies in the builder stage
 RUN poetry install --no-root --no-interaction --no-ansi
 
-# Copy application source code
 COPY coupon_core/ coupon_core/
 COPY authentication/ authentication/
 COPY geodiscounts/ geodiscounts/
@@ -44,7 +35,6 @@ COPY manage.py .
 # --- Final Stage ---
 FROM python:3.12-${VARIANT}
 
-# Install system dependencies, including GDAL
 RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
     netcat-traditional \
@@ -52,34 +42,33 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgdal-dev && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Copy Poetry binary from builder
+# Copy dependencies from builder
 COPY --from=builder /root/.local /root/.local
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Ensure Poetry is available in PATH
 RUN ln -s /root/.local/bin/poetry /usr/local/bin/poetry
 
-# Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/root/.local/bin:$PATH" \
     POETRY_VIRTUALENVS_CREATE=false \
-    GDAL_LIBRARY_PATH="/usr/lib/libgdal.so"
+    GDAL_LIBRARY_PATH="/usr/lib/libgdal.so" \
+    GDAL_DATA="/usr/share/gdal"
 
-# Set working directory
 WORKDIR /app
 
-# Copy application from builder
 COPY --from=builder /app /app
 
-# Expose the application port
 EXPOSE 8000
 
-# Add the entrypoint script
 COPY Scripts/entryfile_backend.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
-# Set entrypoint
+# Debugging step
+RUN python -m pip list
+RUN poetry show
+
 ENTRYPOINT ["/app/entrypoint.sh"]
 
-# Just keep the container running indefinitely
 CMD ["tail", "-f", "/dev/null"]
