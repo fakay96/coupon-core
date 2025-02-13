@@ -31,11 +31,6 @@ spec:
               memory: "{{ .Values.backend.resources.limits.memory }}"
               cpu: "{{ .Values.backend.resources.limits.cpu }}"
           env:
-            - name: DB_NAME
-              valueFrom:
-                secretKeyRef:
-                  name: app-secrets
-                  key: DB_NAME
             - name: DB_PORT
               valueFrom:
                 secretKeyRef:
