@@ -56,11 +56,6 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: ENVIRONMENT
-            - name: GDAL_LIBRARY_PATH
-              valueFrom:
-                secretKeyRef:
-                  name: app-secrets
-                  key: GDAL_LIBRARY_PATH
             - name: MILVUS_HOST
               valueFrom:
                 secretKeyRef:
