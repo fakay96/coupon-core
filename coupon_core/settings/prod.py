@@ -43,6 +43,9 @@ DATABASES = {
         "PASSWORD": os.getenv("DB_PASSWORD", "password"),
         "HOST": os.getenv("DB_HOST", "localhost"),
         "PORT": os.getenv("DB_PORT", "5432"),
+        "OPTIONS": {
+            "sslmode": "require",
+        },
     },
     "authentication_shard": {
         "ENGINE": "django.db.backends.postgresql",
@@ -51,6 +54,9 @@ DATABASES = {
         "PASSWORD": os.getenv("DB_PASSWORD", "password"),
         "HOST": os.getenv("DB_HOST", "localhost"),
         "PORT": os.getenv("DB_PORT", "5432"),
+        "OPTIONS": {
+            "sslmode": "require",
+        },
     },
     "geodiscounts_db": {
         "ENGINE": "django.db.backends.postgresql",
@@ -59,6 +65,9 @@ DATABASES = {
         "PASSWORD": os.getenv("GEODISCOUNTS_DB_PASSWORD", "password"),
         "HOST": os.getenv("GEODISCOUNTS_DB_HOST", "localhost"),
         "PORT": os.getenv("GEODISCOUNTS_DB_PORT", "5432"),
+        "OPTIONS": {
+            "sslmode": "require",
+        },
     },
 }
 
