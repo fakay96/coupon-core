@@ -76,7 +76,8 @@ jobs:
             --set backend.image.tag=${version_tag} \
             --namespace production --create-namespace \
             -f ./k8s/backend/values/production-values.yaml \
-            --history-max 10
+            --atomic --force --cleanup-on-fail --history-max 5
+
 
       # Step 10: Verify service endpoints
       - name: Verify service endpoints
