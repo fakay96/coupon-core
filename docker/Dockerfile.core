@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1
 
+# ARG TARGETPLATFORM is automatically defined by buildx
 ARG TARGETPLATFORM
 ARG VARIANT=slim
 
@@ -70,12 +71,14 @@ WORKDIR /app
 # Copy application from builder
 COPY --from=builder /app /app
 
+
+
 # Expose the application port
 EXPOSE 8000
 
-# Add the entrypoint script but do not use it
+# Add the entrypoint script
 COPY Scripts/entryfile_backend.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
-# Keep the container running indefinitely
-CMD ["tail", "-f", "/dev/null"]
+# Set entrypoint
+ENTRYPOINT ["/app/entrypoint.sh"]
