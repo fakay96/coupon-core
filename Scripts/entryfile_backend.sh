@@ -8,7 +8,7 @@ done
 echo "Database is ready."
 
 # Export the database password for PostgreSQL
-export PGPASSWORD="$DEV_DB_PASSWORD"
+export PGPASSWORD="$DB_PASSWORD"
 
 # Function to create a database shard
 create_database_shard() {
