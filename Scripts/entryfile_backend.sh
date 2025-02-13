@@ -15,10 +15,10 @@ create_database_shard() {
   local shard_name=$1
 
   echo "Checking if database shard '$shard_name' exists..."
-  psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres "sslmode=require" -tAc "SELECT 1 FROM pg_database WHERE datname = '$shard_name'" | grep -q 1
+  psql "postgresql://$DB_USER:$DB_PASSWORD@$DB_HOST:$DB_PORT/postgres?sslmode=require" -tAc "SELECT 1 FROM pg_database WHERE datname = '$shard_name'" | grep -q 1
   if [ $? -ne 0 ]; then
     echo "Database shard '$shard_name' does not exist. Creating..."
-    psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres "sslmode=require" -c "CREATE DATABASE $shard_name;"
+    psql "postgresql://$DB_USER:$DB_PASSWORD@$DB_HOST:$DB_PORT/postgres?sslmode=require" -c "CREATE DATABASE $shard_name;"
     if [ $? -eq 0 ]; then
       echo "Database shard '$shard_name' created successfully."
     else
