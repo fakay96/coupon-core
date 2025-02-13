@@ -54,14 +54,8 @@ jobs:
           echo "Ensuring production namespace exists..."
           kubectl create namespace production || echo "Namespace 'production' already exists."
 
-      # Step 7: Decode and apply Kubernetes secrets
-      
 
-      # Step 8: Debug version tag
-      - name: Debug version tag
-        run: 'echo "The version tag being used for deployment is: ${version_tag}"'
-
-      # Step 9: Deploy backend service with Helm
+      # Step 8: Deploy backend service with Helm
       - name: Deploy backend service with Helm
         env:
           version_tag: ${{ env.version_tag }}
@@ -72,30 +66,30 @@ jobs:
             --set backend.image.tag=${version_tag} \
             --namespace production --create-namespace \
             -f ./k8s/backend/values/production-values.yaml \
-            --atomic --force --cleanup-on-fail --history-max 5
+            --atomic --force --cleanup-on-fail --history-max 5 \
+            --timeout 10m0s
 
-
-      # Step 10: Verify service endpoints
+      # Step 9: Verify service endpoints
       - name: Verify service endpoints
         run: |
           echo "Verifying if service endpoints are available..."
           kubectl get endpoints backend-service -n production
 
-      # Step 11: Debug pod logs on failure
+      # Step 10: Debug pod logs on failure
       - name: Debug pod logs on failure
         if: failure()
         run: |
           echo "Fetching logs from backend pods for debugging..."
           kubectl logs -l app=backend -n production --tail=50
 
-      # Step 12: Scale down deployment on failure
+      # Step 11: Scale down deployment on failure
       - name: Scale down deployment on failure
         if: failure()
         run: |
           echo "Scaling down the deployment to 0 replicas to minimize resource usage..."
           kubectl scale deployment backend --replicas=0 -n production
 
-      # Step 13: Rollback to previous version on failure
+      # Step 12: Rollback to previous version on failure
       - name: Rollback to previous version on failure
         if: failure()
         run: |
