@@ -77,18 +77,4 @@ spec:
                   name: app-secrets
                   key: MILVUS_PORT
          
-          
-          readinessProbe:
-            httpGet:
-              path: /healthz/
-              port: {{ .Values.backend.service.port }}
-            initialDelaySeconds: 10
-            periodSeconds: 5
-            successThreshold: 1
-          livenessProbe:
-            httpGet:
-              path: /healthz/
-              port: {{ .Values.backend.service.port }}
-            initialDelaySeconds: 15
-            periodSeconds: 20
-            failureThreshold: 3
+         
