@@ -15,10 +15,24 @@ create_database_shard() {
   local shard_name=$1
 
   echo "Checking if database shard '$shard_name' exists..."
-  psql "postgresql://$DB_USER:$DB_PASSWORD@$DB_HOST:$DB_PORT/postgres?sslmode=require" -tAc "SELECT 1 FROM pg_database WHERE datname = '$shard_name'" | grep -q 1
+
+  # Use sslmode=require only if environment is not development
+  if [ "$ENVIRONMENT" = "development" ]; then
+    psql "host=$DB_HOST port=$DB_PORT dbname=postgres user=$DB_USER" -tAc "SELECT 1 FROM pg_database WHERE datname = '$shard_name'" | grep -q 1
+  else
+    psql "host=$DB_HOST port=$DB_PORT dbname=postgres user=$DB_USER sslmode=require" -tAc "SELECT 1 FROM pg_database WHERE datname = '$shard_name'" | grep -q 1
+  fi
+
   if [ $? -ne 0 ]; then
     echo "Database shard '$shard_name' does not exist. Creating..."
-    psql "postgresql://$DB_USER:$DB_PASSWORD@$DB_HOST:$DB_PORT/postgres?sslmode=require" -c "CREATE DATABASE $shard_name;"
+
+    # Use sslmode=require only if environment is not development
+    if [ "$ENVIRONMENT" = "development" ]; then
+      psql "host=$DB_HOST port=$DB_PORT dbname=postgres user=$DB_USER" -c "CREATE DATABASE $shard_name;"
+    else
+      psql "host=$DB_HOST port=$DB_PORT dbname=postgres user=$DB_USER sslmode=require" -c "CREATE DATABASE $shard_name;"
+    fi
+
     if [ $? -eq 0 ]; then
       echo "Database shard '$shard_name' created successfully."
     else
@@ -71,18 +85,10 @@ done
 
 echo "Shard creation and migrations complete."
 
-# If in development environment, collect static files
-if [ "$ENVIRONMENT" = "development" ]; then
-  echo "Environment is development. Collecting static files..."
-  python manage.py collectstatic --noinput
-else
-  echo "Environment is not development. Skipping collectstatic."
-fi
+# Collect static files (typically done in production as well)
+echo "Collecting static files..."
+python manage.py collectstatic --noinput
 
-exec gunicorn coupon_core.wsgi:application \
-    --bind=0.0.0.0:8000 \
-    --workers=3 \
-    --timeout=120 \
-    --log-level=info \
-    --access-logfile=- \
-    --error-logfile=-
+# Start the Django application using Gunicorn
+echo "Starting Gunicorn server..."
+exec gunicorn coupon_core.wsgi:application --bind 0.0.0.0:8000
