@@ -16,7 +16,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
     netcat-traditional \
     gdal-bin \
-    libgdal-dev && \
+    libgdal-dev \
+    python3-gdal && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN curl -sSL https://install.python-poetry.org | python3 - && \
@@ -39,7 +40,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
     netcat-traditional \
     gdal-bin \
-    libgdal-dev && \
+    libgdal-dev \
+    python3-gdal && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Copy dependencies from builder
@@ -47,13 +49,18 @@ COPY --from=builder /root/.local /root/.local
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
+RUN ln -s /root/.local/bin/poetry /usr/local/bin/poetry
+
+# Fix GDAL path issues
+RUN ln -s /usr/lib/aarch64-linux-gnu/libgdal.so /usr/lib/libgdal.so || true
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/root/.local/bin:$PATH" \
     POETRY_VIRTUALENVS_CREATE=false \
-    GDAL_LIBRARY_PATH="/usr/lib/libgdal.so" \
-    GDAL_DATA="/usr/share/gdal"
+    GDAL_LIBRARY_PATH="/usr/lib/aarch64-linux-gnu/libgdal.so" \
+    GDAL_DATA="/usr/share/gdal" \
+    PROJ_LIB="/usr/share/proj"
 
 WORKDIR /app
 
@@ -64,9 +71,11 @@ EXPOSE 8000
 COPY Scripts/entryfile_backend.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
-# Debugging step
+# Debugging steps
 RUN python -m pip list
 RUN poetry show
+RUN gdalinfo --version
+RUN ldconfig -p | grep gdal
 
 ENTRYPOINT ["/app/entrypoint.sh"]
 
