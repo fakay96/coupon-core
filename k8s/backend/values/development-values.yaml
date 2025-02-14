@@ -39,6 +39,9 @@ milvus:
       memory: "1Gi"
       cpu: "1"
 
+  env:
+    environment: development
+    logLevel: debug
   nodeSelector: {}
   tolerations: []
   affinity: {}

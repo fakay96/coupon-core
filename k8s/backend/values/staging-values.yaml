@@ -38,7 +38,9 @@ milvus:
     limits:
       memory: "1Gi"
       cpu: "1"
-
+  env:
+    environment: staging
+    logLevel: debug
   nodeSelector: {}
   tolerations: []
   affinity: {}
