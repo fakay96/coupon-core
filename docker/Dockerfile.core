@@ -57,8 +57,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/root/.local/bin:$PATH" \
     POETRY_VIRTUALENVS_CREATE=false \
-    GDAL_LIBRARY_PATH="/usr/lib/aarch64-linux-gnu/libgdal.so" \
-    GDAL_DATA="/usr/share/gdal" \
     PROJ_LIB="/usr/share/proj"
 
 WORKDIR /app
