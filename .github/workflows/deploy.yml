@@ -69,7 +69,7 @@ jobs:
             --namespace production --create-namespace \
             -f ./k8s/backend/values/production-values.yaml \
             --atomic --force --cleanup-on-fail --history-max 5 \
-            --timeout 15m0s
+            --timeout 30m0s
 
       # Step 9: Verify service endpoints
       - name: Verify service endpoints
