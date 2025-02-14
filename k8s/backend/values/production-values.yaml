@@ -1,46 +1,69 @@
-backend:
-  replicaCount: 1
+replicaCount: 1
 
-  image:
-    repository: fakay96/coupon-core 
-    tag: ""
-    pullPolicy: Always
+image:
+  repository: fakay96/coupon-core
+  pullPolicy: IfNotPresent
+  tag: ""
 
-  service:
-    type: ClusterIP
-    port: 8000
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
 
-  resources:
-    requests:
-      memory: "2Gi"
-      cpu: "1"
-    limits:
-      memory: "4Gi"
-      cpu: "2"
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
 
-milvus:
-  replicaCount: 1
+podAnnotations: {}
 
-  image:
-    repository: milvusdb/milvus
-    tag: "v2.2.12"
-    pullPolicy: Always
+podSecurityContext: {}
+  # fsGroup: 2000
 
-  service:
-    type: ClusterIP
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
 
-  logLevel: "debug"
+service:
+  type: ClusterIP
+  port: 80
 
-  resources:
-    requests:
-      memory: "1Gi"
-      cpu: "1"
-    limits:
-      memory: "2Gi"
-      cpu: "2"
-  env:
-    environment: production
-    logLevel: debug
-  nodeSelector: {}
-  tolerations: []
-  affinity: {}
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: dishpal.ai
+      paths:
+        - path: /api
+          pathType: Prefix
+  tls:
+    - hosts:
+        - dishpal.ai
+      secretName: dishpal-ai-tls
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "512Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1Gi"
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
