@@ -1,9 +1,10 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "backend.fullname" . }}
+  name: coupon-service-ingress
   labels:
-    {{- include "backend.labels" . | nindent 4 }}
+    app: coupon-service
+    release: coupon-service
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /$1
 spec:
@@ -16,6 +17,6 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: {{ include "backend.fullname" . }}
+            name: coupon-service
             port:
               number: 80
