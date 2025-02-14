@@ -22,7 +22,20 @@ spec:
         app: {{ .Chart.Name }}
         release: {{ .Release.Name }}
     spec:
-      priorityClassName: milvus-high-priority
+      priorityClassName: core-services-priority
+      initContainers:
+      - name: wait-for-etcd
+        image: busybox:1.28
+        command: 
+        - sh
+        - -c
+        - until nc -z {{ .Release.Name }}-etcd 2379; do echo waiting for etcd; sleep 2; done;
+      - name: wait-for-minio
+        image: busybox:1.28
+        command: 
+        - sh
+        - -c
+        - until nc -z {{ .Release.Name }}-minio 9000; do echo waiting for minio; sleep 2; done;
       containers:
       - name: milvus
         image: "{{ .Values.milvus.image.repository }}:{{ .Values.milvus.image.tag | default .Chart.AppVersion }}"

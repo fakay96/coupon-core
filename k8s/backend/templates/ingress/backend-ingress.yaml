@@ -1,23 +1,21 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: backend-ingress
+  name: {{ include "backend.fullname" . }}
+  labels:
+    {{- include "backend.labels" . | nindent 4 }}
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
 spec:
+  ingressClassName: nginx
   rules:
-    - host: backend.local
-      http:
-        paths:
-          - path: /api/geodiscount/v1/
-            pathType: Prefix
-            backend:
-              service:
-                name: backend-service
-                port:
-                  number: {{ .Values.backend.service.port }}
-          - path: /api/authentication/v1/
-            pathType: Prefix
-            backend:
-              service:
-                name: backend-service
-                port:
-                  number: {{ .Values.backend.service.port }}
+  - host: dishpal.ai
+    http:
+      paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ include "backend.fullname" . }}
+            port:
+              number: 80
