@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-milvus
+  labels:
+    app: {{ .Chart.Name }}
+    release: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.milvus.replicaCount | default 1 }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: {{ .Chart.Name }}
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Chart.Name }}
+        release: {{ .Release.Name }}
+    spec:
+      priorityClassName: milvus-high-priority
+      containers:
+      - name: milvus
+        image: "{{ .Values.milvus.image.repository }}:{{ .Values.milvus.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.milvus.image.pullPolicy | quote }}
+        ports:
+        - containerPort: 19530
+        - containerPort: 9091
+        env:
+        - name: ETCD_ENDPOINTS
+          value: "{{ .Release.Name }}-etcd:2379"
+        - name: MINIO_ADDRESS
+          value: "{{ .Release.Name }}-minio:9000"
+        - name: MILVUS_LOG_LEVEL
+          value: "{{ .Values.milvus.logLevel | default "debug" }}"
+        resources:
+          {{- toYaml .Values.milvus.resources | nindent 10 }}

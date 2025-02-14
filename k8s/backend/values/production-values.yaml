@@ -12,16 +12,32 @@ backend:
 
   resources:
     requests:
-      memory: "256Mi"   # increased from 128Mi
-      cpu: "200m"       # increased from 100m
+      memory: "2Gi"
+      cpu: "1"
     limits:
-      memory: "512Mi"   # increased from 256Mi
-      cpu: "1000m"      # increased from 500m
+      memory: "4Gi"
+      cpu: "2"
 
+milvus:
+  replicaCount: 1
 
-  env:
-    environment: production
-    logLevel: debug
+  image:
+    repository: milvusdb/milvus
+    tag: "v2.2.12"
+    pullPolicy: Always
+
+  service:
+    type: ClusterIP
+
+  logLevel: "debug"
+
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "1"
+    limits:
+      memory: "2Gi"
+      cpu: "2"
 
   nodeSelector: {}
   tolerations: []

@@ -18,9 +18,26 @@ backend:
       memory: "256Mi"
       cpu: "500m"
 
-  env:
-    environment: production
-    logLevel: debug
+milvus:
+  replicaCount: 1
+
+  image:
+    repository: milvusdb/milvus
+    tag: "v2.2.12"
+    pullPolicy: Always
+
+  service:
+    type: ClusterIP
+
+  logLevel: "debug"
+
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "1Gi"
+      cpu: "1"
 
   nodeSelector: {}
   tolerations: []
