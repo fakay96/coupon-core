@@ -7,8 +7,13 @@ metadata:
     release: coupon-service
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /$1
+    cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   ingressClassName: nginx
+  tls:
+  - hosts:
+    - dishpal.ai
+    secretName: dishpal-ai-tls
   rules:
   - host: dishpal.ai
     http:
