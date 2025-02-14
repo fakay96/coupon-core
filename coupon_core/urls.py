@@ -17,7 +17,7 @@ from django.contrib import admin
 from django.urls import include, path
 from dotenv import load_dotenv
 
-from utils.health_check import health_check
+#from utils.health_check import health_check
 
 # Load environment variables
 load_dotenv()
@@ -44,7 +44,7 @@ schema_view = get_schema_view(
 # Base URL patterns
 urlpatterns = [
     path("admin/", admin.site.urls),  # Admin panel
-    path("healthz/", health_check, name="health-check"),  # Health check endpoint
+   # path("healthz/", health_check, name="health-check"),  # Health check endpoint
 
 ]
 
