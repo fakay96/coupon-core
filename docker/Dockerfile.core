@@ -74,6 +74,6 @@ RUN poetry show
 RUN gdalinfo --version
 RUN ldconfig -p | grep gdal
 
-ENTRYPOINT ["/app/entrypoint.sh"]
+#ENTRYPOINT ["/app/entrypoint.sh"]
 
 CMD ["tail", "-f", "/dev/null"]
