@@ -19,7 +19,7 @@ from datetime import timedelta
 DEBUG = False
 
 # Allowed Hosts
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["dishpal.ai"]
 
 
 # Secret Key
