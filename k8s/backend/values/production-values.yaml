@@ -1,35 +1,46 @@
-replicaCount: 1
+backend:
+  replicaCount: 1
 
-image:
-  repository: fakay96/coupon-core
-  pullPolicy: IfNotPresent
-  tag: ""
+  image:
+    repository: fakay96/backend  
+    tag: ""
+    pullPolicy: Always
 
-imagePullSecrets: []
-nameOverride: ""
-fullnameOverride: ""
+  service:
+    type: ClusterIP
+    port: 8000
 
-serviceAccount:
-  create: true
-  annotations: {}
-  name: ""
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
 
-podAnnotations: {}
+milvus:
+  replicaCount: 1
 
-podSecurityContext: {}
-  # fsGroup: 2000
+  image:
+    repository: milvusdb/milvus
+    tag: "v2.2.12"
+    pullPolicy: Always
 
-securityContext: {}
-  # capabilities:
-  #   drop:
-  #   - ALL
-  # readOnlyRootFilesystem: true
-  # runAsNonRoot: true
-  # runAsUser: 1000
+  service:
+    type: ClusterIP
 
-service:
-  type: ClusterIP
-  port: 80
+  logLevel: "debug"
+
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "1Gi"
+      cpu: "1"
+  env:
+    environment: staging
+    logLevel: debug
 
 ingress:
   enabled: true
