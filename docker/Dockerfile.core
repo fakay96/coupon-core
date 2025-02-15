@@ -3,13 +3,17 @@
 ARG TARGETPLATFORM
 ARG VARIANT=slim
 
+# ----- Builder Stage -----
 FROM python:3.12-${VARIANT} AS builder
 
+# Environment Variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/root/.local/bin:$PATH" \
-    POETRY_VIRTUALENVS_CREATE=false
+    POETRY_VIRTUALENVS_CREATE=false \
+    PROJ_LIB="/usr/share/proj"
 
+# Install System Dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
     curl \
@@ -20,22 +24,27 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-gdal && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Install Poetry
 RUN curl -sSL https://install.python-poetry.org | python3 - && \
     ln -s /root/.local/bin/poetry /usr/local/bin/poetry
 
+# Set Working Directory
 WORKDIR /app
 
+# Copy Poetry Dependencies and Install
 COPY pyproject.toml poetry.lock ./
 RUN poetry install --no-root --no-interaction --no-ansi
 
+# Copy Application Code
 COPY coupon_core/ coupon_core/
 COPY authentication/ authentication/
 COPY geodiscounts/ geodiscounts/
 COPY manage.py .
 
-# --- Final Stage ---
+# ----- Final Stage -----
 FROM python:3.12-${VARIANT}
 
+# Install Required System Dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
     netcat-traditional \
@@ -49,31 +58,39 @@ COPY --from=builder /root/.local /root/.local
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
+# Ensure GDAL Library is Correctly Linked
+RUN ln -s /usr/lib/x86_64-linux-gnu/libgdal.so /usr/lib/libgdal.so || true
 
-# Fix GDAL path issues
-RUN ln -s /usr/lib/aarch64-linux-gnu/libgdal.so /usr/lib/libgdal.so || true
-
+# Set Environment Variables for GDAL
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/root/.local/bin:$PATH" \
     POETRY_VIRTUALENVS_CREATE=false \
+    GDAL_LIBRARY_PATH="/usr/lib/x86_64-linux-gnu/libgdal.so" \
+    LD_LIBRARY_PATH="/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH" \
     PROJ_LIB="/usr/share/proj"
 
+# Set Working Directory
 WORKDIR /app
 
+# Copy Application Files
 COPY --from=builder /app /app
 
+# Expose Port
 EXPOSE 8000
 
+# Copy and Set Permissions for Entry Script
 COPY Scripts/entryfile_backend.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
-# Debugging steps
+# Debugging Steps
 RUN python -m pip list
 RUN poetry show
 RUN gdalinfo --version
 RUN ldconfig -p | grep gdal
 
+# Start the Application
 #ENTRYPOINT ["/app/entrypoint.sh"]
+
 
 CMD ["tail", "-f", "/dev/null"]
