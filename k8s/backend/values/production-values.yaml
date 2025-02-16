@@ -12,11 +12,24 @@ backend:
 
   resources:
     requests:
-      memory: "128Mi"
-      cpu: "100m"
+      memory: "512Mi"
+      cpu: "200m"
     limits:
       memory: "1Gi"
-      cpu: "1"
+      cpu: "1000m"
+
+  nodeSelector:
+    workload: backend
+
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: workload
+            operator: In
+            values:
+            - backend
 
 milvus:
   replicaCount: 1
@@ -38,6 +51,19 @@ milvus:
     limits:
       memory: "1Gi"
       cpu: "1"
+
+  nodeSelector:
+    workload: milvus
+
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: workload
+            operator: In
+            values:
+            - milvus
 
   env:
     environment: staging
@@ -73,8 +99,6 @@ autoscaling:
   maxReplicas: 3
   targetCPUUtilizationPercentage: 80
   targetMemoryUtilizationPercentage: 80
-
-nodeSelector: {}
 
 tolerations: []
 
