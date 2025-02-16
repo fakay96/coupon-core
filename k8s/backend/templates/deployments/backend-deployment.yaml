@@ -17,6 +17,25 @@ spec:
       labels:
         app: backend
     spec:
+      initContainers:
+      - name: wait-for-milvus
+        image: busybox:1.28
+        command: 
+        - sh
+        - -c
+        - until nc -z {{ .Release.Name }}-milvus 19530; do echo waiting for milvus; sleep 2; done;
+      - name: wait-for-etcd
+        image: busybox:1.28
+        command: 
+        - sh
+        - -c
+        - until nc -z {{ .Release.Name }}-etcd 2379; do echo waiting for etcd; sleep 2; done;
+      - name: wait-for-minio
+        image: busybox:1.28
+        command: 
+        - sh
+        - -c
+        - until nc -z {{ .Release.Name }}-minio 9000; do echo waiting for minio; sleep 2; done;
       containers:
         - name: backend
           image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
@@ -26,7 +45,7 @@ spec:
           resources:
             requests:
               memory: "{{ .Values.backend.resources.requests.memory }}"
-              cpu: "{{ .Values.backend.resources.requests.cpu }}"
+              cpu: "{{ .Values.backend.resources.requests.cup }}"
             limits:
               memory: "{{ .Values.backend.resources.limits.memory }}"
               cpu: "{{ .Values.backend.resources.limits.cpu }}"
@@ -66,5 +85,3 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: MILVUS_PORT
-         
-         
