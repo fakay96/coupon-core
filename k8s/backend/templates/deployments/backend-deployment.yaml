@@ -45,7 +45,7 @@ spec:
           resources:
             requests:
               memory: "{{ .Values.backend.resources.requests.memory }}"
-              cpu: "{{ .Values.backend.resources.requests.cup }}"
+              cpu: "{{ .Values.backend.resources.requests.cpu }}"
             limits:
               memory: "{{ .Values.backend.resources.limits.memory }}"
               cpu: "{{ .Values.backend.resources.limits.cpu }}"
