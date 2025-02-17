@@ -12,6 +12,3 @@ spec:
     targetPort: 21121
     protocol: TCP
     name: querynode
-  selector:
-    app: milvus-querynode
-    release: {{ .Release.Name }}
