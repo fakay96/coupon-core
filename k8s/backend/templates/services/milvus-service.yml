@@ -16,6 +16,4 @@ spec:
     targetPort: 9091
     protocol: TCP
     name: metrics
-  selector:
-    app: {{ .Chart.Name }}
-    release: {{ .Release.Name }}
+ 
