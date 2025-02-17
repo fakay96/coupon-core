@@ -26,16 +26,24 @@ spec:
       initContainers:
       - name: wait-for-etcd
         image: busybox:1.28
-        command: 
+        command:
         - sh
         - -c
-        - until nc -z {{ .Release.Name }}-etcd 2379; do echo waiting for etcd; sleep 2; done;
+        - |
+          echo "Waiting for ETCD..."
+          timeout 60 sh -c 'until nc -z {{ .Release.Name }}-etcd.production.svc.cluster.local 2379; do echo waiting for etcd; sleep 2; done'
+          echo "ETCD is ready!"
+
       - name: wait-for-minio
         image: busybox:1.28
-        command: 
+        command:
         - sh
         - -c
-        - until nc -z {{ .Release.Name }}-minio 9000; do echo waiting for minio; sleep 2; done;
+        - |
+          echo "Waiting for MinIO..."
+          timeout 60 sh -c 'until nc -z {{ .Release.Name }}-minio.production.svc.cluster.local 9000; do echo waiting for minio; sleep 2; done'
+          echo "MinIO is ready!"
+
       containers:
       - name: milvus
         image: "{{ .Values.milvus.image.repository }}:{{ .Values.milvus.image.tag | default .Chart.AppVersion }}"
@@ -45,9 +53,9 @@ spec:
         - containerPort: 9091
         env:
         - name: ETCD_ENDPOINTS
-          value: "{{ .Release.Name }}-etcd:2379"
+          value: "http://{{ .Release.Name }}-etcd.production.svc.cluster.local:2379"
         - name: MINIO_ADDRESS
-          value: "{{ .Release.Name }}-minio:9000"
+          value: "http://{{ .Release.Name }}-minio.production.svc.cluster.local:9000"
         - name: MILVUS_LOG_LEVEL
           value: "{{ .Values.milvus.logLevel | default "debug" }}"
         resources:
