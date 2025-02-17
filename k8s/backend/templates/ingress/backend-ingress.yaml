@@ -6,19 +6,19 @@ metadata:
     app: coupon-service
     release: coupon-service
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    nginx.ingress.kubernetes.io/rewrite-target: /
     cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   ingressClassName: nginx
   tls:
   - hosts:
-    - dishpal.ai
-    secretName: dishpal-ai-tls
+    - api.dishpal.ai
+    secretName: api-dishpal-ai-tls
   rules:
-  - host: dishpal.ai
+  - host: api.dishpal.ai
     http:
       paths:
-      - path: /api
+      - path: /
         pathType: Prefix
         backend:
           service:
