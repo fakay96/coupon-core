@@ -34,7 +34,7 @@ spec:
           value: "50000"
         command: 
         - etcd
-        - --advertise-client-urls=http://0.0.0.0:2379
+        - --advertise-client-urls=http://{{ .Release.Name }}-etcd.production.svc.cluster.local:2379
         - --listen-client-urls=http://0.0.0.0:2379
         - --data-dir=/etcd
         ports:
@@ -49,22 +49,6 @@ spec:
           limits:
             memory: "512Mi"
             cpu: "500m"
-        livenessProbe:
-          exec:
-            command:
-            - etcdctl
-            - endpoint
-            - health
-          initialDelaySeconds: 10
-          periodSeconds: 10
-        readinessProbe:
-          exec:
-            command:
-            - etcdctl
-            - endpoint
-            - health
-          initialDelaySeconds: 5
-          periodSeconds: 5
       volumes:
       - name: etcd-data
         emptyDir: {}
