@@ -23,4 +23,8 @@ spec:
         - containerPort: 21123
         env:
         - name: ETCD_ENDPOINTS
-          value: "http://{{ .Release.Name }}-etcd.production
+          value: "http://{{ .Release.Name }}-etcd.production.svc.cluster.local:2379"
+        - name: MINIO_ADDRESS
+          value: "http://{{ .Release.Name }}-minio.production.svc.cluster.local:9000"
+        - name: MILVUS_LOG_LEVEL
+          value: "{{ .Values.milvus.logLevel | default "debug" }}"
