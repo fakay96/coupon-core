@@ -55,7 +55,7 @@ jobs:
           kubectl create namespace production || echo "Namespace 'production' already exists."
 
       # Step 8: Deploy backend service with Helm
-      - name: Deploy backend service with Helm
+      - name: Deploy core services with Helm
         env:
           version_tag: ${{ env.version_tag }}
         run: |

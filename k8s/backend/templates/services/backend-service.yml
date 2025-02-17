@@ -6,11 +6,11 @@ metadata:
     app: backend
     release: {{ .Release.Name }}
 spec:
-  type: "{{ .Values.backend.service.type }}"
+  type: "{{ .Values.backend.service.type | default "ClusterIP" }}"
   ports:
-    - port: 8000
-      targetPort: 8000
+    - port: {{ .Values.backend.service.port | default 8000 }}
+      targetPort: {{ .Values.backend.service.port | default 8000 }}
       protocol: TCP
   selector:
-    app: {{ .Chart.Name }}
+    app: backend
     release: {{ .Release.Name }}

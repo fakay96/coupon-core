@@ -6,10 +6,10 @@ metadata:
     app: milvus-datanode
     release: {{ .Release.Name }}
 spec:
-  type: ClusterIP
+  type: "{{ .Values.milvus.service.type | default "ClusterIP" }}"
   selector:
     app: milvus-datanode
   ports:
     - name: grpc
-      port: 21123
-      targetPort: 21123
+      port: {{ .Values.milvus.service.port | default 21123 }}
+      targetPort: {{ .Values.milvus.service.port | default 21123 }}

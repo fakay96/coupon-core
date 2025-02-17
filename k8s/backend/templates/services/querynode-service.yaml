@@ -6,9 +6,13 @@ metadata:
     app: milvus-querynode
     release: {{ .Release.Name }}
 spec:
-  type: ClusterIP
+  type: "{{ .Values.milvus.service.type | default "ClusterIP" }}"
+  selector:
+    app: milvus-querynode
+    release: {{ .Release.Name }}
   ports:
-  - port: 21121
-    targetPort: 21121
+
+  - name: querynode
+    port: {{ .Values.milvus.service.querynodePort | default 21121 }}
+    targetPort: {{ .Values.milvus.service.querynodePort | default 21121 }}
     protocol: TCP
-    name: querynode

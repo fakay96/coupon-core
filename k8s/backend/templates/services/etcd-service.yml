@@ -3,14 +3,14 @@ kind: Service
 metadata:
   name: {{ .Release.Name }}-etcd
   labels:
-    app: {{ .Chart.Name }}
+    app: {{ .Release.Name }}-etcd
     release: {{ .Release.Name }}
 spec:
-  type: ClusterIP
+  type: {{ .Values.etcd.service.type | default "ClusterIP" | quote }}
   selector:
-    app: {{ .Chart.Name }}
+    app: {{ .Release.Name }}-etcd
     release: {{ .Release.Name }}
   ports:
     - name: etcd
-      port: 2379
-      targetPort: 2379
+      port: {{ .Values.etcd.service.port | default 2379 }}
+      targetPort: {{ .Values.etcd.service.port | default 2379 }}
