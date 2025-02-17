@@ -9,21 +9,21 @@ on:
       - main
 
 jobs:
-  build:
-    uses: ./.github/workflows/build.yml
-    with:
-      tag: "0.0.1"
-    secrets:
-      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+  # build:
+  #   uses: ./.github/workflows/build.yml
+  #   with:
+  #     tag: "0.0.1"
+  #   secrets:
+  #     DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+  #     DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
 
 
 
   deploy:
-    needs: build
+    # needs: build
     uses: ./.github/workflows/deploy.yml
     with:
-      version_tag: ${{ needs.build.outputs.version_tag }}
+      version_tag: "0.0.1"
     secrets:
       KUBECONFIG_CONTENT: ${{ secrets.KUBECONFIG_CONTENT }}
       KUBERNETES_SECRETS: ${{ secrets.KUBERNETES_SECRETS}}
