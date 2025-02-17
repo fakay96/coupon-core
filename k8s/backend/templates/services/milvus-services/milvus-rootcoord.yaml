@@ -6,12 +6,12 @@ metadata:
     app: milvus-rootcoord
     release: {{ .Release.Name }}
 spec:
-  type: "{{ .Values.milvus.service.type | default "ClusterIP" }}" 
+  type: {{ .Values.rootcoord.service.type | default "ClusterIP" }}
   selector:
     app: milvus-rootcoord
     release: {{ .Release.Name }}
   ports:
     - name: rootcoord
-      port: {{ .Values.milvus.service.rootcoordPort | default 53100 }} 
-      targetPort: {{ .Values.milvus.service.rootcoordPort | default 53100 }}
+      port: {{ .Values.rootcoord.service.port | default 53100 }}
+      targetPort: {{ .Values.rootcoord.service.port | default 53100 }}
       protocol: TCP

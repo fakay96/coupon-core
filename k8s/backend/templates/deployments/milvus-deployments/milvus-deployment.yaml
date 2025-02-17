@@ -60,7 +60,11 @@ spec:
         - name: MILVUS_LOG_LEVEL
           value: "{{ .Values.milvus.logLevel | default "debug" }}"
         
-        
+        # RootCoord address added here
+        - name: ROOT_COORD_ADDRESS
+          value: "{{ .Release.Name }}-rootcoord.production.svc.cluster.local:53100"
+
+        # Other service addresses remain unchanged
         - name: DATA_COORD_ADDRESS
           value: "{{ .Release.Name }}-datacoord.production.svc.cluster.local:13333"
         - name: DATA_NODE_ADDRESS

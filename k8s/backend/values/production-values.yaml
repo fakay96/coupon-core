@@ -96,6 +96,25 @@ querynode:
   service:
     port: 21121
 
+rootcoord:
+  replicaCount: 1
+
+  image:
+    repository: milvusdb/milvus
+    tag: "v2.2.12"
+    pullPolicy: Always
+
+  service:
+    type: ClusterIP
+    port: 53100
+
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
 ingress:
   enabled: true
   className: "nginx"

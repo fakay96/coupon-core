@@ -6,7 +6,7 @@ metadata:
     app: milvus-rootcoord
     release: {{ .Release.Name }}
 spec:
-  replicas: 1 
+  replicas: {{ .Values.rootcoord.replicaCount | default 1 }}
   selector:
     matchLabels:
       app: milvus-rootcoord
@@ -19,19 +19,20 @@ spec:
     spec:
       containers:
         - name: rootcoord
-          image: "{{ .Values.milvus.image.repository }}:{{ .Values.milvus.image.tag | default .Chart.AppVersion }}"
+          image: "{{ .Values.rootcoord.image.repository }}:{{ .Values.rootcoord.image.tag | default "v2.2.12" }}"
+          imagePullPolicy: "{{ .Values.rootcoord.image.pullPolicy | default "Always" }}"
           command: ["milvus", "run", "rootcoord"]
           ports:
-            - containerPort: {{ .Values.milvus.service.rootcoordPort | default 53100 }}
+            - containerPort: {{ .Values.rootcoord.service.port | default 53100 }}
           env:
             - name: ETCD_ENDPOINTS
-              value: "http://{{ .Release.Name }}-etcd.production.svc.cluster.local:2379" 
+              value: "http://{{ .Release.Name }}-etcd.production.svc.cluster.local:2379"
             - name: MINIO_ADDRESS
               value: "http://{{ .Release.Name }}-minio.production.svc.cluster.local:9000"
           resources:
             requests:
-              memory: "{{ .Values.milvus.resources.rootcoord.requests.memory | default "2Gi" }}"
-              cpu: "{{ .Values.milvus.resources.rootcoord.requests.cpu | default "1000m" }}"
+              memory: "{{ .Values.rootcoord.resources.requests.memory | default "512Mi" }}"
+              cpu: "{{ .Values.rootcoord.resources.requests.cpu | default "250m" }}"
             limits:
-              memory: "{{ .Values.milvus.resources.rootcoord.limits.memory | default "4Gi" }}"
-              cpu: "{{ .Values.milvus.resources.rootcoord.limits.cpu | default "2000m" }}"
+              memory: "{{ .Values.rootcoord.resources.limits.memory | default "1Gi" }}"
+              cpu: "{{ .Values.rootcoord.resources.limits.cpu | default "500m" }}"
