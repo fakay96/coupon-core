@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-datanode
+  labels:
+    app: milvus-datanode
+    release: {{ .Release.Name }}
+spec:
+  type: ClusterIP
+  selector:
+    app: milvus-datanode
+  ports:
+    - name: grpc
+      port: 21123
+      targetPort: 21123
