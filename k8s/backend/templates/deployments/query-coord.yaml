@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-querycoord
+  labels:
+    app: milvus-querycoord
+    release: {{ .Release.Name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: milvus-querycoord
+  template:
+    metadata:
+      labels:
+        app: milvus-querycoord
+    spec:
+      containers:
+      - name: querycoord
+        image: "{{ .Values.milvus.image.repository }}:{{ .Values.milvus.image.tag | default .Chart.AppVersion }}"
+        command: ["milvus", "run", "querycoord"]
+        ports:
+        - containerPort: 19531
+        env:
+        - name: ETCD_ENDPOINTS
+          value: "http://{{ .Release.Name }}-etcd.production.svc.cluster.local:2379"
+        - name: MINIO_ADDRESS
+          value: "http://{{ .Release.Name }}-minio.production.svc.cluster.local:9000"
