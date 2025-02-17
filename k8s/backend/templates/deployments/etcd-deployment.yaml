@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: {{ .Release.Name }}-etcd
   labels:
-    app: {{ .Chart.Name }}
+    app: {{ .Release.Name }}-etcd
     release: {{ .Release.Name }}
 spec:
   replicas: 1
@@ -11,12 +11,12 @@ spec:
     type: Recreate
   selector:
     matchLabels:
-      app: {{ .Chart.Name }}
+      app: {{ .Release.Name }}-etcd
       release: {{ .Release.Name }}
   template:
     metadata:
       labels:
-        app: {{ .Chart.Name }}
+        app: {{ .Release.Name }}-etcd
         release: {{ .Release.Name }}
     spec:
       priorityClassName: core-services-priority
