@@ -3,7 +3,7 @@ kind: Service
 metadata:
   name: {{ .Release.Name }}-milvus
   labels:
-    app: coupon-service-milvus-proxy
+    app: milvus-proxy
     release: {{ .Release.Name }}
 spec:
   type: {{ .Values.milvus.service.type | quote }}
@@ -16,6 +16,4 @@ spec:
     targetPort: 9091
     protocol: TCP
     name: metrics
-  selector:
-    app: {{ .Chart.Name }}
-    release: {{ .Release.Name }}
+ 

@@ -12,6 +12,4 @@ spec:
     targetPort: 19531
     protocol: TCP
     name: querycoord
-  selector:
-    app: milvus-querycoord
-    release: {{ .Release.Name }}
+
