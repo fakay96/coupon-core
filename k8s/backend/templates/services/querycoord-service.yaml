@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-querycoord
+  labels:
+    app: milvus-querycoord
+    release: {{ .Release.Name }}
+spec:
+  type: ClusterIP
+  ports:
+  - port: 19531
+    targetPort: 19531
+    protocol: TCP
+    name: querycoord
+  selector:
+    app: milvus-querycoord
+    release: {{ .Release.Name }}

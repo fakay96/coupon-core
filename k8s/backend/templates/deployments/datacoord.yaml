@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-datacoord
+  labels:
+    app: milvus-datacoord
+    release: {{ .Release.Name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: milvus-datacoord
+  template:
+    metadata:
+      labels:
+        app: milvus-datacoord
+    spec:
+      containers:
+      - name: datacoord
+        image: "{{ .Values.milvus.image.repository }}:{{ .Values.milvus.image.tag | default .Chart.AppVersion }}"
+        command: ["milvus", "run", "datacoord"]
+        ports:
+        - containerPort: 13333
+        env:
+        - name: ETCD_ENDPOINTS
+          value: "http://{{ .Release.Name }}-etcd.production.svc.cluster.local:2379"
+        - name: MINIO_ADDRESS
+          value: "http://{{ .Release.Name }}-minio.production.svc.cluster.local:9000"

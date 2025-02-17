@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-datacoord
+  labels:
+    app: milvus-datacoord
+    release: {{ .Release.Name }}
+spec:
+  type: ClusterIP
+  selector:
+    app: milvus-datacoord
+  ports:
+    - name: grpc
+      port: 13333
+      targetPort: 13333
