@@ -11,8 +11,7 @@ spec:
     app: milvus-querynode
     release: {{ .Release.Name }}
   ports:
-
-  - name: querynode
-    port: {{ .Values.milvus.service.querynodePort | default 21121 }}
-    targetPort: {{ .Values.milvus.service.querynodePort | default 21121 }}
-    protocol: TCP
+    - name: querynode
+      port: {{ .Values.milvus.service.querynodePort | default 21121 }} 
+      targetPort: {{ .Values.milvus.service.querynodePort | default 21121 }} 
+      protocol: TCP #

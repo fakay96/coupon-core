@@ -10,10 +10,12 @@ spec:
   selector:
     matchLabels:
       app: milvus-querynode
+      release: {{ .Release.Name }}
   template:
     metadata:
       labels:
         app: milvus-querynode
+        release: {{ .Release.Name }}=
     spec:
       containers:
       - name: querynode

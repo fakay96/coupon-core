@@ -10,10 +10,12 @@ spec:
   selector:
     matchLabels:
       app: milvus-querycoord
+      release: {{ .Release.Name }} 
   template:
     metadata:
       labels:
         app: milvus-querycoord
+        release: {{ .Release.Name }} 
     spec:
       containers:
       - name: querycoord

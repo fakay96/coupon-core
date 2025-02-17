@@ -9,9 +9,9 @@ spec:
   type: "{{ .Values.milvus.service.type | default "ClusterIP" }}"
   selector:
     app: milvus-querycoord
-    release: {{ .Release.Name }}
+    release: {{ .Release.Name }} 
   ports:
     - name: querycoord
       port: {{ .Values.milvus.service.querycoordPort | default 19531 }}
       targetPort: {{ .Values.milvus.service.querycoordPort | default 19531 }}
-      protocol: TCP
+      protocol: TCP 
