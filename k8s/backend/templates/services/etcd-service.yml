@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: coupon-service-etcd
+  namespace: production
+  labels:
+    app: coupon-service-etcd
+spec:
+  type: ClusterIP
+  selector:
+    app: coupon-service-etcd
+  ports:
+    - name: etcd
+      port: 2379
+      targetPort: 2379
