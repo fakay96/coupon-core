@@ -15,7 +15,7 @@ spec:
     metadata:
       labels:
         app: milvus-querynode
-        release: {{ .Release.Name }}=
+        release: {{ .Release.Name }} # Ensure this value does not have invalid characters
     spec:
       containers:
       - name: querynode

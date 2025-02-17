@@ -55,31 +55,31 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and push the backend image
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          file: docker/Dockerfile.core
-          push: true
-          tags: fakay96/coupon-core:${{ env.VERSION_TAG }}
-          platforms: linux/amd64
-          no-cache: true
+      # - name: Build and push the backend image
+      #   uses: docker/build-push-action@v3
+      #   with:
+      #     context: .
+      #     file: docker/Dockerfile.core
+      #     push: true
+      #     tags: fakay96/coupon-core:${{ env.VERSION_TAG }}
+      #     platforms: linux/amd64
+      #     no-cache: true
 
           
 
-      - name: Prune Docker resources after backend build
-        run: docker system prune --force --volumes
+      # - name: Prune Docker resources after backend build
+      #   run: docker system prune --force --volumes
 
-      - name: Build and push the web scraper image
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          file: docker/Dockerfile.web_scraper
-          push: true
-          tags: fakay96/web_scraper:${{ env.VERSION_TAG }}
-          platforms: linux/amd64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      # - name: Build and push the web scraper image
+      #   uses: docker/build-push-action@v3
+      #   with:
+      #     context: .
+      #     file: docker/Dockerfile.web_scraper
+      #     push: true
+      #     tags: fakay96/web_scraper:${{ env.VERSION_TAG }}
+      #     platforms: linux/amd64
+      #     cache-from: type=gha
+      #     cache-to: type=gha,mode=max
 
       - name: Prune Docker resources after web scraper build
         run: docker system prune --force --volumes

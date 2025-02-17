@@ -10,21 +10,21 @@ spec:
   selector:
     matchLabels:
       app: milvus-querycoord
-      release: {{ .Release.Name }} 
+      release: {{ .Release.Name }} # Ensure this matches pod labels exactly
   template:
     metadata:
       labels:
         app: milvus-querycoord
-        release: {{ .Release.Name }} 
+        release: {{ .Release.Name }} # Ensure this matches the service selector
     spec:
       containers:
       - name: querycoord
         image: "{{ .Values.milvus.image.repository }}:{{ .Values.milvus.image.tag | default .Chart.AppVersion }}"
         command: ["milvus", "run", "querycoord"]
         ports:
-        - containerPort: 19531
+        - containerPort: 19531 # Internal port used by querycoord
         env:
         - name: ETCD_ENDPOINTS
-          value: "http://{{ .Release.Name }}-etcd.production.svc.cluster.local:2379"
+          value: "http://{{ .Release.Name }}-etcd.production.svc.cluster.local:2379" # Ensure etcd service is reachable
         - name: MINIO_ADDRESS
-          value: "http://{{ .Release.Name }}-minio.production.svc.cluster.local:9000"
+          value: "http://{{ .Release.Name }}-minio.production.svc.cluster.local:9000" # Ensure minio service is reachable
