@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-rootcoord
+  labels:
+    app: milvus-rootcoord
+    release: {{ .Release.Name }}
+spec:
+  type: "{{ .Values.milvus.service.type | default "ClusterIP" }}" 
+  selector:
+    app: milvus-rootcoord
+    release: {{ .Release.Name }}
+  ports:
+    - name: rootcoord
+      port: {{ .Values.milvus.service.rootcoordPort | default 53100 }} 
+      targetPort: {{ .Values.milvus.service.rootcoordPort | default 53100 }}
+      protocol: TCP
