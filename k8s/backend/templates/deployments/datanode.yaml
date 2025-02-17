@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-datanode
+  labels:
+    app: milvus-datanode
+    release: {{ .Release.Name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: milvus-datanode
+  template:
+    metadata:
+      labels:
+        app: milvus-datanode
+    spec:
+      containers:
+      - name: datanode
+        image: "{{ .Values.milvus.image.repository }}:{{ .Values.milvus.image.tag | default .Chart.AppVersion }}"
+        command: ["milvus", "run", "datanode"]
+        ports:
+        - containerPort: 21123
+        env:
+        - name: ETCD_ENDPOINTS
+          value: "http://{{ .Release.Name }}-etcd.production
