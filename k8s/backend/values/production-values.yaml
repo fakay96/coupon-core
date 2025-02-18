@@ -1,15 +1,26 @@
+namespace: production
+
+ingress:
+  host: api.dishpal.ai
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  tls:
+    - hosts:
+        - api.dishpal.ai
+      secretName: api-dishpal-ai-tls
+
 backend:
   replicaCount: 1
-
   image:
     repository: fakay96/backend  
     tag: ""
     pullPolicy: Always
-
   service:
     type: ClusterIP
     port: 8000
-
   resources:
     requests:
       memory: "512Mi"
@@ -17,10 +28,8 @@ backend:
     limits:
       memory: "1Gi"
       cpu: "1000m"
-
   nodeSelector:
     workload: backend
-
   affinity:
     nodeAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
@@ -30,28 +39,9 @@ backend:
             operator: In
             values:
             - backend
-
   env:
     environment: staging
     logLevel: debug
-
-
-
-ingress:
-  enabled: true
-  className: "nginx"
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /$1
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-  hosts:
-    - host: dishpal.ai
-      paths:
-        - path: /api
-      pathType: Prefix
-  tls:
-    - hosts:
-        - dishpal.ai
-      secretName: dishpal-ai-tls
 
 resources:
   requests:
@@ -75,7 +65,6 @@ redis:
   persistence:
     enabled: true
     size: "1Gi"
-
 
 autoscaling:
   enabled: false

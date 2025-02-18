@@ -1,17 +1,27 @@
-name: Deploy to DigitalOcean Kubernetes
+name: Deploy to Kubernetes
 
 on:
-  workflow_call:
+  workflow_dispatch:
     inputs:
       version_tag:
         description: 'The version tag to deploy'
         required: true
         type: string
-    secrets:
-      KUBECONFIG_CONTENT:
+      environment:
+        description: 'Target environment'
         required: true
-      KUBERNETES_SECRETS:
-        required: true
+        type: choice
+        options:
+          - staging
+          - production
+
+
+env:
+  NAMESPACE: ${{ github.event.inputs.environment }}
+  KUBECONFIG_CONTENT: ${{ secrets.KUBECONFIG_CONTENT }}
+
+
+
 
 jobs:
   deploy:
@@ -51,13 +61,23 @@ jobs:
       # Step 6: Ensure namespace exists before applying secrets
       - name: Create namespace if not exists
         run: |
-          echo "Ensuring production namespace exists..."
-          kubectl create namespace production || echo "Namespace 'production' already exists."
+          echo "Ensuring ${{ env.NAMESPACE }} namespace exists..."
+          kubectl create namespace ${{ env.NAMESPACE }} || echo "Namespace '${{ env.NAMESPACE }}' already exists."
 
-      # Step 8: Deploy backend service with Helm
+
+      # Step 8: Wait for production approval
+      - name: Wait for production approval
+        if: github.event.inputs.environment == 'production'
+        uses: trstringer/manual-approval@v1
+        with:
+          secret: ${{ secrets.GITHUB_TOKEN }}
+          approvers: fakay96
+          minimum-approvals: 1
+
+      # Step 9: Deploy backend service with Helm
       - name: Deploy core services with Helm
         env:
-          version_tag: ${{ env.version_tag }}
+          version_tag: ${{ github.event.inputs.version_tag }}
         run: |
           echo "Deploying with Helm using image tag: ${version_tag}"
           helm upgrade --install coupon-service ./k8s/backend \
@@ -66,10 +86,11 @@ jobs:
             --set milvus.enabled=true \
             --set etcd.enabled=true \
             --set minio.enabled=true \
-            --namespace production --create-namespace \
-            -f ./k8s/backend/values/production-values.yaml \
+            --namespace ${{ env.NAMESPACE }} --create-namespace \
+            -f ./k8s/backend/values/${{ env.NAMESPACE }}-values.yaml \
             --atomic --force --cleanup-on-fail --history-max 5 \
             --timeout 30m0s
+
 
       # Step 9: Verify service endpoints
       - name: Verify service endpoints

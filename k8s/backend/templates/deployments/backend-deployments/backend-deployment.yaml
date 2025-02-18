@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: backend
+  namespace: {{ .Values.namespace }}
 spec:
   replicas: {{ .Values.backend.replicaCount | default 1 }}
   strategy:
@@ -19,15 +20,13 @@ spec:
         release: {{ .Release.Name }}
       annotations:
         checksum/image: {{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag | sha256sum }}
-
-
     spec:
       containers:
       - name: backend
         image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
         imagePullPolicy: "{{ .Values.backend.image.pullPolicy }}"
         ports:
-          - containerPort: {{ .Values.backend.service.port }}
+        - containerPort: {{ .Values.backend.service.port }}
         resources:
           requests:
             memory: "{{ .Values.backend.resources.requests.memory }}"
@@ -36,38 +35,38 @@ spec:
             memory: "{{ .Values.backend.resources.limits.memory }}"
             cpu: "{{ .Values.backend.resources.limits.cpu }}"
         env:
-          - name: DB_PORT
-            valueFrom:
-              secretKeyRef:
-                name: app-secrets
-                key: DB_PORT
-          - name: DB_USER
-            valueFrom:
-              secretKeyRef:
-                name: app-secrets
-                key: DB_USER
-          - name: DB_PASSWORD
-            valueFrom:
-              secretKeyRef:
-                name: app-secrets
-                key: DB_PASSWORD
-          - name: DB_HOST
-            valueFrom:
-              secretKeyRef:
-                name: app-secrets
-                key: DB_HOST
-          - name: ENVIRONMENT
-            valueFrom:
-              secretKeyRef:
-                name: app-secrets
-                key: ENVIRONMENT
-          - name: REDIS_PASSWORD
-            valueFrom:
-              secretKeyRef:
-                name: app-secrets
-                key: REDIS_PASSWORD
-          - name: REDIS_HOST
-            valueFrom:
-              secretKeyRef:
-                name: app-secrets
-                key: REDIS_HOST
+        - name: DB_PORT
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: DB_PORT
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: DB_USER
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: DB_PASSWORD
+        - name: DB_HOST
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: DB_HOST
+        - name: ENVIRONMENT
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: ENVIRONMENT
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: REDIS_PASSWORD
+        - name: REDIS_HOST
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: REDIS_HOST

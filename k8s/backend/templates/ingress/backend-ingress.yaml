@@ -2,6 +2,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: coupon-service-ingress
+  namespace: {{ .Values.namespace }}
   labels:
     app: backend
     release: coupon-service
@@ -12,10 +13,10 @@ spec:
   ingressClassName: nginx
   tls:
   - hosts:
-    - api.dishpal.ai
-    secretName: api-dishpal-ai-tls
+    - {{ .Values.ingress.host }}
+    secretName: {{ .Values.ingress.host | replace "." "-" }}-tls
   rules:
-  - host: api.dishpal.ai
+  - host: {{ .Values.ingress.host }}
     http:
       paths:
       - path: /

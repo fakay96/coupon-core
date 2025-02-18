@@ -149,3 +149,14 @@ DATABASE_ROUTERS = [
     "authentication.routers.AuthenticationRouter",
     "geodiscounts.routers.GeoDiscountsRouter"
 ]
+
+
+SWAGGER_SETTINGS = {
+    'SECURITY_DEFINITIONS': {
+         'Bearer': {
+             'type': 'apiKey',
+             'name': 'Authorization',
+             'in': 'header'
+         }
+    },
+}

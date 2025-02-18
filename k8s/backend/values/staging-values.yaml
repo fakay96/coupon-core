@@ -1,3 +1,17 @@
+namespace: staging
+
+ingress:
+  host: api-staging.dishpal.ai
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  tls:
+    - hosts:
+        - api-staging.dishpal.ai
+      secretName: api-staging-dishpal-ai-tls
+
 backend:
   replicaCount: 1
 
@@ -35,24 +49,6 @@ backend:
     environment: staging
     logLevel: debug
 
-
-
-ingress:
-  enabled: true
-  className: "nginx"
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /$1
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-  hosts:
-    - host: dishpal.ai
-      paths:
-        - path: /api
-      pathType: Prefix
-  tls:
-    - hosts:
-        - dishpal.ai
-      secretName: dishpal-ai-tls
-
 resources:
   requests:
     cpu: "500m"
@@ -75,7 +71,6 @@ redis:
   persistence:
     enabled: true
     size: "1Gi"
-
 
 autoscaling:
   enabled: false
