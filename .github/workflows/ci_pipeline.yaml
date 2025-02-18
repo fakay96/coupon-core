@@ -24,9 +24,10 @@ jobs:
     uses: ./.github/workflows/deploy.yml
     with:
       version_tag: "0.0.1"
+      environment: "staging"
     secrets:
       KUBECONFIG_CONTENT: ${{ secrets.KUBECONFIG_CONTENT }}
-      KUBERNETES_SECRETS: ${{ secrets.KUBERNETES_SECRETS}}
+
 
   notify_failure:
     runs-on: ubuntu-latest
@@ -34,4 +35,3 @@ jobs:
     steps:
       - name: Notify about failure 
         run: echo "CI Pipeline failed. Check logs for more details."
-
