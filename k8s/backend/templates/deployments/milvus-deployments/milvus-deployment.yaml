@@ -32,7 +32,12 @@ spec:
           value: "{{ .Values.milvus.logLevel | default "debug" }}"
         - name: STANDALONE_MODE
           value: "true"
+        - name: ETCD_ENDPOINTS
+          value: "http://{{ .Release.Name }}-etcd.production.svc.cluster.local:2379" # Ensure etcd service is reachable
+        - name: MINIO_ADDRESS
+          value: "http://{{ .Release.Name }}-minio.production.svc.cluster.local:9000" # Ensure minio service is reachable
 
+        
         volumeMounts:
         - name: milvus-storage
           mountPath: /var/lib/milvus
