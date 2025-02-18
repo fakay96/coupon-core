@@ -14,6 +14,15 @@ on:
         options:
           - staging
           - production
+  workflow_call:
+    inputs:
+      version_tag:
+        required: true
+        type: string
+      environment:
+        required: true
+        type: string
+
 
 
 env:
