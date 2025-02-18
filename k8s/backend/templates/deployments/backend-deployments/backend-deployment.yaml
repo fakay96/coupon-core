@@ -17,6 +17,9 @@ spec:
       labels:
         app: backend
         release: {{ .Release.Name }}
+      annotations:
+        checksum/image: {{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag | sha256sum }}
+
 
     spec:
       containers:

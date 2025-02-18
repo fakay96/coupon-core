@@ -16,10 +16,10 @@ import os
 from datetime import timedelta
 
 # Debug
-DEBUG = False
+DEBUG = True
 
 # Allowed Hosts
-ALLOWED_HOSTS = ["dishpal.ai"]
+ALLOWED_HOSTS = ["api.dishpal.ai"]
 
 
 # Secret Key
