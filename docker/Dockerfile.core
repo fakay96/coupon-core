@@ -90,7 +90,7 @@ RUN gdalinfo --version
 RUN ldconfig -p | grep gdal
 
 # Start the Application
-#ENTRYPOINT ["/app/entrypoint.sh"]
+ENTRYPOINT ["/app/entrypoint.sh"]
 
 
-CMD ["tail", "-f", "/dev/null"]
+#CMD ["tail", "-f", "/dev/null"]

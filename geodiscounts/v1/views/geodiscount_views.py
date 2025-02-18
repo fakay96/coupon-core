@@ -19,13 +19,13 @@ from geodiscounts.v1.utils.ip_geolocation import (
     get_location_from_ip,
     validate_max_distance,
 )
-from geodiscounts.v1.utils.vector_utils import search_vectors
+from geodiscounts.v1.utils.vector_utils import PostgreSQLVectorClient
 
 # drf-yasg imports for OpenAPI documentation
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
-
+client = PostgreSQLVectorClient()
 class DiscountListView(APIView):
     """
     API endpoint to fetch all available discounts.
@@ -289,7 +289,7 @@ class SearchDiscountsView(APIView):
                 raise ValidationError("top_k must be a positive integer.")
 
             # Search vector database
-            search_results = search_vectors(query_vector, top_k=top_k)
+            search_results = client.search_vectors(query_vector, top_k=top_k)
 
             # Extract matching vector IDs
             matching_ids = [result["id"] for result in search_results]
