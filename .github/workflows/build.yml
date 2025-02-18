@@ -55,15 +55,15 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # - name: Build and push the backend image
-      #   uses: docker/build-push-action@v3
-      #   with:
-      #     context: .
-      #     file: docker/Dockerfile.core
-      #     push: true
-      #     tags: fakay96/coupon-core:${{ env.VERSION_TAG }}
-      #     platforms: linux/amd64
-      #     no-cache: true
+      - name: Build and push the backend image
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          file: docker/Dockerfile.core
+          push: true
+          tags: fakay96/coupon-core:${{ env.VERSION_TAG }}
+          platforms: linux/amd64
+          no-cache: true
 
           
 
