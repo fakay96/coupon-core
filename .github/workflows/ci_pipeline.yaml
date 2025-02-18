@@ -25,8 +25,7 @@ jobs:
     with:
       version_tag: "0.0.1"
       environment: "staging"
-    secrets:
-      KUBECONFIG_CONTENT: ${{ secrets.KUBECONFIG_CONTENT }}
+    
 
 
   notify_failure:
