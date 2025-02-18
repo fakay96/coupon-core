@@ -12,63 +12,62 @@ backend:
 
   resources:
     requests:
-      memory: "128Mi"
-      cpu: "100m"
-    limits:
-      memory: "1Gi"
-      cpu: "1"
-
-milvus:
-  replicaCount: 1
-
-  image:
-    repository: milvusdb/milvus
-    tag: "v2.2.12"
-    pullPolicy: Always
-
-  service:
-    type: ClusterIP
-    port: 19530
-    metricsPort: 9091
-
-  logLevel: "debug"
-
-  resources:
-    requests:
       memory: "512Mi"
-      cpu: "500m"
+      cpu: "200m"
     limits:
       memory: "1Gi"
-      cpu: "1"
+      cpu: "1000m"
+
+  nodeSelector:
+    workload: backend
+
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: workload
+            operator: In
+            values:
+            - backend
 
   env:
-    environment: development
+    environment: staging
     logLevel: debug
-  nodeSelector: {}
-  tolerations: []
-  affinity: {}
 
-datacoord:
-  service:
-    port: 13333
 
-datanode:
-  service:
-    port: 21123
 
-etcd:
-  service:
-    port: 2379
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: dishpal.ai
+      paths:
+        - path: /api
+      pathType: Prefix
+  tls:
+    - hosts:
+        - dishpal.ai
+      secretName: dishpal-ai-tls
 
-minio:
-  service:
-    port: 9000
-    consolePort: 9001
+resources:
+  requests:
+    cpu: "500m"
+    memory: "512Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1Gi"
 
-querycoord:
-  service:
-    port: 19531
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 40
+  targetMemoryUtilizationPercentage: 80
 
-querynode:
-  service:
-    port: 21121
+tolerations: []
+
+affinity: {}

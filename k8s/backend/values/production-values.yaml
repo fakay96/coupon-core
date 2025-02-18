@@ -31,90 +31,12 @@ backend:
             values:
             - backend
 
-milvus:
-  replicaCount: 1
-
-  image:
-    repository: milvusdb/milvus
-    tag: "v2.2.12"
-    pullPolicy: Always
-
-  service:
-    type: ClusterIP
-    port: 19530
-    metricsPort: 9091
-
-  logLevel: "debug"
-
-  resources:
-    requests:
-      memory: "512Mi"
-      cpu: "500m"
-    limits:
-      memory: "1Gi"
-      cpu: "500m"
-
-  nodeSelector:
-    workload: milvus
-
-  affinity:
-    nodeAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        nodeSelectorTerms:
-        - matchExpressions:
-          - key: workload
-            operator: In
-            values:
-            - milvus
-
   env:
     environment: staging
     logLevel: debug
 
-datacoord:
-  service:
-    port: 13333
 
-datanode:
-  service:
-    port: 21123
 
-etcd:
-  service:
-    port: 2379
-
-minio:
-  service:
-    port: 9000
-    consolePort: 9001
-
-querycoord:
-  service:
-    port: 19531
-
-querynode:
-  service:
-    port: 21121
-
-rootcoord:
-  replicaCount: 1
-
-  image:
-    repository: milvusdb/milvus
-    tag: "v2.2.12"
-    pullPolicy: Always
-
-  service:
-    type: ClusterIP
-    port: 53100
-
-  resources:
-    requests:
-      memory: "512Mi"
-      cpu: "250m"
-    limits:
-      memory: "1Gi"
-      cpu: "500m"
 ingress:
   enabled: true
   className: "nginx"
@@ -143,7 +65,7 @@ autoscaling:
   enabled: false
   minReplicas: 1
   maxReplicas: 3
-  targetCPUUtilizationPercentage: 80
+  targetCPUUtilizationPercentage: 40
   targetMemoryUtilizationPercentage: 80
 
 tolerations: []
