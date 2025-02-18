@@ -34,7 +34,7 @@ schema_view = get_schema_view(
         default_version='v1',
         description="API documentation for the Dishpal Core project",
         terms_of_service="https://www.example.com/terms/",
-        contact=openapi.Contact(email="contact@example.com"),
+        contact=openapi.Contact(email="fakay96@gmail.com.com"),
         license=openapi.License(name="BSD License"),
     ),
     public=True,
