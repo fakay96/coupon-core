@@ -1,78 +1,46 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Release.Name }}-milvus-proxy
+  name: {{ .Release.Name }}-milvus-standalone
   labels:
-    app: milvus-proxy
+    app: milvus-standalone
     release: {{ .Release.Name }}
 spec:
-  replicas: {{ .Values.milvus.replicaCount | default 1 }}
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
+  replicas: 1  # Standalone version runs with a single replica
   selector:
     matchLabels:
-      app: milvus-proxy
+      app: milvus-standalone
       release: {{ .Release.Name }}
   template:
     metadata:
       labels:
-        app: milvus-proxy
+        app: milvus-standalone
         release: {{ .Release.Name }}
     spec:
       priorityClassName: core-services-priority
-      initContainers:
-      - name: wait-for-etcd
-        image: busybox:1.28
-        command:
-        - sh
-        - -c
-        - |
-          echo "Waiting for ETCD..."
-          timeout 60 sh -c 'until nc -z {{ .Release.Name }}-etcd.production.svc.cluster.local 2379; do echo waiting for etcd; sleep 2; done'
-          echo "ETCD is ready!"
-
-      - name: wait-for-minio
-        image: busybox:1.28
-        command:
-        - sh
-        - -c
-        - |
-          echo "Waiting for MinIO..."
-          timeout 60 sh -c 'until nc -z {{ .Release.Name }}-minio.production.svc.cluster.local 9000; do echo waiting for minio; sleep 2; done'
-          echo "MinIO is ready!"
-
       containers:
-      - name: milvus-proxy
+      - name: milvus-standalone
         image: "{{ .Values.milvus.image.repository }}:{{ .Values.milvus.image.tag | default .Chart.AppVersion }}"
         imagePullPolicy: {{ .Values.milvus.image.pullPolicy | quote }}
-        command: ["milvus", "run", "proxy"] 
+        command: ["milvus", "run", "standalone"]
         ports:
-        - containerPort: 19530
-        - containerPort: 9091
-        env:
-        - name: ETCD_ENDPOINTS
-          value: "http://{{ .Release.Name }}-etcd.production.svc.cluster.local:2379"
-        - name: MINIO_ADDRESS
-          value: "http://{{ .Release.Name }}-minio.production.svc.cluster.local:9000"
-        - name: MILVUS_LOG_LEVEL
-          value: "{{ .Values.milvus.logLevel | default "debug" }}"
-        
-        # RootCoord address added here
-        - name: ROOT_COORD_ADDRESS
-          value: "{{ .Release.Name }}-rootcoord.production.svc.cluster.local:53100"
+        - containerPort: 19530  # gRPC Port
+        - containerPort: 9091   # HTTP API Port
 
-        # Other service addresses remain unchanged
-        - name: DATA_COORD_ADDRESS
-          value: "{{ .Release.Name }}-datacoord.production.svc.cluster.local:13333"
-        - name: DATA_NODE_ADDRESS
-          value: "{{ .Release.Name }}-datanode.production.svc.cluster.local:21123"
-        - name: QUERY_COORD_ADDRESS
-          value: "{{ .Release.Name }}-querycoord.production.svc.cluster.local:19531"
-        - name: QUERY_NODE_ADDRESS
-          value: "{{ .Release.Name }}-querynode.production.svc.cluster.local:21121"
+        env:
+        - name: LOG_LEVEL
+          value: "{{ .Values.milvus.logLevel | default "debug" }}"
+        - name: STANDALONE_MODE
+          value: "true"
+
+        volumeMounts:
+        - name: milvus-storage
+          mountPath: /var/lib/milvus
 
         resources:
           {{- toYaml .Values.milvus.resources | nindent 10 }}
+
+      volumes:
+      - name: milvus-storage
+        persistentVolumeClaim:
+          claimName: milvus-data-pvc
