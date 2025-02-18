@@ -2,7 +2,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: coupon-service-ingress
-  namespace: {{ .Values.namespace }}
+  namespace: production
   labels:
     app: backend
     release: coupon-service
