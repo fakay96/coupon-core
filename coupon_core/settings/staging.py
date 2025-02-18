@@ -21,9 +21,16 @@ DEBUG = True
 # Allowed Hosts
 ALLOWED_HOSTS = ["api.dishpal.ai"]
 
-
 # Secret Key
 SECRET_KEY = os.getenv("SECRET_KEY", "staging-secret-key")
+
+# Trust proxy headers to indicate HTTPS.
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# Optionally enforce HTTPS redirects
+SECURE_SSL_REDIRECT = True
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
 
 # LocalStack S3 Configuration
 AWS_S3_ENDPOINT_URL = os.getenv("LOCALSTACK_S3_ENDPOINT_EXTERNAL")
@@ -36,8 +43,7 @@ AWS_S3_CUSTOM_DOMAIN = f"{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}"
 # Static files storage (S3 via LocalStack)
 STATIC_URL = f"{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/static/"
 STATICFILES_STORAGE = "storages.backends.s3boto3.S3StaticStorage"
-STATIC_ROOT = f"{
-    AWS_S3_ENDPOINT_URL_INTERNAL}/{AWS_STORAGE_BUCKET_NAME}/static/"
+STATIC_ROOT = f"{AWS_S3_ENDPOINT_URL_INTERNAL}/{AWS_STORAGE_BUCKET_NAME}/static/"
 
 # Media files storage (S3 via LocalStack)
 MEDIA_URL = f"{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/media/"
@@ -79,7 +85,7 @@ DATABASES = {
         },
     },
     "vector_db": {
-        'ENGINE': 'django.contrib.gis.db.backends.postgis',
+        "ENGINE": "django.contrib.gis.db.backends.postgis",
         "NAME": os.getenv("VECTOR_DBNAME", "vector_db"),
         "USER": os.getenv("DB_USER", "user"),
         "PASSWORD": os.getenv("DB_PASSWORD", "password"),
@@ -140,5 +146,3 @@ SIMPLE_JWT = {
     "USER_ID_CLAIM": "user_id",
     "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
 }
-
-

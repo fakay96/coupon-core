@@ -30,9 +30,9 @@ from drf_yasg import openapi
 # Set up the schema view for Swagger
 schema_view = get_schema_view(
     openapi.Info(
-        title="Coupon Core API",
+        title="Dishpal Core API",
         default_version='v1',
-        description="API documentation for the Coupon Core project",
+        description="API documentation for the Dishpal Core project",
         terms_of_service="https://www.example.com/terms/",
         contact=openapi.Contact(email="contact@example.com"),
         license=openapi.License(name="BSD License"),
