@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e  # Exit on error
+
 
 LOG_FILE="/app/migration_errors.log"
 
@@ -18,21 +18,7 @@ log_and_print "✅ Database is ready."
 # Export the database password for PostgreSQL
 export PGPASSWORD="$DB_PASSWORD"
 
-# === Find and export the correct GDAL path ===
-log_and_print "🔍 Searching for GDAL library..."
-GDAL_LIB_PATH=$(find /usr/lib /usr/lib/aarch64-linux-gnu /usr/lib/x86_64-linux-gnu -name "libgdal.so*" 2>/dev/null | head -n 1)
 
-if [ -z "$GDAL_LIB_PATH" ]; then
-  log_and_print "❌ GDAL library not found! Exiting."
-  exit 1
-else
-  log_and_print "✅ GDAL found at: $GDAL_LIB_PATH"
-  export GDAL_LIBRARY_PATH="$GDAL_LIB_PATH"
-  export LD_LIBRARY_PATH="$(dirname "$GDAL_LIB_PATH"):$LD_LIBRARY_PATH"
-fi
-
-log_and_print "✅ GDAL_LIBRARY_PATH set to: $GDAL_LIBRARY_PATH"
-log_and_print "✅ LD_LIBRARY_PATH set to: $LD_LIBRARY_PATH"
 
 # === Function to create a database shard ===
 create_database_shard() {
@@ -80,6 +66,7 @@ run_migrations() {
 declare -A APPS_SHARDS=(
   ["authentication"]="authentication_shard"
   ["geodiscounts"]="geodiscounts_db"
+  ["vectors"]="vector_db"
 )
 
 # === Ensure all shards are created before running migrations ===
@@ -87,11 +74,6 @@ for shard in "${APPS_SHARDS[@]}"; do
   log_and_print "🛠️ Ensuring database shard exists for: $shard..."
   create_database_shard "$shard"
 done
-
-# === Ensure vector database shard is created ===
-VECTOR_DB_NAME="${VECTOR_DBNAME:-vector_db}"
-log_and_print "🛠️ Ensuring vector database shard exists for: $VECTOR_DB_NAME..."
-create_database_shard "$VECTOR_DB_NAME"
 
 # === Run migrations for each app ===
 for app in "${!APPS_SHARDS[@]}"; do

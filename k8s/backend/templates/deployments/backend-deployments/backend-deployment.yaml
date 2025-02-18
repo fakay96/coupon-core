@@ -16,6 +16,8 @@ spec:
     metadata:
       labels:
         app: backend
+        release: {{ .Release.Name }}
+
     spec:
       containers:
       - name: backend
@@ -56,4 +58,3 @@ spec:
               secretKeyRef:
                 name: app-secrets
                 key: ENVIRONMENT
-         

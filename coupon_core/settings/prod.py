@@ -35,6 +35,8 @@ STATIC_ROOT = f"{AWS_S3_ENDPOINT_URL_INTERNAL}/{AWS_STORAGE_BUCKET_NAME}/static/
 MEDIA_URL = f"{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/media/"
 DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
 
+
+# PostgreSQL Database
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
@@ -48,7 +50,7 @@ DATABASES = {
         },
     },
     "authentication_shard": {
-        "ENGINE": "django.db.backends.postgresql",
+        "ENGINE": "django.contrib.gis.db.backends.postgis",
         "NAME": "authentication_shard",
         "USER": os.getenv("DB_USER", "user"),
         "PASSWORD": os.getenv("DB_PASSWORD", "password"),
@@ -59,12 +61,12 @@ DATABASES = {
         },
     },
     "geodiscounts_db": {
-        "ENGINE": "django.db.backends.postgresql",
+        "ENGINE": "django.contrib.gis.db.backends.postgis",
         "NAME": os.getenv("GEODISCOUNTS_DB_NAME", "geodiscounts_db"),
-        "USER": os.getenv("GEODISCOUNTS_DB_USER", "user"),
-        "PASSWORD": os.getenv("GEODISCOUNTS_DB_PASSWORD", "password"),
-        "HOST": os.getenv("GEODISCOUNTS_DB_HOST", "localhost"),
-        "PORT": os.getenv("GEODISCOUNTS_DB_PORT", "5432"),
+        "USER": os.getenv("DB_USER", "user"),
+        "PASSWORD": os.getenv("DB_PASSWORD", "password"),
+        "HOST": os.getenv("DB_HOST", "localhost"),
+        "PORT": os.getenv("DB_PORT", "5432"),
         "OPTIONS": {
             "sslmode": "require",
         },
@@ -76,6 +78,9 @@ DATABASES = {
         "PASSWORD": os.getenv("DB_PASSWORD", "password"),
         "HOST": os.getenv("DB_HOST", "localhost"),
         "PORT": os.getenv("DB_PORT", "5432"),
+        "OPTIONS": {
+            "sslmode": "require",
+        },
     },
 }
 

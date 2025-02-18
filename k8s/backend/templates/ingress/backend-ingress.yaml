@@ -3,7 +3,7 @@ kind: Ingress
 metadata:
   name: coupon-service-ingress
   labels:
-    app: coupon-service
+    app: backend
     release: coupon-service
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /
@@ -22,6 +22,6 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: coupon-service
+            name: {{ .Release.Name }}
             port:
-              number: 80
+              number: {{ .Values.backend.service.port | default 8000 }}
