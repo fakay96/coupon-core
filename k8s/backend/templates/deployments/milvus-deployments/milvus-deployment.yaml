@@ -1,25 +1,25 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Release.Name }}-milvus-standalone
+  name: {{ .Release.Name }}-milvus-proxy
   labels:
-    app: milvus-standalone
+    app: milvus-proxy
     release: {{ .Release.Name }}
 spec:
   replicas: 1  # Standalone version runs with a single replica
   selector:
     matchLabels:
-      app: milvus-standalone
+      app: milvus-proxy
       release: {{ .Release.Name }}
   template:
     metadata:
       labels:
-        app: milvus-standalone
+        app: milvus-proxy
         release: {{ .Release.Name }}
     spec:
       priorityClassName: core-services-priority
       containers:
-      - name: milvus-standalone
+      - name: milvus-proxy
         image: "{{ .Values.milvus.image.repository }}:{{ .Values.milvus.image.tag | default .Chart.AppVersion }}"
         imagePullPolicy: {{ .Values.milvus.image.pullPolicy | quote }}
         command: ["milvus", "run", "standalone"]
