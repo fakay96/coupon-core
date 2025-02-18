@@ -88,6 +88,11 @@ for shard in "${APPS_SHARDS[@]}"; do
   create_database_shard "$shard"
 done
 
+# === Ensure vector database shard is created ===
+VECTOR_DB_NAME="${VECTOR_DBNAME:-vector_db}"
+log_and_print "🛠️ Ensuring vector database shard exists for: $VECTOR_DB_NAME..."
+create_database_shard "$VECTOR_DB_NAME"
+
 # === Run migrations for each app ===
 for app in "${!APPS_SHARDS[@]}"; do
   shard=${APPS_SHARDS[$app]}

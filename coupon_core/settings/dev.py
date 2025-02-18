@@ -72,6 +72,14 @@ DATABASES = {
         "HOST": os.getenv("DB_HOST", "localhost"),
         "PORT": os.getenv("DB_PORT", "5432"),
     },
+    "vector_db": {
+        'ENGINE': 'django.contrib.gis.db.backends.postgis',
+        "NAME": os.getenv("VECTOR_DBNAME", "vector_db"),
+        "USER": os.getenv("DB_USER", "user"),
+        "PASSWORD": os.getenv("DB_PASSWORD", "password"),
+        "HOST": os.getenv("DB_HOST", "localhost"),
+        "PORT": os.getenv("DB_PORT", "5432"),
+    },
 }
 
 # Credentials for Redis service
