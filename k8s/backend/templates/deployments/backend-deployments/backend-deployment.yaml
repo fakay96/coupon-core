@@ -17,37 +17,6 @@ spec:
       labels:
         app: backend
     spec:
-      initContainers:
-      - name: wait-for-milvus
-        image: busybox:1.28
-        command:
-        - sh
-        - -c
-        - |
-          echo "Waiting for Milvus..."
-          timeout 60 sh -c 'until nc -z {{ .Release.Name }}-milvus.dishpal-ai.svc.cluster.local 19530; do echo waiting for milvus; sleep 2; done'
-          echo "Milvus is ready!"
-
-      - name: wait-for-etcd
-        image: busybox:1.28
-        command:
-        - sh
-        - -c
-        - |
-          echo "Waiting for ETCD..."
-          timeout 60 sh -c 'until nc -z {{ .Release.Name }}-etcd.production.svc.cluster.local 2379; do echo waiting for etcd; sleep 2; done'
-          echo "ETCD is ready!"
-
-      # - name: wait-for-minio
-      #   image: busybox:1.28
-      #   command:
-      #   - sh
-      #   - -c
-      #   - |
-      #     echo "Waiting for MinIO..."
-      #     timeout 60 sh -c 'until nc -z {{ .Release.Name }}-minio.production.svc.cluster.local 9000; do echo waiting for minio; sleep 2; done'
-      #     echo "MinIO is ready!"
-
       containers:
       - name: backend
         image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
@@ -87,7 +56,4 @@ spec:
               secretKeyRef:
                 name: app-secrets
                 key: ENVIRONMENT
-          - name: MILVUS_HOST
-            value: "{{ .Release.Name }}-milvus.dishpal-ai.svc.cluster.local"
-          - name: MILVUS_PORT
-            value: "19530"
+         
