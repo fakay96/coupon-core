@@ -4,6 +4,9 @@
 
 LOG_FILE="/app/migration_errors.log"
 
+DJANGO_SECRET_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(50))')
+export SECRET_KEY
+
 # Function to log errors and output
 log_and_print() {
   echo "$1" | tee -a "$LOG_FILE"
