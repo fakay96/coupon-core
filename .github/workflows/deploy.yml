@@ -23,63 +23,39 @@ on:
         required: true
         type: string
     secrets:
-        KUBECONFIG_CONTENT:
-          required: true
-        KUBERNETES_SECRETS:
-          required: true
-
-
-
-env:
-  NAMESPACE: ${{ github.event.inputs.environment }}
-  KUBECONFIG_CONTENT: ${{ secrets.KUBECONFIG_CONTENT }}
-
-
-
+      KUBECONFIG_CONTENT:
+        required: true
+      KUBERNETES_SECRETS:
+        required: true
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout code
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Step 2: Download the artifact with the version tag
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: version-file
-
-      # Step 3: Read the version tag from artifact and set it as an environment variable
-      - name: Read version from artifact
-        id: read_version
+      - name: Set environment variables
         run: |
-          version_tag=$(cat version.txt)
-          echo "version_tag=${version_tag}"
-          echo "version_tag=${version_tag}" >> $GITHUB_ENV
+          echo "NAMESPACE=${{ inputs.environment }}" >> $GITHUB_ENV
+          echo "VERSION_TAG=${{ inputs.version_tag }}" >> $GITHUB_ENV
 
-      # Step 4: Configure kubectl for DigitalOcean
       - name: Configure kubectl for DigitalOcean
         run: |
           mkdir -p ~/.kube
-          echo "Creating kubeconfig from raw YAML content..."
           echo "${{ secrets.KUBECONFIG_CONTENT }}" > ~/.kube/config
           chmod 600 ~/.kube/config
 
-      # Step 5: Verify kubeconfig setup
-      - name: Verify kubeconfig file and access
+      - name: Verify kubeconfig access
         run: kubectl get nodes
 
-      # Step 6: Ensure namespace exists before applying secrets
-      - name: Create namespace if not exists
+      - name: Ensure namespace exists
         run: |
-          echo "Ensuring ${{ env.NAMESPACE }} namespace exists..."
-          kubectl create namespace ${{ env.NAMESPACE }} || echo "Namespace '${{ env.NAMESPACE }}' already exists."
+          if ! kubectl get namespace ${{ env.NAMESPACE }}; then
+            kubectl create namespace ${{ env.NAMESPACE }}
+          fi
 
-
-      # Step 8: Wait for production approval
       - name: Wait for production approval
         if: github.event.inputs.environment == 'production'
         uses: trstringer/manual-approval@v1
@@ -88,16 +64,12 @@ jobs:
           approvers: fakay96
           minimum-approvals: 1
 
-      # Step 9: Deploy backend service with Helm
-      - name: Deploy core services with Helm
-        env:
-          version_tag: ${{ github.event.inputs.version_tag }}
+      - name: Deploy services with Helm
         run: |
-          echo "Deploying with Helm using image tag: ${version_tag}"
           helm upgrade --install coupon-service ./k8s/backend \
             --set backend.image.repository=fakay96/coupon-core \
-            --set backend.image.tag=${version_tag} \
-            --set milvus.enabled=true \
+            --set backend.image.tag=${{ env.VERSION_TAG }} \
+            --set database.postgres.enabled=true \
             --set etcd.enabled=true \
             --set minio.enabled=true \
             --namespace ${{ env.NAMESPACE }} --create-namespace \
@@ -105,39 +77,13 @@ jobs:
             --atomic --force --cleanup-on-fail --history-max 5 \
             --timeout 30m0s
 
-
-      # Step 9: Verify service endpoints
       - name: Verify service endpoints
-        run: |
-          echo "Verifying if service endpoints are available..."
-          kubectl get endpoints coupon-service -n production
+        run: kubectl get endpoints coupon-service -n ${{ env.NAMESPACE }}
 
-      # Step 10: Debug pod logs on failure
       - name: Debug pod logs on failure
         if: failure()
-        run: |
-          echo "Fetching logs from backend pods for debugging..."
-          kubectl logs -l app=backend -n production --tail=50
+        run: kubectl logs -l app=backend -n ${{ env.NAMESPACE }} --tail=50
 
-      # Step 11: Scale down deployment on failure
-      - name: Scale down deployment on failure
+      - name: Rollback on failure
         if: failure()
-        run: |
-          echo "Scaling down the deployment to 0 replicas to minimize resource usage..."
-          kubectl scale deployment backend --replicas=0 -n production
-
-      # Step 12: Rollback to previous version on failure
-      - name: Rollback to previous version on failure
-        if: failure()
-        run: |
-          echo "Deployment failed. Rolling back to previous version..."
-          helm rollback coupon-service 1 --namespace production
-          
-          echo "Verifying rollback status..."
-          kubectl rollout status deployment/backend -n production --timeout=5m
-          
-          echo "Checking pod logs after rollback..."
-          kubectl logs -l app=backend -n production --tail=50
-          
-          echo "Verifying service endpoints after rollback..."
-          kubectl get endpoints coupon-service -n production
+        run: helm rollback coupon-service 1 --namespace ${{ env.NAMESPACE }}
