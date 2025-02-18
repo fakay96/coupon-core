@@ -88,6 +88,6 @@ spec:
                 name: app-secrets
                 key: ENVIRONMENT
           - name: MILVUS_HOST
-            value: "{{ .Release.Name }}-milvus.production.svc.cluster.local"
+            value: "{{ .Release.Name }}-milvus.milvus.svc.cluster.local"
           - name: MILVUS_PORT
             value: "19530"
