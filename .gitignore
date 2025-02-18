@@ -6,3 +6,4 @@ poetry.lock
 static/
 staticfiles/
 cert-manager/
+pvcs/

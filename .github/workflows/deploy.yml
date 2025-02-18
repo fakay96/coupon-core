@@ -69,9 +69,6 @@ jobs:
           helm upgrade --install coupon-service ./k8s/backend \
             --set backend.image.repository=fakay96/coupon-core \
             --set backend.image.tag=${{ env.VERSION_TAG }} \
-            --set database.postgres.enabled=true \
-            --set etcd.enabled=true \
-            --set minio.enabled=true \
             --namespace ${{ env.NAMESPACE }} --create-namespace \
             -f ./k8s/backend/values/${{ env.NAMESPACE }}-values.yaml \
             --atomic --force --cleanup-on-fail --history-max 5 \
