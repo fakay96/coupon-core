@@ -22,6 +22,11 @@ on:
       environment:
         required: true
         type: string
+    secrets:
+        KUBECONFIG_CONTENT:
+          required: true
+        KUBERNETES_SECRETS:
+          required: true
 
 
 

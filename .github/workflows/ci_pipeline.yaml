@@ -25,7 +25,9 @@ jobs:
     with:
       version_tag: "0.0.1"
       environment: "staging"
-    
+    secrets:
+      KUBECONFIG_CONTENT: ${{ secrets.KUBECONFIG_CONTENT }}
+      KUBERNETES_SECRETS: ${{ secrets.KUBERNETES_SECRETS }}
 
 
   notify_failure:
