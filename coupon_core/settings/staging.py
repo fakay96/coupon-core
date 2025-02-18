@@ -92,8 +92,8 @@ DATABASES = {
 }
 
 # Credentials for Redis service
-REDIS_HOST = os.getenv("DEV_REDIS_HOST", "localhost")
-REDIS_PASSWORD = os.getenv("DEV_REDIS_PASS", "redis_password")
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "redis_password")
 REDIS_PORT = 6379
 
 # Caching (Redis)

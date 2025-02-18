@@ -61,6 +61,22 @@ resources:
     cpu: "1000m"
     memory: "1Gi"
 
+redis:
+  enabled: true
+  replicaCount: 1
+  imageTag: "7.0"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  persistence:
+    enabled: true
+    size: "1Gi"
+
+
 autoscaling:
   enabled: false
   minReplicas: 1

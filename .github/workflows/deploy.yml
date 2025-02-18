@@ -95,5 +95,14 @@ jobs:
       - name: Rollback to previous version on failure
         if: failure()
         run: |
-          echo "Deployment failed. Rolling back to previous version."
+          echo "Deployment failed. Rolling back to previous version..."
           helm rollback coupon-service 1 --namespace production
+          
+          echo "Verifying rollback status..."
+          kubectl rollout status deployment/backend -n production --timeout=5m
+          
+          echo "Checking pod logs after rollback..."
+          kubectl logs -l app=backend -n production --tail=50
+          
+          echo "Verifying service endpoints after rollback..."
+          kubectl get endpoints coupon-service -n production

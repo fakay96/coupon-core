@@ -61,3 +61,13 @@ spec:
               secretKeyRef:
                 name: app-secrets
                 key: ENVIRONMENT
+          - name: REDIS_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: app-secrets
+                key: REDIS_PASSWORD
+          - name: REDIS_HOST
+            valueFrom:
+              secretKeyRef:
+                name: app-secrets
+                key: REDIS_HOST
