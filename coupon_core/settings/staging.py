@@ -19,7 +19,7 @@ from datetime import timedelta
 DEBUG = True
 
 # Allowed Hosts
-ALLOWED_HOSTS = ["api.dishpal.ai"]
+ALLOWED_HOSTS = ["api-staging.dishpal.ai"]
 
 # Secret Key
 SECRET_KEY = os.getenv("SECRET_KEY", "staging-secret-key")
