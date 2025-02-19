@@ -51,7 +51,6 @@ STATIC_ROOT = f"{AWS_S3_ENDPOINT_URL_INTERNAL}/{AWS_STORAGE_BUCKET_NAME}/static/
 MEDIA_URL = f"{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/media/"
 DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
 
-# PostgreSQL Database
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
@@ -66,7 +65,7 @@ DATABASES = {
     },
     "authentication_shard": {
         "ENGINE": "django.contrib.gis.db.backends.postgis",
-        "NAME": "authentication_shard",
+        "NAME": os.getenv("AUTHENTICATION_SHARD_DB_NAME"),
         "USER": os.getenv("DB_USER", "user"),
         "PASSWORD": os.getenv("DB_PASSWORD", "password"),
         "HOST": os.getenv("DB_HOST", "localhost"),
@@ -77,7 +76,7 @@ DATABASES = {
     },
     "geodiscounts_db": {
         "ENGINE": "django.contrib.gis.db.backends.postgis",
-        "NAME": os.getenv("GEODISCOUNTS_DB_NAME", "geodiscounts_db"),
+        "NAME": os.getenv("GEODISCOUNTS_DB_NAME"),
         "USER": os.getenv("DB_USER", "user"),
         "PASSWORD": os.getenv("DB_PASSWORD", "password"),
         "HOST": os.getenv("DB_HOST", "localhost"),
@@ -88,7 +87,7 @@ DATABASES = {
     },
     "vector_db": {
         "ENGINE": "django.contrib.gis.db.backends.postgis",
-        "NAME": os.getenv("VECTOR_DBNAME", "vector_db"),
+        "NAME": os.getenv("VECTOR_DB_NAME", "vector_db"),
         "USER": os.getenv("DB_USER", "user"),
         "PASSWORD": os.getenv("DB_PASSWORD", "password"),
         "HOST": os.getenv("DB_HOST", "localhost"),
