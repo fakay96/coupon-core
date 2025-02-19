@@ -1,96 +1,101 @@
-#!/bin/bash
-
-
+#!/usr/bin/env bash
+set -e  # Exit on any error
 
 LOG_FILE="/app/migration_errors.log"
-
 SECRET_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(50))')
 export SECRET_KEY
 
-# Function to log errors and output
+########################
+# 1) Logging Function  #
+########################
 log_and_print() {
   echo "$1" | tee -a "$LOG_FILE"
 }
 
-echo "=== Waiting for the database to be ready ==="
-while ! nc -z "$DB_HOST" "$DB_PORT"; do
+########################
+# 2) Wait for Database #
+########################
+echo "=== Waiting for the database to be ready on $DB_HOST:$DB_PORT ==="
+until nc -z "$DB_HOST" "$DB_PORT"; do
   sleep 1
 done
 log_and_print "✅ Database is ready."
 
-# Export the database password for PostgreSQL
+# Export password so psql won't prompt
 export PGPASSWORD="$DB_PASSWORD"
 
+######################################
+# 3) Create Databases if Necessary   #
+######################################
+# Actual PostgreSQL database names come from environment variables
 
+create_database_if_missing() {
+  local db_name="$1"
 
-# === Function to create a database shard ===
-create_database_shard() {
-  local shard_name=$1
-
-  log_and_print "🔍 Checking if database shard '$shard_name' exists..."
-  psql "host=$DB_HOST port=$DB_PORT dbname=postgres user=$DB_USER sslmode=require" -tAc \
-    "SELECT 1 FROM pg_database WHERE datname = '$shard_name'" | grep -q 1
-
-  if [ $? -ne 0 ]; then
-    log_and_print "🛠️ Creating database shard '$shard_name'..."
-    psql "host=$DB_HOST port=$DB_PORT dbname=postgres user=$DB_USER sslmode=require" -c "CREATE DATABASE $shard_name;"
-    if [ $? -eq 0 ]; then
-      log_and_print "✅ Database shard '$shard_name' created successfully."
-    else
-      log_and_print "❌ Failed to create database shard '$shard_name'. Exiting."
-      exit 1
-    fi
+  log_and_print "🔍 Checking if database '$db_name' exists..."
+  if ! psql "host=$DB_HOST port=$DB_PORT dbname=postgres user=$DB_USER sslmode=require" \
+      -tAc "SELECT 1 FROM pg_database WHERE datname = '$db_name'" | grep -q 1; then
+    log_and_print "🛠️ Creating database '$db_name'..."
+    psql "host=$DB_HOST port=$DB_PORT dbname=postgres user=$DB_USER sslmode=require" \
+      -c "CREATE DATABASE $db_name;"
+    log_and_print "✅ Created database '$db_name'."
   else
-    log_and_print "✅ Database shard '$shard_name' already exists."
+    log_and_print "✅ Database '$db_name' already exists."
   fi
 }
 
-# === Function to run migrations for an app on a specific shard ===
-run_migrations() {
-  local app_name=$1
-  local shard_name=$2
+# Create each physical DB (actual name in Postgres) if needed
+# Even though we don't migrate "vectors", we still create the DB if it's required.
+create_database_if_missing "$AUTHENTICATION_SHARD_DB_NAME"
+create_database_if_missing "$GEODISCOUNTS_DB_NAME"
+create_database_if_missing "$VECTOR_DB_NAME"
 
-  log_and_print "🛠️ Running makemigrations for app: $app_name..."
-  python manage.py makemigrations "$app_name" 2>&1 | tee -a "$LOG_FILE"
-  if [ $? -ne 0 ]; then
-    log_and_print "❌ Failed to run makemigrations for app: $app_name. Check $LOG_FILE for details."
-    exit 1
-  fi
+################################################
+# 4) Run Migrations for Apps that Need Them    #
+################################################
 
-  log_and_print "🛠️ Running migrations for app: $app_name on database: $shard_name..."
-  python manage.py migrate "$app_name" --database="$shard_name" 2>&1 | tee -a "$LOG_FILE"
-  if [ $? -ne 0 ]; then
-    log_and_print "❌ Failed to run migrations for app: $app_name on database: $shard_name. Check $LOG_FILE for details."
-    exit 1
-  fi
-}
-
-# === Define app-to-shard mapping ===
-declare -A APPS_SHARDS=(
-  ["authentication"]=$AUTHENTICATION_SHARD_DB_NAME
-  ["geodiscounts"]=$GEODISCOUNTS_DB_NAME
-  ["vectors"]=$VECTOR_DB_NAME
+# Mapping: (App Name) -> (Django DB Alias)
+# We DO NOT include 'vectors' here, because it's not a real Django app.
+declare -A APP_TO_ALIAS=(
+  ["authentication"]="authentication_shard"
+  ["geodiscounts"]="geodiscounts_db"
 )
 
-# === Ensure all shards are created before running migrations ===
-for shard in "${APPS_SHARDS[@]}"; do
-  log_and_print "🛠️ Ensuring database shard exists for: $shard..."
-  create_database_shard "$shard"
+run_migrations() {
+  local app_name="$1"
+  local db_alias="$2"
+
+  # 4a) Generate migrations for this specific app
+  log_and_print "🛠️ Running makemigrations for app: $app_name..."
+  python manage.py makemigrations "$app_name" 2>&1 | tee -a "$LOG_FILE"
+  
+  # 4b) Apply migrations using the DB alias
+  log_and_print "🛠️ Running migrations for app: $app_name on database alias: $db_alias..."
+  python manage.py migrate "$app_name" --database="$db_alias" 2>&1 | tee -a "$LOG_FILE"
+}
+
+# Only run migrations for the apps in the APP_TO_ALIAS dictionary
+for app in "${!APP_TO_ALIAS[@]}"; do
+  alias="${APP_TO_ALIAS[$app]}"
+  log_and_print "🚀 Running migrations for app: '$app' on alias: '$alias'"
+  run_migrations "$app" "$alias"
 done
 
-# === Run migrations for each app ===
-for app in "${!APPS_SHARDS[@]}"; do
-  shard=${APPS_SHARDS[$app]}
-  log_and_print "🚀 Running migrations for app: $app on database: $shard..."
-  run_migrations "$app" "$shard"
-done
+log_and_print "✅ All shard migrations complete."
 
-log_and_print "✅ Shard creation and migrations complete."
-
-# === Collect static files (only in production) ===
+################################
+# 5) Collect Static Files       #
+################################
 log_and_print "📦 Collecting static files..."
 python manage.py collectstatic --noinput 2>&1 | tee -a "$LOG_FILE"
 
-# === Start the Django application using Gunicorn ===
+########################################
+# 6) Start the Django App (Gunicorn)   #
+########################################
 log_and_print "🚀 Starting Gunicorn server..."
-exec gunicorn coupon_core.wsgi:application --bind 0.0.0.0:8000
+gunicorn coupon_core.wsgi:application \
+  --bind 0.0.0.0:8000 \
+  --workers 3 \
+  --threads 2 \
+  --timeout 120
+
