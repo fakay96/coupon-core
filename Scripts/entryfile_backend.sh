@@ -95,7 +95,8 @@ python manage.py collectstatic --noinput 2>&1 | tee -a "$LOG_FILE"
 log_and_print "🚀 Starting Gunicorn server..."
 gunicorn coupon_core.wsgi:application \
   --bind 0.0.0.0:8000 \
-  --workers 3 \
-  --threads 2 \
+  --workers 2 \
+  --threads 1 \
   --timeout 120
+
 
