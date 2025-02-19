@@ -14,6 +14,9 @@ on:
         options:
           - staging
           - production
+  push:
+    branches:
+      - main
   workflow_call:
     inputs:
       version_tag:
@@ -27,6 +30,7 @@ on:
         required: true
       KUBERNETES_SECRETS:
         required: true
+
 
 jobs:
   deploy:
@@ -56,13 +60,25 @@ jobs:
             kubectl create namespace ${{ env.NAMESPACE }}
           fi
 
+      - name: Deploy to staging
+        if: github.ref == 'refs/heads/main'
+        run: |
+          helm upgrade --install coupon-service ./k8s/backend \
+            --set backend.image.repository=fakay96/coupon-core \
+            --set backend.image.tag=${{ env.VERSION_TAG }} \
+            --namespace staging --create-namespace \
+            -f ./k8s/backend/values/staging-values.yaml \
+            --atomic --force --cleanup-on-fail --history-max 5 \
+            --timeout 30m0s
+
       - name: Wait for production approval
-        if: github.event.inputs.environment == 'production'
+        if: github.event.inputs.environment == 'production' || github.event_name == 'workflow_dispatch'
         uses: trstringer/manual-approval@v1
         with:
           secret: ${{ secrets.GITHUB_TOKEN }}
           approvers: fakay96
           minimum-approvals: 1
+
 
       - name: Deploy services with Helm
         run: |

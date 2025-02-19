@@ -21,6 +21,13 @@ DEBUG = True
 # Allowed Hosts
 ALLOWED_HOSTS = ["api-staging.dishpal.ai"]
 
+# CORS Configuration
+CORS_ALLOWED_ORIGINS = [
+    "http://127.0.0.0:5173",
+    "https://app-staging.dishpal.ai",
+]
+
+
 # Secret Key
 SECRET_KEY = os.getenv("SECRET_KEY", "staging-secret-key")
 

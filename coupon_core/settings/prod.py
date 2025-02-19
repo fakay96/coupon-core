@@ -22,7 +22,7 @@ DEBUG = False
 ALLOWED_HOSTS = ["api.dishpal.ai"]
 
 # Secret Key
-SECRET_KEY = os.getenv("SECRET_KEY", "staging-secret-key")
+SECRET_KEY = os.getenv("SECRET_KEY", "production-secret-key")
 
 # Trust proxy headers to indicate HTTPS.
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
