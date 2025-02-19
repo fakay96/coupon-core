@@ -64,7 +64,7 @@ DATABASES = {
     },
     "authentication_shard": {
         "ENGINE": "django.contrib.gis.db.backends.postgis",
-        "NAME": "authentication_shard",
+        "NAME": os.getenv("AUTHENTICATION_SHARD_DB_NAME"),
         "USER": os.getenv("DB_USER", "user"),
         "PASSWORD": os.getenv("DB_PASSWORD", "password"),
         "HOST": os.getenv("DB_HOST", "localhost"),
@@ -75,7 +75,7 @@ DATABASES = {
     },
     "geodiscounts_db": {
         "ENGINE": "django.contrib.gis.db.backends.postgis",
-        "NAME": os.getenv("GEODISCOUNTS_DB_NAME", "geodiscounts_db"),
+        "NAME": os.getenv("GEODISCOUNTS_DB_NAME"),
         "USER": os.getenv("DB_USER", "user"),
         "PASSWORD": os.getenv("DB_PASSWORD", "password"),
         "HOST": os.getenv("DB_HOST", "localhost"),
@@ -86,7 +86,7 @@ DATABASES = {
     },
     "vector_db": {
         "ENGINE": "django.contrib.gis.db.backends.postgis",
-        "NAME": os.getenv("VECTOR_DBNAME", "vector_db"),
+        "NAME": os.getenv("VECTOR_DB_NAME", "vector_db"),
         "USER": os.getenv("DB_USER", "user"),
         "PASSWORD": os.getenv("DB_PASSWORD", "password"),
         "HOST": os.getenv("DB_HOST", "localhost"),

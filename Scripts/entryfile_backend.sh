@@ -67,9 +67,9 @@ run_migrations() {
 
 # === Define app-to-shard mapping ===
 declare -A APPS_SHARDS=(
-  ["authentication"]="authentication_shard"
-  ["geodiscounts"]="geodiscounts_db"
-  ["vectors"]="vector_db"
+  ["authentication"]=$AUTHENTICATION_SHARD_DB_NAME
+  ["geodiscounts"]=$GEODISCOUNTS_DB_NAME
+  ["vectors"]=$VECTOR_DB_NAME
 )
 
 # === Ensure all shards are created before running migrations ===
