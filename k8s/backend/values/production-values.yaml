@@ -40,7 +40,7 @@ backend:
             values:
             - backend
   env:
-    environment: staging
+    environment: production
     logLevel: debug
 
 resources:
