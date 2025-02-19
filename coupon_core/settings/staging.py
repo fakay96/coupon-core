@@ -18,15 +18,10 @@ from datetime import timedelta
 # Debug
 DEBUG = True
 
-# Allowed Hosts
+
 ALLOWED_HOSTS = ["api-staging.dishpal.ai"]
 
-# CORS Configuration
-CORS_ALLOWED_ORIGINS = [
-    "http://127.0.0.0:5173",
-    "https://app-staging.dishpal.ai",
-]
-
+CORS_ALLOW_ALL_ORIGINS = True
 
 # Secret Key
 SECRET_KEY = os.getenv("SECRET_KEY", "staging-secret-key")
