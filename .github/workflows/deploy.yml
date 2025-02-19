@@ -92,3 +92,4 @@ jobs:
       - name: Rollback on failure
         if: failure()
         run: helm rollback coupon-service 1 --namespace ${{ env.NAMESPACE }}
+
