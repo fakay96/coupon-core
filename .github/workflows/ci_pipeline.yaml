@@ -17,7 +17,7 @@ jobs:
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
 
-  deploy:
+  deploy-staging:
     needs: build
     uses: ./.github/workflows/deploy.yml
     with:
@@ -26,7 +26,15 @@ jobs:
     secrets:
       KUBECONFIG_CONTENT: ${{ secrets.KUBECONFIG_CONTENT }}
       KUBERNETES_SECRETS: ${{ secrets.KUBERNETES_SECRETS }}
-
+  deploy-production:
+    needs: deploy-staging
+    uses: ./.github/workflows/deploy.yml
+    with:
+      version_tag: ${{ needs.build.outputs.version_tag }}
+      environment: "production"
+    secrets:
+      KUBECONFIG_CONTENT: ${{ secrets.KUBECONFIG_CONTENT }}
+      KUBERNETES_SECRETS: ${{ secrets.KUBERNETES_SECRETS }}
   notify_failure:
     runs-on: ubuntu-latest
     if: failure()

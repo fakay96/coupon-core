@@ -14,9 +14,7 @@ on:
         options:
           - staging
           - production
-  push:
-    branches:
-      - main
+  
   workflow_call:
     inputs:
       version_tag:
