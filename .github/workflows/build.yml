@@ -70,7 +70,7 @@ jobs:
         run: echo "${{ env.VERSION_TAG }}" > version.txt
 
       - name: Upload version file as artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: version
           path: version.txt
