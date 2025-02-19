@@ -34,17 +34,19 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # Leverage GitHub environment protection (set up in repo settings) for production
     environment:
       name: ${{ inputs.environment }}
+    env:
+      NAMESPACE: ${{ inputs.environment }}
+      VERSION_TAG: ${{ inputs.version_tag }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set environment variables
+      - name: Debug input values
         run: |
-          echo "NAMESPACE=${{ inputs.environment }}" >> $GITHUB_ENV
-          echo "VERSION_TAG=${{ inputs.version_tag }}" >> $GITHUB_ENV
+          echo "NAMESPACE is: $NAMESPACE"
+          echo "VERSION_TAG is: $VERSION_TAG"
 
       - name: Configure kubectl for DigitalOcean
         run: |
@@ -57,39 +59,38 @@ jobs:
 
       - name: Ensure namespace exists
         run: |
-          kubectl get namespace ${{ env.NAMESPACE }} || kubectl create namespace ${{ env.NAMESPACE }}
+          kubectl get namespace $NAMESPACE || kubectl create namespace $NAMESPACE
 
       - name: Deploy with Helm
         run: |
-          if [ "${{ env.NAMESPACE }}" = "staging" ]; then
+          if [ "$NAMESPACE" = "staging" ]; then
             helm upgrade --install coupon-service ./k8s/backend \
               --set backend.image.repository=fakay96/coupon-core \
-              --set backend.image.tag=${{ env.VERSION_TAG }} \
+              --set backend.image.tag=$VERSION_TAG \
               --namespace staging --create-namespace \
               -f ./k8s/backend/values/staging-values.yaml \
               --atomic --force --cleanup-on-fail --history-max 5 \
               --timeout 30m0s
-          elif [ "${{ env.NAMESPACE }}" = "production" ]; then
+          elif [ "$NAMESPACE" = "production" ]; then
             helm upgrade --install coupon-service ./k8s/backend \
               --set backend.image.repository=fakay96/coupon-core \
-              --set backend.image.tag=${{ env.VERSION_TAG }} \
+              --set backend.image.tag=$VERSION_TAG \
               --namespace production --create-namespace \
               -f ./k8s/backend/values/production-values.yaml \
               --atomic --force --cleanup-on-fail --history-max 5 \
               --timeout 30m0s
           else
-            echo "Unknown environment: ${{ env.NAMESPACE }}"
+            echo "Unknown environment: $NAMESPACE"
             exit 1
           fi
 
       - name: Verify service endpoints
-        run: kubectl get endpoints coupon-service -n ${{ env.NAMESPACE }}
+        run: kubectl get endpoints coupon-service -n $NAMESPACE
 
       - name: Debug pod logs on failure
         if: failure()
-        run: kubectl logs -l app=backend -n ${{ env.NAMESPACE }} --tail=50
+        run: kubectl logs -l app=backend -n $NAMESPACE --tail=50
 
       - name: Rollback on failure
         if: failure()
-        run: helm rollback coupon-service 1 --namespace ${{ env.NAMESPACE }}
-
+        run: helm rollback coupon-service 1 --namespace $NAMESPACE
