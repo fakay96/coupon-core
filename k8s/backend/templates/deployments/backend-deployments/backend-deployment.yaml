@@ -85,3 +85,8 @@ spec:
             secretKeyRef:
               name: app-secrets
               key: VECTOR_DB_NAME
+        - name: DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: DB_NAME
