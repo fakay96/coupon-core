@@ -20,15 +20,17 @@ jobs:
       version_tag: ${{ steps.get_version.outputs.version_tag }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        run: |
+          git fetch --all
+          git checkout ${{ github.sha }}
 
-      # Set up Buildx with the docker-container driver, which supports cache export.
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-        with:
-          driver: docker-container
+        run: |
+          docker buildx create --use
+          docker buildx inspect --bootstrap
 
       - name: Get version information
+
         id: get_version
         run: |
           if [ -n "${{ inputs.tag }}" ]; then
@@ -50,20 +52,18 @@ jobs:
         run: 'echo "Generated version tag is: ${{ env.VERSION_TAG }}"'
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+        run: |
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
       - name: Build and push the backend image
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          file: docker/Dockerfile.core
-          push: true
-          tags: fakay96/coupon-core:${{ env.VERSION_TAG }}
-          platforms: linux/amd64
-          no-cache: true
+        run: |
+          docker buildx build \
+            -f docker/Dockerfile.core \
+            -t fakay96/coupon-core:${{ env.VERSION_TAG }} \
+            --platform linux/amd64 \
+            --no-cache \
+            --push .
+
 
           
 
@@ -75,7 +75,7 @@ jobs:
         run: echo "${{ env.VERSION_TAG }}" > version.txt
 
       - name: Upload version file as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: version-file
-          path: version.txt
+        run: |
+          mkdir -p artifacts
+          cp version.txt artifacts/
+          echo "::set-output name=artifact-path::artifacts/version.txt"
