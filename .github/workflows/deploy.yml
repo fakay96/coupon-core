@@ -44,7 +44,7 @@ jobs:
 
       - name: Download version artifact if version_tag not provided
         if: ${{ inputs.version_tag == '' }}
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: version
           path: ./artifact
