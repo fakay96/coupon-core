@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       version_tag:
-        description: 'The version tag to deploy'
-        required: true
+        description: 'The version tag to deploy (leave blank to use artifact version)'
+        required: false
         type: string
       environment:
         description: 'Target environment'
@@ -20,7 +20,7 @@ on:
   workflow_call:
     inputs:
       version_tag:
-        required: true
+        required: false
         type: string
       environment:
         required: true
@@ -38,10 +38,27 @@ jobs:
       name: ${{ inputs.environment }}
     env:
       NAMESPACE: ${{ inputs.environment }}
-      VERSION_TAG: ${{ inputs.version_tag }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+
+      - name: Download version artifact if version_tag not provided
+        if: ${{ inputs.version_tag == '' }}
+        uses: actions/download-artifact@v3
+        with:
+          name: version
+          path: ./artifact
+
+      - name: Set version tag
+        id: set_version
+        run: |
+          if [ -z "${{ inputs.version_tag }}" ]; then
+            VERSION_TAG=$(cat ./artifact/version.txt)
+          else
+            VERSION_TAG="${{ inputs.version_tag }}"
+          fi
+          echo "VERSION_TAG=$VERSION_TAG" >> $GITHUB_ENV
+          echo "Version tag is $VERSION_TAG"
 
       - name: Debug input values
         run: |
