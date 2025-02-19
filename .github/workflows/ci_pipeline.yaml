@@ -12,27 +12,24 @@ jobs:
   build:
     uses: ./.github/workflows/build.yml
     with:
-      tag: "0.0.1"
+      tag: ""  
     secrets:
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-
-
 
   deploy:
     needs: build
     uses: ./.github/workflows/deploy.yml
     with:
-      version_tag: "0.0.1"
+      version_tag: ${{ needs.build.outputs.version_tag }}
       environment: "staging"
     secrets:
       KUBECONFIG_CONTENT: ${{ secrets.KUBECONFIG_CONTENT }}
       KUBERNETES_SECRETS: ${{ secrets.KUBERNETES_SECRETS }}
 
-
   notify_failure:
     runs-on: ubuntu-latest
     if: failure()
     steps:
-      - name: Notify about failure 
+      - name: Notify about failure
         run: echo "CI Pipeline failed. Check logs for more details."

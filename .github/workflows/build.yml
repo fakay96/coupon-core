@@ -20,9 +20,9 @@ jobs:
       version_tag: ${{ steps.get_version.outputs.version_tag }}
     steps:
       - name: Checkout code
-        run: |
-          git fetch --all
-          git checkout ${{ github.sha }}
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
       - name: Set up Docker Buildx
         run: |
@@ -30,9 +30,9 @@ jobs:
           docker buildx inspect --bootstrap
 
       - name: Get version information
-
         id: get_version
         run: |
+          # If a tag is provided as an input, use it; otherwise, auto-generate one.
           if [ -n "${{ inputs.tag }}" ]; then
             TAG=${{ inputs.tag }}
           else
@@ -45,15 +45,14 @@ jobs:
             echo "Using generated version tag: $TAG"
           fi
 
-          echo "VERSION_TAG=${TAG}" >> "$GITHUB_ENV"
-          echo "version_tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "VERSION_TAG=${TAG}" >> $GITHUB_ENV
+          echo "version_tag=${TAG}" >> $GITHUB_OUTPUT
 
       - name: Debug version tag
         run: 'echo "Generated version tag is: ${{ env.VERSION_TAG }}"'
-
+      
       - name: Log in to Docker Hub
-        run: |
-          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
       - name: Build and push the backend image
         run: |
@@ -64,18 +63,14 @@ jobs:
             --no-cache \
             --push .
 
-
-          
-
-
-      - name: Prune Docker resources after web scraper build
+      - name: Prune Docker resources after build
         run: docker system prune --force --volumes
 
       - name: Save version tag to file
         run: echo "${{ env.VERSION_TAG }}" > version.txt
 
       - name: Upload version file as artifact
-        run: |
-          mkdir -p artifacts
-          cp version.txt artifacts/
-          echo "::set-output name=artifact-path::artifacts/version.txt"
+        uses: actions/upload-artifact@v3
+        with:
+          name: version
+          path: version.txt

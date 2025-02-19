@@ -31,17 +31,15 @@ on:
       KUBERNETES_SECRETS:
         required: true
 
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
+    # Leverage GitHub environment protection (set up in repo settings) for production
+    environment:
+      name: ${{ inputs.environment }}
     steps:
       - name: Checkout code
-        run: |
-          git fetch --all
-          git checkout ${{ github.sha }}
-
+        uses: actions/checkout@v3
 
       - name: Set environment variables
         run: |
@@ -59,39 +57,30 @@ jobs:
 
       - name: Ensure namespace exists
         run: |
-          if ! kubectl get namespace ${{ env.NAMESPACE }}; then
-            kubectl create namespace ${{ env.NAMESPACE }}
+          kubectl get namespace ${{ env.NAMESPACE }} || kubectl create namespace ${{ env.NAMESPACE }}
+
+      - name: Deploy with Helm
+        run: |
+          if [ "${{ env.NAMESPACE }}" = "staging" ]; then
+            helm upgrade --install coupon-service ./k8s/backend \
+              --set backend.image.repository=fakay96/coupon-core \
+              --set backend.image.tag=${{ env.VERSION_TAG }} \
+              --namespace staging --create-namespace \
+              -f ./k8s/backend/values/staging-values.yaml \
+              --atomic --force --cleanup-on-fail --history-max 5 \
+              --timeout 30m0s
+          elif [ "${{ env.NAMESPACE }}" = "production" ]; then
+            helm upgrade --install coupon-service ./k8s/backend \
+              --set backend.image.repository=fakay96/coupon-core \
+              --set backend.image.tag=${{ env.VERSION_TAG }} \
+              --namespace production --create-namespace \
+              -f ./k8s/backend/values/production-values.yaml \
+              --atomic --force --cleanup-on-fail --history-max 5 \
+              --timeout 30m0s
+          else
+            echo "Unknown environment: ${{ env.NAMESPACE }}"
+            exit 1
           fi
-
-      - name: Deploy to staging
-        if: github.ref == 'refs/heads/main'
-        run: |
-          helm upgrade --install coupon-service ./k8s/backend \
-            --set backend.image.repository=fakay96/coupon-core \
-            --set backend.image.tag=${{ env.VERSION_TAG }} \
-            --namespace staging --create-namespace \
-            -f ./k8s/backend/values/staging-values.yaml \
-            --atomic --force --cleanup-on-fail --history-max 5 \
-            --timeout 30m0s
-
-      - name: Wait for production approval
-        if: github.event.inputs.environment == 'production' || github.event_name == 'workflow_dispatch'
-        run: |
-          echo "Production deployment requires manual approval"
-          echo "Please approve the deployment in the GitHub Actions UI"
-          exit 1
-
-
-
-      - name: Deploy services with Helm
-        run: |
-          helm upgrade --install coupon-service ./k8s/backend \
-            --set backend.image.repository=fakay96/coupon-core \
-            --set backend.image.tag=${{ env.VERSION_TAG }} \
-            --namespace ${{ env.NAMESPACE }} --create-namespace \
-            -f ./k8s/backend/values/${{ env.NAMESPACE }}-values.yaml \
-            --atomic --force --cleanup-on-fail --history-max 5 \
-            --timeout 30m0s
 
       - name: Verify service endpoints
         run: kubectl get endpoints coupon-service -n ${{ env.NAMESPACE }}

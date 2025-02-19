@@ -1,17 +1,13 @@
 name: Docker Cleanup
 
 on:
-  # Trigger this workflow on a schedule (e.g., once a day or week)
   schedule:
     - cron: '0 2 * * *'  # Runs every day at 02:00 UTC
-
-  # Allow manual trigger for on-demand cleanup
   workflow_dispatch:
 
 jobs:
   cleanup:
     runs-on: ubuntu-latest
-
     steps:
       - name: Log Docker disk usage before cleanup
         run: docker system df
