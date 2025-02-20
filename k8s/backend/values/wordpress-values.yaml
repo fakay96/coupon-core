@@ -15,14 +15,8 @@ wordpress:
   mariadb:
     enabled: true
     auth:
-      rootPassword: 
-        secretKeyRef:
-          name: mariadb-credentials
-          key: rootPassword
-      password: 
-        secretKeyRef:
-          name: mariadb-credentials
-          key: password
+      rootPassword: "mariadbroot"
+      password: "wordpressdb"
       database: wordpress
       username: wordpress
 
