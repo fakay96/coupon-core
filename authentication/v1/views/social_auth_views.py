@@ -5,7 +5,7 @@ It also includes an endpoint for listing available social authentication provide
 Endpoints:
     - GoogleLogin: Handles authentication via Google OAuth2.
     - AppleLogin: Handles authentication via Apple Sign In.
-    - TwitterLogin: Handles authentication via Twitter OAuth2.
+    - TwitterLogin: Handles authentication via Twitter OAuth.
     - SocialAuthProviders: Returns a list of available social authentication providers.
 
 Error Handling:
@@ -23,7 +23,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
 from allauth.socialaccount.providers.apple.views import AppleOAuth2Adapter
-from allauth.socialaccount.providers.twitter.views import TwitterOAuth2Adapter
+from allauth.socialaccount.providers.twitter.views import TwitterOAuthAdapter  # Corrected import
 from allauth.socialaccount.providers.oauth2.client import OAuth2Client
 from dj_rest_auth.registration.views import SocialLoginView
 from drf_yasg.utils import swagger_auto_schema
@@ -158,24 +158,24 @@ class AppleLogin(SocialLoginView):
 
 class TwitterLogin(SocialLoginView):
     """
-    API endpoint for Twitter OAuth2 login.
+    API endpoint for Twitter OAuth login.
 
-    This endpoint allows users to authenticate via Twitter OAuth2.
+    This endpoint allows users to authenticate via Twitter OAuth.
 
     Attributes:
-        adapter_class (TwitterOAuth2Adapter): Adapter for Twitter authentication.
+        adapter_class (TwitterOAuthAdapter): Adapter for Twitter authentication.
         client_class (OAuth2Client): OAuth2 client for handling the authentication flow.
 
     Methods:
         post(request, *args, **kwargs):
-            Processes POST requests for Twitter OAuth2 authentication.
+            Processes POST requests for Twitter OAuth authentication.
             Returns an authentication response or an error message if authentication fails.
     """
-    adapter_class = TwitterOAuth2Adapter
+    adapter_class = TwitterOAuthAdapter  # Corrected adapter class
     client_class = OAuth2Client
 
     @swagger_auto_schema(
-        operation_description="Authenticate using Twitter OAuth2",
+        operation_description="Authenticate using Twitter OAuth",
         request_body=None,
         manual_parameters=[
             openapi.Parameter(
@@ -196,10 +196,10 @@ class TwitterLogin(SocialLoginView):
     )
     def post(self, request, *args, **kwargs):
         """
-        Handle Twitter OAuth2 authentication.
+        Handle Twitter OAuth authentication.
 
         Args:
-            request (Request): The HTTP request containing OAuth2 parameters.
+            request (Request): The HTTP request containing OAuth parameters.
             *args: Additional positional arguments.
             **kwargs: Additional keyword arguments.
 
