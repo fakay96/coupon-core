@@ -10,14 +10,12 @@ This module customizes the Django admin interface for managing:
 It provides an enhanced user management experience, including:
 - Search and filtering capabilities
 - Custom user and permission management
-- GIS integration for user locations
 """
 
 from typing import Optional, Tuple, Type
 
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from django.contrib.gis.admin import OSMGeoAdmin
 from django.contrib.auth.models import Group, Permission
 from django.db.models import QuerySet
 from django.http import HttpRequest
@@ -103,11 +101,10 @@ class RoleAdmin(admin.ModelAdmin):
 
 
 @admin.register(UserProfile)
-class UserProfileAdmin(OSMGeoAdmin):
+class UserProfileAdmin(admin.ModelAdmin):
     """
     Admin panel customization for UserProfile model.
 
-    - Integrates GIS features for managing user locations
     - Allows administrators to view and edit user preferences
     - Provides search and filtering for efficient user management
     """
@@ -117,11 +114,6 @@ class UserProfileAdmin(OSMGeoAdmin):
     ordering = ("-created_at",)
     readonly_fields = ("created_at", "updated_at")
     list_filter = ("created_at",)
-
-    # GIS Admin default map settings
-    default_lon = 0  # Default longitude for GIS map
-    default_lat = 0  # Default latitude for GIS map
-    default_zoom = 4  # Adjust as needed
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[UserProfile]:
         """
