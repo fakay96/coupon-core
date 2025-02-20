@@ -88,6 +88,7 @@ RUN python -m pip list
 RUN poetry show
 RUN gdalinfo --version
 RUN ldconfig -p | grep gdal
+RUN pip install torch
 
 ENTRYPOINT ["/app/entrypoint.sh"]
 
