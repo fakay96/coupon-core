@@ -47,7 +47,6 @@ class S3StaticStorage(S3Boto3Storage):
 
 
 
-
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -63,7 +62,15 @@ INSTALLED_APPS = [
     "corsheaders",
     "geodiscounts",
     "drf_yasg",
-
+    # Social authentication apps
+    "allauth",
+    "allauth.account",
+    "allauth.socialaccount",
+    "allauth.socialaccount.providers.google",
+    "allauth.socialaccount.providers.apple",
+    "allauth.socialaccount.providers.twitter",
+    "dj_rest_auth",
+    "dj_rest_auth.registration",
 ]
 
 MIDDLEWARE = [
@@ -159,4 +166,48 @@ SWAGGER_SETTINGS = {
              'in': 'header'
          }
     },
+}
+
+# Social authentication settings
+AUTHENTICATION_BACKENDS = [
+    "django.contrib.auth.backends.ModelBackend",
+    "allauth.account.auth_backends.AuthenticationBackend",
+]
+
+SOCIALACCOUNT_PROVIDERS = {
+    "google": {
+        "APP": {
+            "client_id": os.getenv("GOOGLE_CLIENT_ID"),
+            "secret": os.getenv("GOOGLE_CLIENT_SECRET"),
+            "key": "",
+        },
+        "SCOPE": ["profile", "email"],
+        "AUTH_PARAMS": {
+            "access_type": "online",
+        },
+    },
+    "apple": {
+        "APP": {
+            "client_id": os.getenv("APPLE_CLIENT_ID"),
+            "secret": os.getenv("APPLE_CLIENT_SECRET"),
+            "key": os.getenv("APPLE_KEY_ID"),
+            "team_id": os.getenv("APPLE_TEAM_ID"),
+        },
+        "SCOPE": ["email", "name"],
+    },
+    "twitter": {
+        "APP": {
+            "client_id": os.getenv("TWITTER_CLIENT_ID"),
+            "secret": os.getenv("TWITTER_CLIENT_SECRET"),
+        },
+        "SCOPE": ["email", "profile"],
+    },
+}
+
+# Rest auth settings
+REST_AUTH = {
+    "USE_JWT": True,
+    "JWT_AUTH_COOKIE": "jwt-auth",
+    "JWT_AUTH_REFRESH_COOKIE": "jwt-refresh-auth",
+    "SESSION_LOGIN": False,
 }

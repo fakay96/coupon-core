@@ -31,11 +31,12 @@ geopy = "^2.4.1"
 pinecone-client = "^5.0.1"
 transformers = "^4.48.1"
 gunicorn = "^23.0.0"
-torch = "^2.6.0"
 pymilvus = "^2.5.4"
 drf-yasg = "^1.21.8"
 psycopg = "^3.2.4"
 confluent-kafka = "^2.8.0"
+django-allauth = "^65.4.1"
+dj-rest-auth = "^7.0.1"
 
 [[tool.poetry.source]]
 name = "pytorch"
