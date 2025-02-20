@@ -12,7 +12,7 @@ class AuthenticationRouter:
     (admin, auth, sessions, contenttypes) to the authentication_shard database.
     """
 
-    target_apps: Set[str] = {"authentication", "admin", "auth", "sessions", "contenttypes"}
+    target_apps: Set[str] = {"authentication", "admin", "auth", "sessions", "contenttypes","authtoken"}
     db_name: str = "authentication_shard"
 
     def db_for_read(self, model: Model, **hints: Any) -> Optional[str]:
