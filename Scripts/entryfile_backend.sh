@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -e  # Exit on any error
+set -e  # Exit on critical errors
 
 LOG_FILE="/app/migration_errors.log"
 SECRET_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(50))')
@@ -9,15 +9,37 @@ export SECRET_KEY
 # 1) Logging Function  #
 ########################
 log_and_print() {
-  echo "$1" | tee -a "$LOG_FILE"
+  local timestamp
+  timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+  echo "[$timestamp] $1" | tee -a "$LOG_FILE"
 }
 
 ########################
-# 2) Wait for Database #
+# 2) Validate Environment Variables #
 ########################
-echo "=== Waiting for the database to be ready on $DB_HOST:$DB_PORT ==="
-until nc -z "$DB_HOST" "$DB_PORT"; do
+REQUIRED_VARS=("DB_HOST" "DB_PORT" "DB_USER" "DB_PASSWORD" "DB_NAME" "AUTHENTICATION_SHARD_DB_NAME" "GEODISCOUNTS_DB_NAME" "VECTOR_DB_NAME")
+
+for var in "${REQUIRED_VARS[@]}"; do
+  if [ -z "${!var}" ]; then
+    log_and_print "❌ ERROR: Environment variable $var is not set."
+    exit 1
+  fi
+done
+
+########################
+# 3) Wait for Database #
+########################
+TIMEOUT=60
+elapsed=0
+log_and_print "=== Waiting for the database to be ready on $DB_HOST:$DB_PORT ==="
+
+while ! nc -z "$DB_HOST" "$DB_PORT"; do
   sleep 1
+  elapsed=$((elapsed + 1))
+  if [ "$elapsed" -ge "$TIMEOUT" ]; then
+    log_and_print "❌ ERROR: Database did not become ready within $TIMEOUT seconds."
+    exit 1
+  fi
 done
 log_and_print "✅ Database is ready."
 
@@ -25,7 +47,7 @@ log_and_print "✅ Database is ready."
 export PGPASSWORD="$DB_PASSWORD"
 
 ######################################
-# 3) Create Databases if Necessary   #
+# 4) Create Databases if Necessary   #
 ######################################
 create_database_if_missing() {
   local db_name="$1"
@@ -40,62 +62,70 @@ create_database_if_missing() {
   fi
 }
 
-# 3a) Create default DB (still needed for Django, even if we don't run migrations on it)
 create_database_if_missing "$DB_NAME"
-
-# 3b) Create each shard / specialized DB
 create_database_if_missing "$AUTHENTICATION_SHARD_DB_NAME"
 create_database_if_missing "$GEODISCOUNTS_DB_NAME"
 create_database_if_missing "$VECTOR_DB_NAME"
 
 ################################################
-# 4) (Excluded) Run Migrations on the Default Database
+# 5) Run Migrations in Order on Authentication Shard  #
 ################################################
-# We are excluding the default database migrations because our router
-# routes all required apps (e.g. admin, auth, sessions, etc.) to a shard.
-# The following lines are commented out.
-#
-# log_and_print "🛠️ Running makemigrations (all apps) on default..."
-# python manage.py makemigrations 2>&1 | tee -a "$LOG_FILE"
-#
-# log_and_print "🛠️ Applying migrations on default DB..."
-# python manage.py migrate --database=default 2>&1 | tee -a "$LOG_FILE"
+AUTH_APPS=("contenttypes" "auth" "admin" "authtoken" "authentication" "sessions")
 
-################################################
-# 5) Run Migrations for Apps on Their Shards   #
-################################################
-# Mapping: (App Name) -> (Django DB Alias)
-declare -A APP_TO_ALIAS=(
-  ["authentication"]="authentication_shard"
-  ["geodiscounts"]="geodiscounts_db"
-)
+log_and_print "🛠️ Running migrations on authentication_shard..."
+migration_errors=0
 
-run_migrations() {
-  local app_name="$1"
-  local db_alias="$2"
-  log_and_print "🛠️ Running migrate for app: $app_name on DB alias: $db_alias..."
-  python manage.py migrate "$app_name" --database="$db_alias" 2>&1 | tee -a "$LOG_FILE"
-}
-
-for app in "${!APP_TO_ALIAS[@]}"; do
-  db_alias="${APP_TO_ALIAS[$app]}"
-  log_and_print "🚀 App '$app' => alias '$db_alias'"
-  run_migrations "$app" "$db_alias"
+for APP in "${AUTH_APPS[@]}"
+do
+    log_and_print "🚀 Migrating $APP on authentication_shard..."
+    if ! python manage.py migrate "$APP" --database=authentication_shard 2>&1 | tee -a "$LOG_FILE"; then
+        log_and_print "❌ ERROR: Migration failed for $APP. Exiting..."
+        migration_errors=$((migration_errors + 1))
+    fi
 done
 
-log_and_print "✅ All migrations complete."
+if [ "$migration_errors" -gt 0 ]; then
+  log_and_print "❌ Some authentication migrations failed. Check $LOG_FILE for details."
+  exit 1
+fi
+
+log_and_print "✅ Authentication shard migrations completed successfully!"
+
+################################################
+# 6) Run Migrations for Geodiscounts           #
+################################################
+GEODISCOUNTS_APPS=("geodiscounts")
+
+log_and_print "🛠️ Running migrations on geodiscounts_db..."
+migration_errors=0
+
+for APP in "${GEODISCOUNTS_APPS[@]}"
+do
+    log_and_print "🚀 Migrating $APP on geodiscounts_db..."
+    if ! python manage.py migrate "$APP" --database=geodiscounts_db 2>&1 | tee -a "$LOG_FILE"; then
+        log_and_print "❌ ERROR: Migration failed for $APP. Exiting..."
+        migration_errors=$((migration_errors + 1))
+    fi
+done
+
+if [ "$migration_errors" -gt 0 ]; then
+  log_and_print "❌ Some geodiscounts migrations failed. Check $LOG_FILE for details."
+  exit 1
+fi
+
+log_and_print "✅ Geodiscounts migrations completed successfully!"
 
 ################################
-# 6) Collect Static Files      #
+# 7) Collect Static Files      #
 ################################
 log_and_print "📦 Collecting static files..."
 python manage.py collectstatic --noinput 2>&1 | tee -a "$LOG_FILE"
 
 ########################################
-# 7) Start the Django App (Gunicorn)   #
+# 8) Start the Django App (Gunicorn)   #
 ########################################
 log_and_print "🚀 Starting Gunicorn server..."
-gunicorn coupon_core.wsgi:application \
+exec gunicorn coupon_core.wsgi:application \
   --bind 0.0.0.0:8000 \
   --workers 2 \
   --threads 1 \
