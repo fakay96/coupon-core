@@ -35,7 +35,8 @@ spec:
             memory: "{{ .Values.frontend.resources.limits.memory }}"
             cpu: "{{ .Values.frontend.resources.limits.cpu }}"
         env:
-        - name: API_URL
-          value: "{{ .Values.frontend.env.apiUrl }}"
-        - name: ENVIRONMENT
-          value: "{{ .Values.frontend.env.environment }}"
+        - name: VITE_API_URL
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: VITE_API_URL
