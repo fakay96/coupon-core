@@ -76,10 +76,7 @@ jobs:
         run: |
           kubectl get namespace $NAMESPACE || kubectl create namespace $NAMESPACE
 
-      - name: Update Helm dependencies
-        run: helm dependency update ./k8s/backend
-
-      - name: Deploy with Helm
+      - name: Deploy Coupon Service with Helm
         run: |
           if [ "$NAMESPACE" = "staging" ]; then
             helm upgrade --install coupon-service ./k8s/backend \
@@ -87,7 +84,6 @@ jobs:
               --set backend.image.tag=$VERSION_TAG \
               --namespace staging --create-namespace \
               -f ./k8s/backend/values/staging-values.yaml \
-              -f ./k8s/backend/values/wordpress-values.yaml \
               --atomic --force --cleanup-on-fail --history-max 5 \
               --timeout 30m0s
           elif [ "$NAMESPACE" = "production" ]; then
@@ -103,13 +99,27 @@ jobs:
             exit 1
           fi
 
+   
+
       - name: Verify service endpoints
-        run: kubectl get endpoints coupon-service -n $NAMESPACE
+        run: |
+          kubectl get endpoints coupon-service -n $NAMESPACE
+          if [ "$NAMESPACE" = "production" ]; then
+            kubectl get endpoints wordpress -n $NAMESPACE
+          fi
 
       - name: Debug pod logs on failure
         if: failure()
-        run: kubectl logs -l app=backend -n $NAMESPACE --tail=50
+        run: |
+          kubectl logs -l app=backend -n $NAMESPACE --tail=50
+          if [ "$NAMESPACE" = "production" ]; then
+            kubectl logs -l app=wordpress -n $NAMESPACE --tail=50
+          fi
 
       - name: Rollback on failure
         if: failure()
-        run: helm rollback coupon-service 1 --namespace $NAMESPACE
+        run: |
+          helm rollback coupon-service 1 --namespace $NAMESPACE
+          if [ "$NAMESPACE" = "production" ]; then
+            helm rollback wordpress 1 --namespace $NAMESPACE
+          fi
