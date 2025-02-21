@@ -1,6 +1,6 @@
 namespace: production
 frontend:
-  replicaCount: 2
+  replicaCount: 1
   image:
     repository: fakay96/coupon-frontend
     tag: ""
@@ -34,3 +34,11 @@ ingress:
     - hosts:
         - app.dishpal.ai
       secretName: app-dishpal-ai-tls
+
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 40
+  targetMemoryUtilizationPercentage: 80

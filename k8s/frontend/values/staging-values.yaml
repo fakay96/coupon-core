@@ -33,3 +33,10 @@ ingress:
     - hosts:
         - app-staging.dishpal.ai
       secretName: app-staging-dishpal-ai-tls
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 40
+  targetMemoryUtilizationPercentage: 80
