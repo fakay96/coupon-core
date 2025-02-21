@@ -20,3 +20,13 @@ frontend:
   env:
     apiUrl: "http://api.dev.example.com"
     environment: "development"
+
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 40
+  targetMemoryUtilizationPercentage: 80
+
+  
