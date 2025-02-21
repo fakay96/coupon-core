@@ -1,6 +1,6 @@
 namespace: staging
 frontend:
-  replicaCount: 2
+  replicaCount: 1
   image:
     repository: fakay96/coupon-frontend
     tag: ""

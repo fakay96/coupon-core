@@ -128,24 +128,18 @@ jobs:
         run: |
           kubectl get endpoints coupon-service -n $NAMESPACE
           kubectl get endpoints frontend -n $NAMESPACE
-          if [ "$NAMESPACE" = "production" ]; then
-            kubectl get endpoints wordpress -n $NAMESPACE
-          fi
+          
 
       - name: Debug pod logs on failure
         if: failure()
         run: |
           kubectl logs -l app=backend -n $NAMESPACE --tail=50
           kubectl logs -l app=frontend -n $NAMESPACE --tail=50
-          if [ "$NAMESPACE" = "production" ]; then
-            kubectl logs -l app=wordpress -n $NAMESPACE --tail=50
-          fi
+          
 
       - name: Rollback on failure
         if: failure()
         run: |
           helm rollback coupon-service 1 --namespace $NAMESPACE
           helm rollback frontend 1 --namespace $NAMESPACE
-          if [ "$NAMESPACE" = "production" ]; then
-            helm rollback wordpress 1 --namespace $NAMESPACE
-          fi
+          
