@@ -1,0 +1,22 @@
+namespace: development
+frontend:
+  replicaCount: 1
+  image:
+    repository: fakay96/coupon-frontend
+    tag: ""
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 80
+  ingress:
+    host: frontend.dev.example.com
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "200m"
+  env:
+    apiUrl: "http://api.dev.example.com"
+    environment: "development"

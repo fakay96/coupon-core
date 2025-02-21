@@ -76,7 +76,8 @@ jobs:
         run: |
           kubectl get namespace $NAMESPACE || kubectl create namespace $NAMESPACE
 
-      - name: Deploy Coupon Service with Helm
+      - name: Deploy Backend
+        id: deploy_backend
         run: |
           if [ "$NAMESPACE" = "staging" ]; then
             helm upgrade --install coupon-service ./k8s/backend \
@@ -99,11 +100,34 @@ jobs:
             exit 1
           fi
 
-   
+      - name: Deploy Frontend
+        if: steps.deploy_backend.outcome == 'success'
+        run: |
+          if [ "$NAMESPACE" = "staging" ]; then
+            helm upgrade --install frontend ./k8s/frontend \
+              --set frontend.image.repository=fakay96/coupon-frontend \
+              --set frontend.image.tag=$VERSION_TAG \
+              --namespace staging --create-namespace \
+              -f ./k8s/frontend/values/staging-values.yaml \
+              --atomic --force --cleanup-on-fail --history-max 5 \
+              --timeout 30m0s
+          elif [ "$NAMESPACE" = "production" ]; then
+            helm upgrade --install frontend ./k8s/frontend \
+              --set frontend.image.repository=fakay96/coupon-frontend \
+              --set frontend.image.tag=$VERSION_TAG \
+              --namespace production --create-namespace \
+              -f ./k8s/frontend/values/production-values.yaml \
+              --atomic --force --cleanup-on-fail --history-max 5 \
+              --timeout 30m0s
+          else
+            echo "Unknown environment: $NAMESPACE"
+            exit 1
+          fi
 
       - name: Verify service endpoints
         run: |
           kubectl get endpoints coupon-service -n $NAMESPACE
+          kubectl get endpoints frontend -n $NAMESPACE
           if [ "$NAMESPACE" = "production" ]; then
             kubectl get endpoints wordpress -n $NAMESPACE
           fi
@@ -112,6 +136,7 @@ jobs:
         if: failure()
         run: |
           kubectl logs -l app=backend -n $NAMESPACE --tail=50
+          kubectl logs -l app=frontend -n $NAMESPACE --tail=50
           if [ "$NAMESPACE" = "production" ]; then
             kubectl logs -l app=wordpress -n $NAMESPACE --tail=50
           fi
@@ -120,6 +145,7 @@ jobs:
         if: failure()
         run: |
           helm rollback coupon-service 1 --namespace $NAMESPACE
+          helm rollback frontend 1 --namespace $NAMESPACE
           if [ "$NAMESPACE" = "production" ]; then
             helm rollback wordpress 1 --namespace $NAMESPACE
           fi

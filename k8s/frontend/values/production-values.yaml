@@ -1,0 +1,36 @@
+namespace: production
+frontend:
+  replicaCount: 2
+  image:
+    repository: fakay96/coupon-frontend
+    tag: ""
+    pullPolicy: Always
+  service:
+    type: LoadBalancer
+    port: 80
+  ingress:
+    host: app.dishpal.ai
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "200m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  env:
+    apiUrl: "https://api.example.com"
+    environment: "production"
+
+
+
+ingress:
+  host: app.dishpal.ai
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    cert-manager.io/cluster-issuer: letsencrypt-staging
+  tls:
+    - hosts:
+        - app.dishpal.ai
+      secretName: app-dishpal-ai-tls

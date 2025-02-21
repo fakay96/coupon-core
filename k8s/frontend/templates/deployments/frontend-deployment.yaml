@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: {{ .Values.frontend.replicaCount | default 1 }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+        release: {{ .Release.Name }}
+      annotations:
+        checksum/image: {{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag | sha256sum }}
+    spec:
+      containers:
+      - name: frontend
+        image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
+        imagePullPolicy: "{{ .Values.frontend.image.pullPolicy }}"
+        ports:
+        - containerPort: {{ .Values.frontend.service.port }}
+        resources:
+          requests:
+            memory: "{{ .Values.frontend.resources.requests.memory }}"
+            cpu: "{{ .Values.frontend.resources.requests.cpu }}"
+          limits:
+            memory: "{{ .Values.frontend.resources.limits.memory }}"
+            cpu: "{{ .Values.frontend.resources.limits.cpu }}"
+        env:
+        - name: API_URL
+          value: "{{ .Values.frontend.env.apiUrl }}"
+        - name: ENVIRONMENT
+          value: "{{ .Values.frontend.env.environment }}"
