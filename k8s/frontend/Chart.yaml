@@ -1,0 +1,7 @@
+apiVersion: v2
+name: coupon-services 
+description: A Helm chart for deploying coupon frontendservices
+version: 0.1.0
+appVersion: "1.0"
+
+
