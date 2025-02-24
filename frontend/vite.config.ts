@@ -6,16 +6,8 @@ import { defineConfig } from "vite";
 export default defineConfig({
   plugins: [react()], // Enables React support
   envDir: './env', // Specify the directory containing your .env files]
-
-  
   server: {
-  host: true, // Allows network access to the dev server
-  // proxy: {
-  //   "/api": {
-  //     target: "https://api.dishpal.ai", // Redirects API requests to the backend
-  //     changeOrigin: true, // Modifies the origin header for CORS handling
-  //   },
-  // },
+  host: true, 
   },
 
   resolve: {
@@ -24,3 +16,12 @@ export default defineConfig({
     },
   },
 });
+
+
+// Allows network access to the dev server
+  // proxy: {
+  //   "/api": {
+  //     target: "https://api.dishpal.ai", // Redirects API requests to the backend
+  //     changeOrigin: true, // Modifies the origin header for CORS handling
+  //   },
+  // },

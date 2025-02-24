@@ -12,17 +12,19 @@ import HistoryPage from "@/pages/dashboard-pages/HistoryPage";
 import SettingsPage from "@/pages/dashboard-pages/SettingsPage";
 import DashboardPage from "@/pages/dashboard-pages/Dashboard";
 import ScrollToTop from "@/hooks/ScrollToTop";
-import LandingPage from "@/pages/LandingPage";
 import ForgotPasswordPage from "@/pages/authentication-pages/ForgotPasswordPage";
 import CodeVerificationPage from "@/pages/authentication-pages/CodeVerificationPage";
 import NotFoundPage from "@/pages/NotFoundPage";
+import Homepage from "@/pages/HomePage";
+import ContinuePage from "@/pages/dashboard-pages/ContinuePage";
+import CategorySearchPage from "@/pages/dashboard-pages/CategorySearchPage";
 
 const AppRoutes = () => {
   return (
     <>
     <ScrollToTop />
     <Routes>
-      <Route path="/" element={<LandingPage />} />
+      <Route path="/" element={<Homepage />} />
 
       <Route path="/auth/login" element={<SignInPage />} />
       <Route path="/auth/register" element={<SignUpPage />} />
@@ -33,10 +35,12 @@ const AppRoutes = () => {
         <Route index element={<DashboardPage />} />
         <Route path="discount" element={<DiscountPage />} />
         <Route path="price" element={<PricePage />} />
+        <Route path="category-search" element={<CategorySearchPage />} />
         <Route path="category" element={<CategoryPage />} />
         <Route path="reservation" element={<ReservationPage />} />
         <Route path="together" element={<TogetherPage />} />
         <Route path="plans" element={<PlanPage />} />
+        <Route path="continue" element={<ContinuePage />} />
         <Route path="history" element={<HistoryPage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>

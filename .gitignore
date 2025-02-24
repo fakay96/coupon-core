@@ -7,3 +7,7 @@ static/
 staticfiles/
 cert-manager/
 pvcs/
+
+node_modules
+env
+env/*

@@ -1,11 +1,11 @@
-import SecondaryNavbar from "@/components/globals/secondaryNavbar";
+import SearchInputNavbar from "@/components/globals/searchInputNavbar";
 
 const HistoryPage = () => {
   return (
     <div className="">
       <div className="bg-bg3xl bg-cover">
         <div className="flex flex-col h-full min-h-screen max-w-screen-xl px-4 sm:px-8 mx-auto">
-          <SecondaryNavbar />
+          <SearchInputNavbar />
           <div className="space-y-8 py-8">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <div className="bg-white p-4 sm:p-8 font-syne relative overflow-hidden">

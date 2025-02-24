@@ -59,10 +59,8 @@ export const authContextDefault = {
   user: null,
   logout: () => {},
   isLoading: false,
-  setUser: () => {}
+  setUser: () => {},
 };
-
-
 
 export const cardNavLinks = [
   {
@@ -111,19 +109,112 @@ export const groceryProducts = [
   {
     title: "Organic Grade A Amber Maple Syrup",
     img: "/images/amber.png",
+    category: "Grocery",
   },
   {
     title: "Green Beans with Cracked Pepper & Sea Salt",
     img: "/images/greenBeans.png",
+    category: "Grocery",
   },
   {
     title: "Organic Grade A Amber Maple Syrup, 32 Fl",
     img: "/images/ambersyrup.png",
+    category: "Grocery",
   },
   {
     title: "Organic Buttermilk Pancake & Waffle Mix, 32 Ounce",
     img: "/images/butterMilk.png",
+    category: "Grocery",
   },
+  {
+    title: "Gray Sweatshirt",
+    img: "/images/sweater.png",
+    category: "Fashion",
+  },
+  {
+    title: "Brown Cargo Pant",
+    img: "/images/trousers.png",
+    category: "Fashion",
+  },
+  {
+    title: "Skirt",
+    img: "/images/skirt.png",
+    category: "Fashion",
+  },
+  {
+    title: "Hoodie",
+    img: "/images/jacket.png",
+    category: "Fashion",
+  },
+  {
+    title: "Fan",
+    img: "/images/fan.png",
+    category: "Electronics",
+  },
+  {
+    title: "Iron",
+    img: "/images/iron.png",
+    category: "Electronics",
+  },
+  {
+    title: "Samsung Galaxy",
+    img: "/images/mobile.png",
+    category: "Electronics",
+  },
+  {
+    title: "HP Laptop",
+    img: "/images/laptop2.png",
+    category: "Electronics",
+  },
+  {
+    title: "Table",
+    img: "/images/table.png",
+    category: "Furniture",
+  },
+  {
+    title: "Rustic Wooden Stool",
+    img: "/images/stool.png",
+    category: "Furniture",
+  },
+  {
+    title: "Gray Fabric Chair",
+    img: "/images/fabric_chair.png",
+    category: "Furniture",
+  },
+  {
+    title: "HP Laptop",
+    img: "/images/laptop2.png",
+    category: "Furniture",
+  },
+  {
+    title: "Flight Ticket",
+    img: "/images/flight.png",
+    category: "Flights",
+  },
+  {
+    title: "Flight Ticket",
+    img: "/images/flight.png",
+    category: "Flights",
+  },
+  {
+    title: "Flight Ticket",
+    img: "/images/flight.png",
+    category: "Flights",
+  },
+  {
+    title: "Flight Ticket",
+    img: "/images/flight.png",
+    category: "Flights",
+  },
+];
+
+export const categoryList = [
+  "All",
+  "Flights",
+  "Furniture",
+  "Grocery",
+  "Fashion",
+  "Electronics",
 ];
 
 export const options = [
@@ -140,12 +231,12 @@ export const options = [
     text: "Fashion",
   },
   {
-    img: "/images/electronics.svg",
-    text: "Electronics",
-  },
-  {
     img: "/images/flight.svg",
     text: "Flights",
+  },
+  {
+    img: "/images/electronics.svg",
+    text: "Electronics",
   },
 ];
 export const imgGrid = [
@@ -153,21 +244,25 @@ export const imgGrid = [
     img: "/images/world.png",
     topTitle: "Select",
     bottomTitle: "Location",
+    href: "",
   },
   {
     img: "/images/clothes.png",
     topTitle: "Select",
     bottomTitle: "Category",
+    href: "/dashboard/category-search",
   },
   {
     img: "/images/discount.png",
     topTitle: "Find",
     bottomTitle: "Discount",
+    href: "",
   },
   {
     img: "/images/ladyTrophy.png",
     topTitle: "Claim",
     bottomTitle: "Discount",
+    href: "",
   },
 ];
 
@@ -185,41 +280,18 @@ export const discountProducts = [
     img: "/images/chicken.svg",
   },
   {
-    title: "Loaf Of Bread",
+    title: "Bread",
     img: "/images/bread.svg",
   },
-  {
-    title: "vegetables",
-    img: "/images/vegetables.svg",
-  },
-  {
-    title: "Milk",
-    img: "/images/milk.svg",
-  },
-  {
-    title: "Chicken Fillet",
-    img: "/images/chicken.svg",
-  },
-  {
-    title: "Loaf Of Bread",
-    img: "/images/bread.svg",
-  },
-  {
-    title: "vegetables",
-    img: "/images/vegetables.svg",
-  },
-  {
-    title: "Milk",
-    img: "/images/milk.svg",
-  },
-  {
-    title: "Chicken Fillet",
-    img: "/images/chicken.svg",
-  },
-  {
-    title: "Loaf Of Bread",
-    img: "/images/bread.svg",
-  },
+  
+];
+
+export const imgs = [
+  { img: "/images/groceries.png", href: "Grocery" },
+  { img: "/images/aeroplane.png", href: "Flights" },
+  { img: "/images/fashionGirl.png", href: "Fashion" },
+  { img: "/images/electronicsImg.png", href: "Electronics" },
+  { img: "/images/furniture.png", href: "Furniture" },
 ];
 
 export const planCard = [
@@ -252,5 +324,36 @@ export const planCard = [
     notification: "true",
     cashBackOffer: true,
     prioritySupport: "24/7 Priority Support",
+  },
+];
+
+export const discountFilters = [
+  {
+    title: "Sort By",
+    item1: "Distance",
+    item2: "Rating",
+    item3: "Price Ascending",
+    item4: "Price Descending",
+  },
+  {
+    title: "Category",
+    item1: "Groceries",
+    item2: "Furniture",
+    item3: "Electronics",
+    item4: "Fashion",
+  },
+  {
+    title: "Past 7 Days",
+    item1: "Milk",
+    item2: "cheap Flights",
+    item3: "Brown Furniture Chair",
+    item4: "Laptop Charger",
+  },
+  {
+    title: "Past 30 Days",
+    item1: "Milk",
+    item2: "cheap Flights",
+    item3: "Brown Furniture Chair",
+    item4: "Laptop Charger",
   },
 ];
