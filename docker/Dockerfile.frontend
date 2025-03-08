@@ -1,0 +1,18 @@
+# Stage 1: Build the Frontend
+FROM node:18-alpine AS builder
+WORKDIR /app/frontend
+
+# Copy only package.json to leverage Docker cache for dependencies
+COPY frontend/package.json ./
+RUN npm install
+
+# Copy the rest of the frontend source code and build for production
+COPY frontend/ .
+RUN npm run build
+
+# Stage 2: Serve the Production Build with Nginx
+FROM nginx:alpine
+COPY --from=builder /app/frontend/dist /usr/share/nginx/html
+EXPOSE 80
+HEALTHCHECK --interval=30s --timeout=10s CMD curl -f http://localhost/ || exit 1
+CMD ["nginx", "-g", "daemon off;"]

@@ -76,10 +76,8 @@ jobs:
         run: |
           kubectl get namespace $NAMESPACE || kubectl create namespace $NAMESPACE
 
-      - name: Update Helm dependencies
-        run: helm dependency update ./k8s/backend
-
-      - name: Deploy with Helm
+      - name: Deploy Backend
+        id: deploy_backend
         run: |
           if [ "$NAMESPACE" = "staging" ]; then
             helm upgrade --install coupon-service ./k8s/backend \
@@ -87,7 +85,6 @@ jobs:
               --set backend.image.tag=$VERSION_TAG \
               --namespace staging --create-namespace \
               -f ./k8s/backend/values/staging-values.yaml \
-              -f ./k8s/backend/values/wordpress-values.yaml \
               --atomic --force --cleanup-on-fail --history-max 5 \
               --timeout 30m0s
           elif [ "$NAMESPACE" = "production" ]; then
@@ -103,13 +100,46 @@ jobs:
             exit 1
           fi
 
+      - name: Deploy Frontend
+        if: steps.deploy_backend.outcome == 'success'
+        run: |
+          if [ "$NAMESPACE" = "staging" ]; then
+            helm upgrade --install frontend ./k8s/frontend \
+              --set frontend.image.repository=fakay96/coupon-frontend \
+              --set frontend.image.tag=$VERSION_TAG \
+              --namespace staging --create-namespace \
+              -f ./k8s/frontend/values/staging-values.yaml \
+              --atomic --force --cleanup-on-fail --history-max 5 \
+              --timeout 30m0s
+          elif [ "$NAMESPACE" = "production" ]; then
+            helm upgrade --install frontend ./k8s/frontend \
+              --set frontend.image.repository=fakay96/coupon-frontend \
+              --set frontend.image.tag=$VERSION_TAG \
+              --namespace production --create-namespace \
+              -f ./k8s/frontend/values/production-values.yaml \
+              --atomic --force --cleanup-on-fail --history-max 5 \
+              --timeout 30m0s
+          else
+            echo "Unknown environment: $NAMESPACE"
+            exit 1
+          fi
+
       - name: Verify service endpoints
-        run: kubectl get endpoints coupon-service -n $NAMESPACE
+        run: |
+          kubectl get endpoints coupon-service -n $NAMESPACE
+          kubectl get endpoints frontend -n $NAMESPACE
+          
 
       - name: Debug pod logs on failure
         if: failure()
-        run: kubectl logs -l app=backend -n $NAMESPACE --tail=50
+        run: |
+          kubectl logs -l app=backend -n $NAMESPACE --tail=50
+          kubectl logs -l app=frontend -n $NAMESPACE --tail=50
+          
 
       - name: Rollback on failure
         if: failure()
-        run: helm rollback coupon-service 1 --namespace $NAMESPACE
+        run: |
+          helm rollback coupon-service 1 --namespace $NAMESPACE
+          helm rollback frontend 1 --namespace $NAMESPACE
+          

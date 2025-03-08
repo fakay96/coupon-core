@@ -70,7 +70,7 @@ create_database_if_missing "$VECTOR_DB_NAME"
 ################################################
 # 5) Run Migrations in Order on Authentication Shard  #
 ################################################
-AUTH_APPS=("contenttypes" "auth" "admin" "authtoken" "authentication" "sessions")
+AUTH_APPS=("contenttypes" "auth" "admin" "authtoken" "authentication" "sessions","socialaccount","account")
 
 log_and_print "🛠️ Running migrations on authentication_shard..."
 migration_errors=0

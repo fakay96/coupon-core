@@ -66,6 +66,14 @@ jobs:
             --platform linux/amd64 \
             --no-cache \
             --push .
+      - name: Build and push the frontend image
+        run: |
+          docker buildx build \
+            -f docker/Dockerfile.frontend \
+            -t fakay96/coupon-frontend:${{ env.VERSION_TAG }} \
+            --platform linux/amd64 \
+            --no-cache \
+            --push .
 
       - name: Prune Docker resources after build
         run: docker system prune --force --volumes

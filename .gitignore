@@ -8,6 +8,10 @@ staticfiles/
 cert-manager/
 pvcs/
 
+<<<<<<< HEAD
 node_modules
 env
 env/*
+=======
+node_modules/
+>>>>>>> 8b414ce535de17477594e9650c1c948ba11f243d
