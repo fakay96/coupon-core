@@ -28,11 +28,10 @@ import { X } from "lucide-react";
 import CategorySwiper from "@/components/category-page-components/CategorySwiper";
 import { isEmpty } from "lodash";
 
-
 const CategoryPage = () => {
   const [searchParams] = useSearchParams();
   const category = searchParams.get("category");
-  // const filter = searchParams.get("filter");
+  const search = searchParams.get("search");
 
   console.count("CategoryPage");
 
@@ -41,6 +40,12 @@ const CategoryPage = () => {
     if (category) {
       const filtered = groceryProducts.filter((item) => {
         return item.category.toLowerCase() === category.toLowerCase();
+      });
+      setCategoryItems(filtered);
+    } else if (search) {
+      console.log(search);
+      const filtered = groceryProducts.filter((item) => {
+        return item?.title?.toLowerCase().includes(search.toLowerCase());
       });
       setCategoryItems(filtered);
     } else {
@@ -202,6 +207,7 @@ const CategoryPage = () => {
             <SearchInputBox
               setCategoryItems={setCategoryItems}
               categoryItems={categoryItems}
+              search={search}
               category={category}
             />
           </div>
@@ -217,6 +223,7 @@ const SearchInputBox = ({
   categoryItems,
   setCategoryItems,
   category,
+  search
 }: {
   categoryItems: {
     title: string;
@@ -224,15 +231,16 @@ const SearchInputBox = ({
     category: string;
   }[];
   setCategoryItems: Dispatch<
-    SetStateAction<
-      {
-        title: string;
-        img: string;
-        category: string;
-      }[]
-    >
+  SetStateAction<
+  {
+    title: string;
+    img: string;
+    category: string;
+  }[]
+  >
   >;
   category: string | null;
+  search: string | null;
 }) => {
   const [value, setValue] = useState("");
   const debouncedSearch = useDebounce(value);
@@ -259,7 +267,7 @@ const SearchInputBox = ({
           <img src="/images/search.svg" className="!size-3 text-white " />
         </div>
       )}
-      {(value || isEmpty(categoryItems)) && (
+      {(value || isEmpty(categoryItems) || category || search) && (
         <div
           onClick={() => {
             setValue("");

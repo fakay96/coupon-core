@@ -8,7 +8,7 @@ const Homepage = () => {
   return (
     <div className="">
       <div className="bg-bg3xl bg-cover">
-        <div className="flex flex-col h-full min-h-screen max-w-screen-2xl mx-auto px-4 sm:px-8">
+        <div className="flex flex-col h-full min-h-screen max-w-screen-xl mx-auto px-4 sm:px-8">
           <div className="relative">
             <div className="absolute left-0 top-0 w-full">
               <SearchInputNavbar />

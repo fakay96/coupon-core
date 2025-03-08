@@ -6,12 +6,12 @@ const SearchInputNavbar = ({ link }: { link?: string }) => {
   // const { logout } = useAuth();
 
   return (
-    <section className="flex items-center justify-between gap-4">
+    <section className="flex items-center justify-between pt-2 gap-4">
       <Link to={link ? link : "/dashboard"} className="grid">
         <img
           alt="dispal"
           src="/images/logo.svg"
-          className="hover:cursor-pointer hover:scale-105 duration-500 size-[60px] sm:size-[100px] transition-all"
+          className="hover:cursor-pointer hover:scale-105 duration-500 size-[60px] transition-all"
         />
       </Link>
       <div className="flex gap-4 sm:gap-6 items-center justify-center">
@@ -20,18 +20,18 @@ const SearchInputNavbar = ({ link }: { link?: string }) => {
           target="_blank"
           rel="noopener noreferrer"
         >
-          <Info />
+          <Info className="size-4" />
         </a>
         <Link to="/dashboard/history">
-          <History />
+          <History className="size-4" />
         </Link>
         <img
           src="/images/notification.svg"
           alt="notification"
-          className=""
+          className="size-4"
         />
         <Link to="/dashboard/reservation">
-          <FaHeart className="text-red-500 " />
+          <FaHeart className="text-red-500 size-4" />
         </Link>
         <Link
           to="/dashboard/settings"

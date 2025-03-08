@@ -53,7 +53,7 @@ const DiscountPage = () => {
   return (
     <div className="">
       <div className="bg-bg3xl bg-cover">
-        <div className="flex flex-col max-w-screen-2xl mx-auto min-h-screen px-4 sm:px-8">
+        <div className="flex flex-col max-w-screen-xl mx-auto min-h-screen px-4 sm:px-8">
           <SearchInputNavbar />
           <div className="sm:flex sm:gap-8">
             <div className="w-[300px] hidden sm:flex flex-col">
@@ -221,9 +221,12 @@ const DiscountPage = () => {
                             </div>
                           </div>
                         </div>
-                        <Button className="bg-buttonGreen font-bold font-syne w-full rounded-none h-12 absolute bottom-0"  onClick={() => {
+                        <Button
+                          className="bg-buttonGreen font-bold font-syne w-full rounded-none h-12 absolute bottom-0"
+                          onClick={() => {
                             navigate(`/dashboard/continue`);
-                          }}>
+                          }}
+                        >
                           {index % 2 === 0 ? "BUY ONLINE" : "GET DIRECTION"}
                         </Button>
                       </div>
@@ -290,7 +293,7 @@ const SearchInputBox = ({
           <img src="/images/search.svg" className="!size-3 text-white " />
         </div>
       )}
-      {value && (
+      {(value || discount) && (
         <div
           onClick={() => {
             console.log(discount);

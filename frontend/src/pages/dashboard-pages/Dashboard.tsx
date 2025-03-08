@@ -8,10 +8,10 @@ const DashboardPage = () => {
   return (
     <div className="">
       <div className="bg-bg3xl bg-cover">
-        <div className="flex flex-col h-full min-h-screen max-w-screen-2xl mx-auto px-4 sm:px-8 ">
+        <div className="flex flex-col h-full min-h-screen max-w-screen-xl mx-auto px-4 sm:px-8 ">
           <SearchInputNavbar link={"/"} />
           <>
-            <div className="flex-1 flex-col flex items-center justify-center">
+            <div className="flex-1 flex-col flex items-center justify-center py-12">
               <div className="max-w-xl text-center mx-auto flex flex-col space-y-4 mb-8">
                 <div className="">
                   <h1 className="font-syne capitalize font-bold text-2xl sm:text-4xl text-vividOrange max-sm:max-w-sm mx-auto">
