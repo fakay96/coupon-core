@@ -13,6 +13,11 @@ const env = fs.existsSync(envDirPath) ? loadEnv(process.env.NODE_ENV, envDirPath
 
 export default defineConfig({
   plugins: [react()], // Enables React support
+<<<<<<< HEAD
+  envDir: './env', // Specify the directory containing your .env files]
+  server: {
+  host: true, 
+=======
   envDir: './env', // Specify the directory containing your .env files
 
   define: {
@@ -27,6 +32,7 @@ export default defineConfig({
     //     changeOrigin: true, // Modifies the origin header for CORS handling
     //   },
     // },
+>>>>>>> 8b414ce535de17477594e9650c1c948ba11f243d
   },
 
   resolve: {
@@ -34,4 +40,17 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"), // Creates a shorthand for importing from "src"
     },
   },
+<<<<<<< HEAD
 });
+
+
+// Allows network access to the dev server
+  // proxy: {
+  //   "/api": {
+  //     target: "https://api.dishpal.ai", // Redirects API requests to the backend
+  //     changeOrigin: true, // Modifies the origin header for CORS handling
+  //   },
+  // },
+=======
+});
+>>>>>>> 8b414ce535de17477594e9650c1c948ba11f243d

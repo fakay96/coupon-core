@@ -113,7 +113,7 @@ const SignUpPage = () => {
   };
 
   return (
-    <div className="h-full min-h-screen bg-bg3xl bg-cover grid md:grid-cols-2 gap-4 md:gap-8 max-sm:p-6  max-2xl:p-8 ">
+    <div className="h-full min-h-screen flex bg-bg3xl bg-cover md:grid  md:grid-cols-2 gap-4 md:gap-8 max-sm:p-6 max-2xl:p-8 justify-center items-center">
       <img
         src="/images/signup.png"
         width={500}
@@ -133,9 +133,9 @@ const SignUpPage = () => {
           className="2xl:absolute 2xl:h-full 2xl:w-full place-self-center justify-self-end "
         />
       </div>
-      <div className="flex items-center justify-center md:justify-start 2xl:mx-auto w-full max-w-lg mb-16">
+      <div className="flex items-center justify-center md:justify-start 2xl:mx-auto w-full max-w-lg mb-16 ">
         <div className="space-y-4 sm:space-y-6 w-full">
-          <div className="space-y-3 mb-12 hidden lg:block">
+          <div className="space-y-3 mb-12 hidden md:block">
             <h1 className="font-bold text-xl xxx:text-3xl  xl:text-5xl max-xx:text-center xl:text-center font-syne">
               Create An Account
             </h1>

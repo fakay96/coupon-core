@@ -1,34 +1,49 @@
-import Logo from "./logo";
-import { SearchInput } from "./search-input";
 import { FaHeart } from "react-icons/fa6";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { cardNavLinks } from "@/constants";
 import { Link } from "react-router-dom";
-import { useAuth } from "@/context/authContext";
-import { Button } from "../ui/button";
-import { LogOut } from "lucide-react";
+import { History, Info } from "lucide-react";
 
-const SearchInputNavbar = () => {
-  const { logout } = useAuth();
+const SearchInputNavbar = ({ link }: { link?: string }) => {
+  // const { logout } = useAuth();
 
   return (
-    <section className="flex items-center justify-between gap-4">
-      <Logo />
-      <SearchInput />
-      <div className="flex gap-4 sm:gap-8 items-center justify-center">
+    <section className="flex items-center justify-between pt-2 gap-4">
+      <Link to={link ? link : "/dashboard"} className="grid">
+        <img
+          alt="dispal"
+          src="/images/logo.svg"
+          className="hover:cursor-pointer hover:scale-105 duration-500 size-[60px] transition-all"
+        />
+      </Link>
+      <div className="flex gap-4 sm:gap-6 items-center justify-center">
+        <a
+          href="http://www.dishpalinfo.com"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <Info className="size-4" />
+        </a>
+        <Link to="/dashboard/history">
+          <History className="size-4" />
+        </Link>
         <img
           src="/images/notification.svg"
           alt="notification"
-          className=" max-sm:hidden"
+          className="size-4"
         />
-        <FaHeart className="text-red-500 max-sm:hidden" />
-
-        <DropdownMenu>
+        <Link to="/dashboard/reservation">
+          <FaHeart className="text-red-500 size-4" />
+        </Link>
+        <Link
+          to="/dashboard/settings"
+          className="rounded-full overflow-hidden size-10 focus:outline-none focus:ring-0 focus:border-none"
+        >
+          <img
+            src={"/images/settingsLadyPlaceholderImg.png"}
+            alt="lady"
+            className=""
+          />
+        </Link>
+        {/* <DropdownMenu>
           <DropdownMenuTrigger className="rounded-full  overflow-hidden size-10 focus:outline-none focus:ring-0 focus:border-none">
             <img
               src={"/images/settingsLadyPlaceholderImg.png"}
@@ -56,7 +71,7 @@ const SearchInputNavbar = () => {
               Sign Out <LogOut className="ml-2" />
             </Button>
           </DropdownMenuContent>
-        </DropdownMenu>
+        </DropdownMenu> */}
       </div>
     </section>
   );

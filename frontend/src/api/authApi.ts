@@ -82,3 +82,17 @@ export const axiosGoogleLogin = async (tokenResponse: TokenResponse) => {
   );
   return data;
 };
+
+// Returns a list of all discounts in the system.
+export const getDiscounts = async () => {
+  try {
+    console.log(import.meta.env.VITE_API_URL+"/api/geodiscounts/v1/discounts/");
+    console.log(axiosInstance.defaults.headers.common);
+
+    const response = await axiosInstance.get("/api/geodiscounts/v1/discounts/");
+    console.log(response);
+    
+  } catch (error) {
+    console.error(error);
+  }
+};

@@ -6,21 +6,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cardNavLinks } from "@/constants";
-import { Link, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/context/authContext";
 import { Button } from "../ui/button";
 import { LogOut, Menu } from "lucide-react";
 
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Dispatch, SetStateAction } from "react";
-
-const SecondaryNavbar = ({
-  setTab,
-}: {
-  setTab?: Dispatch<SetStateAction<string>>;
-}) => {
-  const pathname = useLocation().pathname;
+const SecondaryNavbar = () => {
   const { user, logout } = useAuth();
   return (
     <div className="">
@@ -45,24 +36,6 @@ const SecondaryNavbar = ({
                   </Link>
                 </DropdownMenuItem>
               ))}
-              {pathname === "/dashboard" && (
-                <div className="rounded-md p-2 hover:cursor-pointer  hover:shadow-md hover:!bg-slate-100">
-                  <div className="flex items-center space-x-2 ">
-                    <Switch
-                      id="card"
-                      className="data-[state=checked]:bg-vividOrange"
-                      onCheckedChange={(value) => {
-                        if (value) return setTab && setTab("card");
-                        return setTab && setTab("input");
-                      }}
-                    />
-                    <Label htmlFor="card" className="font-normal">
-                      Grid View
-                    </Label>
-                  </div>
-                </div>
-              )}
-
               <div className="flex gap-2 mt-2">
                 <Button className="font-syne px-6 bg-vividOrange hover:bg-orange-500/50">
                   <Link to={"/auth/login"}>Log In</Link>
@@ -99,25 +72,7 @@ const SecondaryNavbar = ({
                   </Link>
                 </DropdownMenuItem>
               ))}
-              {pathname === "/dashboard" && (
-                <div className="rounded-md p-2 hover:cursor-pointer  hover:shadow-md hover:!bg-slate-100">
-                  <div className="flex items-center space-x-2 ">
-                    <Switch
-                      id="card"
-                      className="data-[state=checked]:bg-vividOrange"
-                      onCheckedChange={(value) => {
-                        if (value) return setTab && setTab("card");
-                        return setTab && setTab("input");
-                      }}
-                    />
-                    <Label htmlFor="card" className="font-normal">
-                      Grid View
-                    </Label>
-                  </div>
-                </div>
-              )}
-
-              <Button
+             <Button
                 className="text-vividOrange mt-4 w-full"
                 variant={"outline"}
                 onClick={() => logout()}
