@@ -11,6 +11,7 @@ dotenv.config();
 const envDirPath = path.resolve(__dirname, './env');
 const env = fs.existsSync(envDirPath) ? loadEnv(process.env.NODE_ENV as string, envDirPath) : process.env;
 
+
 export default defineConfig({
   plugins: [react()], // Enables React support
   envDir: './env', // Specify the directory containing your .env files
