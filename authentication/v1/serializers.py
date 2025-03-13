@@ -189,27 +189,71 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model: type = CustomUser
-        fields: list[str] = ["id", "username", "email", "first_name", "last_name"]
+        fields = ["id", "username", "email", "first_name", "last_name", "phone_number"]
         read_only_fields: list[str] = ["id"]
-
 
 class UserProfileSerializer(serializers.ModelSerializer):
     """
     Serializer for managing user profiles.
 
-    Includes fields for user preferences and location.
+    This serializer is responsible for serializing and deserializing user profile data.
+    It supports:
+        - Retrieving profile information, including user details.
+        - Updating user preferences and location.
+        - Allowing updates to the user's phone number.
+
+    Attributes:
+        - user (UserSerializer, read-only): Nested serializer for user details.
+        - phone_number (str, optional): Allows updating the phone number of the user.
+        - preferences (dict, optional): JSON object storing user preferences.
+        - location (PointField, optional): Geographical location of the user.
+        - created_at (datetime, read-only): Timestamp when the profile was created.
+        - updated_at (datetime, read-only): Timestamp when the profile was last updated.
     """
 
-    user: UserSerializer = UserSerializer(read_only=True)
+    user = UserSerializer(read_only=True)
+    phone_number = serializers.CharField(
+        source="user.phone_number",
+        required=False,
+        help_text="The phone number of the user in international format (e.g., +1234567890)."
+    )
 
     class Meta:
-        model: type = UserProfile
-        fields: list[str] = [
+        model = UserProfile
+        fields = [
             "id",
             "user",
+            "phone_number",
             "preferences",
             "location",
             "created_at",
             "updated_at",
         ]
-        read_only_fields: list[str] = ["id", "created_at", "updated_at"]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+    def update(self, instance, validated_data):
+        """
+        Update the UserProfile and the associated User model.
+
+        This method ensures that:
+        - `phone_number` updates are applied to the `CustomUser` model.
+        - Other profile-related fields (`preferences`, `location`) are updated normally.
+
+        Args:
+            instance (UserProfile): The current user profile instance.
+            validated_data (dict): The validated data from the request.
+
+        Returns:
+            UserProfile: The updated user profile instance.
+        """
+        # Extract user data from the validated data
+        user_data = validated_data.pop("user", {})
+        phone_number = user_data.get("phone_number")
+
+        # If a new phone number is provided, update the related User model
+        if phone_number:
+            instance.user.phone_number = phone_number
+            instance.user.save()
+
+        # Update UserProfile fields
+        return super().update(instance, validated_data)

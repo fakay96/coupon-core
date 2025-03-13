@@ -312,3 +312,63 @@ class UserRegistrationView(APIView):
                 {"error": "An unexpected error occurred.", "details": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+
+class UserDeleteView(APIView):
+    """
+    API endpoint to allow users to delete their account.
+
+    Permissions:
+        - Requires the user to be authenticated.
+
+    Endpoints:
+        - DELETE /api/v1/user-profile/: Delete the authenticated user's account.
+    
+    Responses:
+        - 204: Successfully deleted user account.
+        - 403: User is not authorized to perform this action.
+        - 500: Internal server error.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_description="Delete the authenticated user's account.",
+        responses={
+            204: openapi.Response(description="User account successfully deleted."),
+            403: openapi.Response(
+                description="User is not authorized to delete this account.",
+                schema=error_response_schema
+            ),
+            500: openapi.Response(
+                description="Internal server error.",
+                schema=error_response_schema
+            ),
+        },
+    )
+    def delete(self, request: Any) -> Response:
+        """
+        Delete the authenticated user's account.
+
+        Returns:
+            - 204: Successfully deleted user account.
+            - 403: User is not authorized to perform this action.
+            - 500: Internal server error.
+        """
+        try:
+            user = request.user  # Get authenticated user
+            
+            # Perform user deletion
+            user.delete()
+            
+            return Response(
+                {"message": "User account deleted successfully."},
+                status=status.HTTP_204_NO_CONTENT
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": "An unexpected error occurred.", "details": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
