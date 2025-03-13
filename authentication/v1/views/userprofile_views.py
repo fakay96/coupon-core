@@ -360,7 +360,7 @@ class UserDeleteView(APIView):
             user = request.user  # Get authenticated user
             
             # Perform user deletion
-            user.delete()
+            CustomUser.delete()
             
             return Response(
                 {"message": "User account deleted successfully."},
