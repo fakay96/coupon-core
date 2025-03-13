@@ -46,6 +46,7 @@ api.interceptors.response.use(
   },
   async (error) => {
     const originalRequest = error.config;
+    // console.log("ERROR IN AXIOS CLIENT : ", error)
 
     // If the response status is 401 (Unauthorized) and the request has not been retried yet
     if (error?.response?.status === 401 && !originalRequest._retry) {

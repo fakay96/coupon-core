@@ -9,7 +9,8 @@ dotenv.config();
 
 // Check if the "./env" directory exists before trying to load
 const envDirPath = path.resolve(__dirname, './env');
-const env = fs.existsSync(envDirPath) ? loadEnv(process.env.NODE_ENV, envDirPath) : process.env;
+const env = fs.existsSync(envDirPath) ? loadEnv(process.env.NODE_ENV as string, envDirPath) : process.env;
+
 
 export default defineConfig({
   plugins: [react()], // Enables React support
@@ -20,13 +21,7 @@ export default defineConfig({
   },
 
   server: {
-    host: true, // Allows network access to the dev server
-    // proxy: {
-    //   "/api": {
-    //     target: "https://api.dishpal.ai", // Redirects API requests to the backend
-    //     changeOrigin: true, // Modifies the origin header for CORS handling
-    //   },
-    // },
+    host: true, 
   },
 
   resolve: {
