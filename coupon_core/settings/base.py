@@ -17,6 +17,7 @@ from pathlib import Path
 from storages.backends.s3boto3 import S3Boto3Storage
 
 GDAL_LIBRARY_PATH = os.getenv("GDAL_LIBRARY_PATH", "/usr/lib/libgdal.so")
+print(GDAL_LIBRARY_PATH)
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
