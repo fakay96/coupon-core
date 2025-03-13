@@ -15,3 +15,7 @@ env/*
 node_modules/
 **.csv
 
+.vnv
+**.log
+migrate.sh
+req.txt
