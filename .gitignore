@@ -8,14 +8,20 @@ staticfiles/
 cert-manager/
 pvcs/
 
+
+
+node_modules/
+**.csv
+
 node_modules
 env
 env/*
 
-node_modules/
+
 **.csv
 
 .vnv
 **.log
 migrate.sh
 req.txt
+
