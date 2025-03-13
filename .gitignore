@@ -9,3 +9,4 @@ cert-manager/
 pvcs/
 
 node_modules/
+**.csv

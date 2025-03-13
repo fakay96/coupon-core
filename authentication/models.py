@@ -10,6 +10,12 @@ from django.core.validators import EmailValidator, MinLengthValidator
 from django.db import models
 
 
+from django.contrib.auth.models import AbstractUser, Group, Permission
+from django.contrib.gis.db.models import PointField
+from django.core.validators import EmailValidator, MinLengthValidator, RegexValidator
+from django.db import models
+
+
 class CustomUser(AbstractUser):
     """
     Custom user model with additional fields for extended functionality.
@@ -20,6 +26,19 @@ class CustomUser(AbstractUser):
     email = models.EmailField(
         unique=True,
         validators=[EmailValidator(message="Enter a valid email address.")],
+    )
+    phone_number = models.CharField(
+        max_length=15,
+        unique=True,
+        blank=True,
+        null=True,
+        validators=[
+            RegexValidator(
+                regex=r"^\+?[1-9]\d{1,14}$",
+                message="Enter a valid phone number in international format (e.g., +123456789).",
+            )
+        ],
+        help_text="User's phone number in international format.",
     )
     is_guest = models.BooleanField(
         default=False, help_text="Indicates if the user is a guest."
