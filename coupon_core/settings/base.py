@@ -22,28 +22,7 @@ GDAL_LIBRARY_PATH = os.getenv("GDAL_LIBRARY_PATH", "/usr/lib/libgdal.so")
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-class S3MediaStorage(S3Boto3Storage):
-    """
-    Custom S3 storage class for managing media files.
 
-    Media files are stored in a private S3 bucket with no overwrites.
-    """
-
-    location = "media"
-    default_acl = "private"
-    file_overwrite = False
-
-
-class S3StaticStorage(S3Boto3Storage):
-    """
-    Custom S3 storage class for managing static files.
-
-    Static files are stored in a public-read S3 bucket with overwrites enabled.
-    """
-
-    location = "static"
-    default_acl = "public-read"
-    file_overwrite = True
 
 
 
