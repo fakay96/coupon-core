@@ -19,6 +19,7 @@ from django.urls import path
 from geodiscounts.v1.views.geodiscount_views import (
     DiscountListView,
     NearbyDiscountsView,
+    CategoryView,
 )
 from geodiscounts.v1.views.retailer_views import RetailerDetailView, RetailerListView
 
@@ -31,6 +32,11 @@ urlpatterns = [
         "v1/discounts/nearby/",
         NearbyDiscountsView.as_view(),
         name="nearby_discounts",
+    ),
+    path(
+        "v1/discounts/categories/",
+        CategoryView.as_view(),
+        name="discount_categories",
     ),
     # Retailer-related endpoints
     path("v1/retailers/", RetailerListView.as_view(), name="retailer_list"),

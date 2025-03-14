@@ -90,3 +90,14 @@ spec:
             secretKeyRef:
               name: app-secrets
               key: DB_NAME
+        - name: DO_SPACES_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: DO_SPACES_ACCESS_KEY_ID
+        - name: DO_SPACES_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: DO_SPACES_SECRET_ACCESS_KEY
+

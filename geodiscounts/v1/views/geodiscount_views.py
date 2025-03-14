@@ -1,5 +1,22 @@
+"""
+API Views for the Discount Discovery System.
+
+This module contains API endpoints for:
+- Fetching all available discount categories (cached for 30 minutes).
+- Fetching all available discounts.
+- Finding nearby discounts based on user IP.
+- Searching for discounts using vector embeddings.
+
+Each endpoint is documented and uses Django Rest Framework (DRF) for serialization.
+Caching is enabled where applicable to optimize performance.
+
+Author: Your Name
+Date: YYYY-MM-DD
+"""
+
 from typing import List
 
+from django.core.cache import cache
 from django.contrib.gis.db.models.functions import Distance
 from django.contrib.gis.geos import Point
 from rest_framework.exceptions import ValidationError
@@ -12,8 +29,8 @@ from rest_framework.status import (
 )
 from rest_framework.views import APIView
 
-from geodiscounts.models import Discount
-from geodiscounts.v1.serializers import DiscountSerializer
+from geodiscounts.models import Discount, Category
+from geodiscounts.v1.serializers import DiscountSerializer, CategorySerializer
 from geodiscounts.v1.utils.embedding_utils import generate_embedding
 from geodiscounts.v1.utils.ip_geolocation import (
     get_location_from_ip,
@@ -26,6 +43,70 @@ from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
 client = PostgreSQLVectorClient()
+
+
+class CategoryView(APIView):
+    """
+    API endpoint to retrieve all available discount categories.
+
+    Categories are **cached for 30 minutes** to optimize performance and reduce database load.
+    """
+
+    @swagger_auto_schema(
+        operation_description="Fetches all discount categories. Caches results for 30 minutes.",
+        responses={
+            HTTP_200_OK: openapi.Response(
+                description="Success.",
+                schema=CategorySerializer(many=True)
+            ),
+            HTTP_404_NOT_FOUND: openapi.Response(
+                description="No categories found.",
+                examples={"application/json": {"message": "No categories available."}}
+            ),
+            HTTP_500_INTERNAL_SERVER_ERROR: openapi.Response(
+                description="Internal server error.",
+                examples={"application/json": {"error": "An unexpected error occurred."}}
+            ),
+        },
+    )
+    def get(self, request) -> Response:
+        """
+        Handles GET requests to retrieve all available discount categories.
+
+        Caching:
+            - Categories are **cached for 30 minutes** (`cache_key="categories_list"`).
+
+        Returns:
+            Response: JSON response containing the list of categories.
+
+        Status Codes:
+            - 200: Success.
+            - 404: No categories found.
+            - 500: Internal server error.
+        """
+        try:
+            cache_key = "categories_list"
+            categories = cache.get(cache_key)
+
+            if categories is None:
+                category_queryset = Category.objects.all()
+                if not category_queryset.exists():
+                    return Response(
+                        {"message": "No categories available."},
+                        status=HTTP_404_NOT_FOUND,
+                    )
+                serializer = CategorySerializer(category_queryset, many=True)
+                categories = serializer.data
+                cache.set(cache_key, categories, timeout=1800)  # Cache for 30 minutes
+
+            return Response(categories, status=HTTP_200_OK)
+
+        except Exception as e:
+            return Response(
+                {"error": "An unexpected error occurred.", "details": str(e)},
+                status=HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
 class DiscountListView(APIView):
     """
     API endpoint to fetch all available discounts.
