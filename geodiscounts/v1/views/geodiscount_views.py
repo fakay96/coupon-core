@@ -41,8 +41,9 @@ from geodiscounts.v1.utils.vector_utils import PostgreSQLVectorClient
 # drf-yasg imports for OpenAPI documentation
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
-
+from rest_framework.permissions import AllowAny
 client = PostgreSQLVectorClient()
+
 
 
 class CategoryView(APIView):
@@ -51,6 +52,7 @@ class CategoryView(APIView):
 
     Categories are **cached for 30 minutes** to optimize performance and reduce database load.
     """
+    permission_classes = [AllowAny]  # Allow unrestricted access
 
     @swagger_auto_schema(
         operation_description="Fetches all discount categories. Caches results for 30 minutes.",
@@ -106,6 +108,7 @@ class CategoryView(APIView):
                 {"error": "An unexpected error occurred.", "details": str(e)},
                 status=HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
 
 class DiscountListView(APIView):
     """
