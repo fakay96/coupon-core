@@ -3,7 +3,7 @@ Staging settings for the coupon_core project.
 
 This module includes configurations tailored for the staging environment,
 such as connection details for the PostgreSQL database, Redis caching,
-RabbitMQ for Celery, and S3 storage via LocalStack.
+RabbitMQ for Celery, and S3 storage via DigitalOcean Spaces.
 
 Environment variables are used to ensure sensitive data and configurations
 can be customized per deployment without modifying the source code.
@@ -18,9 +18,10 @@ from datetime import timedelta
 # Debug
 DEBUG = True
 
-
+# Allowed Hosts
 ALLOWED_HOSTS = ["api-staging.dishpal.ai"]
 
+# Allow CORS for all origins in staging
 CORS_ALLOW_ALL_ORIGINS = True
 
 # Secret Key
@@ -34,23 +35,37 @@ SECURE_SSL_REDIRECT = True
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 
-# LocalStack S3 Configuration
-AWS_S3_ENDPOINT_URL = os.getenv("LOCALSTACK_S3_ENDPOINT_EXTERNAL")
-AWS_S3_ENDPOINT_URL_INTERNAL = os.getenv("LOCALSTACK_S3_ENDPOINT")
-AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", "test")
-AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "test")
-AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME", "election-system-dev")
-AWS_S3_CUSTOM_DOMAIN = f"{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}"
+# -----------------------------------------------
+# DigitalOcean Spaces Configuration
+# -----------------------------------------------
+AWS_S3_ENDPOINT_URL = "https://fra1.digitaloceanspaces.com"  # DigitalOcean Spaces endpoint for Frankfurt region
+AWS_ACCESS_KEY_ID = os.getenv("DO_SPACES_ACCESS_KEY_ID", "your-access-key")
+AWS_SECRET_ACCESS_KEY = os.getenv("DO_SPACES_SECRET_ACCESS_KEY", "your-secret-key")
+AWS_STORAGE_BUCKET_NAME = "dishpal-data"  # DigitalOcean Spaces bucket name
 
-# Static files storage (S3 via LocalStack)
-STATIC_URL = f"{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/static/"
+# Define a custom domain for assets
+AWS_S3_CUSTOM_DOMAIN = f"https://{AWS_STORAGE_BUCKET_NAME}.fra1.digitaloceanspaces.com"
+
+# Define the `staging/` folder for assets and media files
+STAGING_FOLDER = "staging"
+
+# Static files storage (for serving CSS, JS, etc.)
+STATIC_URL = f"{AWS_S3_CUSTOM_DOMAIN}/{STAGING_FOLDER}/static/"
 STATICFILES_STORAGE = "storages.backends.s3boto3.S3StaticStorage"
-STATIC_ROOT = f"{AWS_S3_ENDPOINT_URL_INTERNAL}/{AWS_STORAGE_BUCKET_NAME}/static/"
 
-# Media files storage (S3 via LocalStack)
-MEDIA_URL = f"{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/media/"
+# Media files storage (for serving uploaded images and other media)
+MEDIA_URL = f"{AWS_S3_CUSTOM_DOMAIN}/{STAGING_FOLDER}/media/"
 DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
 
+# Set object ACLs for public access (optional, if required)
+AWS_S3_OBJECT_PARAMETERS = {
+    "CacheControl": "max-age=86400",
+    "ACL": "public-read",
+}
+
+# -----------------------------------------------
+# PostgreSQL Database Configuration
+# -----------------------------------------------
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
@@ -98,7 +113,9 @@ DATABASES = {
     },
 }
 
-# Credentials for Redis service
+# -----------------------------------------------
+# Redis Configuration
+# -----------------------------------------------
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "redis_password")
 REDIS_PORT = 6379
@@ -124,17 +141,23 @@ CHANNEL_LAYERS = {
     },
 }
 
-# Celery settings (RabbitMQ as the broker)
+# -----------------------------------------------
+# Celery Configuration (RabbitMQ)
+# -----------------------------------------------
 CELERY_BROKER_URL = (
-    f"amqp://{os.getenv('DEV_RABBITMQ_USER', 'guest')}:"
+    f"amqp://{os.getenv('DEV_RABBITMQ_USER', 'guest')}:" 
     f"{os.getenv('DEV_RABBITMQ_PASSWORD', 'guest')}@"
     f"{os.getenv('DEV_RABBITMQ_HOST', 'localhost')}:5672/"
 )
 
-# Email backend (console for staging)
+# -----------------------------------------------
+# Email Backend (Console for Staging)
+# -----------------------------------------------
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
-# SimpleJWT Configuration
+# -----------------------------------------------
+# SimpleJWT Authentication Configuration
+# -----------------------------------------------
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
