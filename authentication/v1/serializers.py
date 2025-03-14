@@ -236,7 +236,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         Update the UserProfile and the associated User model.
 
         This method ensures that:
-        - `phone_number` updates are applied to the `CustomUser` model.
+        - `phone_number`, `first_name`, and `last_name` updates are applied to the `CustomUser` model.
         - Other profile-related fields (`preferences`, `location`) are updated normally.
 
         Args:
@@ -246,14 +246,24 @@ class UserProfileSerializer(serializers.ModelSerializer):
         Returns:
             UserProfile: The updated user profile instance.
         """
-        # Extract user data from the validated data
+        # Extract user data from validated data
         user_data = validated_data.pop("user", {})
-        phone_number = user_data.get("phone_number")
 
-        # If a new phone number is provided, update the related User model
+        # Update user fields if provided
+        user = instance.user
+        phone_number = user_data.get("phone_number")
+        first_name = user_data.get("first_name")
+        last_name = user_data.get("last_name")
+
         if phone_number:
-            instance.user.phone_number = phone_number
-            instance.user.save()
+            user.phone_number = phone_number
+        if first_name:
+            user.first_name = first_name
+        if last_name:
+            user.last_name = last_name
+
+        # Save updated user details
+        user.save()
 
         # Update UserProfile fields
         return super().update(instance, validated_data)

@@ -143,8 +143,11 @@ class UserProfileView(APIView):
         try:
             profile = request.user.profile  # Fetch the authenticated user's profile.
             serializer = UserProfileSerializer(profile, data=request.data, partial=True)
+            
             if serializer.is_valid():
+                
                 serializer.save()  # Save the updated profile data.
+                print(serializer.data)
                 return Response(serializer.data, status=status.HTTP_200_OK)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except UserProfile.DoesNotExist:
