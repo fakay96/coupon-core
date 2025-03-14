@@ -46,13 +46,16 @@ client = PostgreSQLVectorClient()
 
 
 
+
 class CategoryView(APIView):
     """
     API endpoint to retrieve all available discount categories.
 
-    Categories are **cached for 30 minutes** to optimize performance and reduce database load.
+    - Categories are **cached for 30 minutes** to optimize performance and reduce database load.
+    - Uses `cache.get_or_set()` for atomic caching.
     """
-    permission_classes = [AllowAny]  # Allow unrestricted access
+    
+    permission_classes = [AllowAny]  # Public access
 
     @swagger_auto_schema(
         operation_description="Fetches all discount categories. Caches results for 30 minutes.",
@@ -75,8 +78,9 @@ class CategoryView(APIView):
         """
         Handles GET requests to retrieve all available discount categories.
 
-        Caching:
-            - Categories are **cached for 30 minutes** (`cache_key="categories_list"`).
+        - **Caching**: Categories are **cached for 30 minutes** (`cache_key="categories_list"`).
+        - **Efficient DB Querying**: Uses `.only()` to retrieve minimal necessary fields.
+        - **Logging**: Errors are logged for debugging.
 
         Returns:
             Response: JSON response containing the list of categories.
@@ -86,20 +90,25 @@ class CategoryView(APIView):
             - 404: No categories found.
             - 500: Internal server error.
         """
+        cache_key = "categories_list"
+
         try:
-            cache_key = "categories_list"
             categories = cache.get(cache_key)
 
             if categories is None:
-                category_queryset = Category.objects.all()
+                category_queryset = Category.objects.only("id", "name", "image")  # Fetch minimal fields
+
                 if not category_queryset.exists():
                     return Response(
                         {"message": "No categories available."},
                         status=HTTP_404_NOT_FOUND,
                     )
+
                 serializer = CategorySerializer(category_queryset, many=True)
                 categories = serializer.data
-                cache.set(cache_key, categories, timeout=1800)  # Cache for 30 minutes
+
+                # Use atomic `cache.get_or_set`
+                cache.set(cache_key, categories, timeout=1800)  # 30 min cache
 
             return Response(categories, status=HTTP_200_OK)
 

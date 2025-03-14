@@ -19,10 +19,10 @@ class CategorySerializer(serializers.ModelSerializer):
     Fields:
         - id: The primary key of the category.
         - name: The name of the category.
-        - image: Image representing the category.
+        - image: Image representing the category (supports SVG).
     """
 
-    image = serializers.ImageField(required=False, allow_null=True)
+    image = serializers.FileField(required=False, allow_null=True)  # Changed to FileField
 
     class Meta:
         model = Category
@@ -42,7 +42,7 @@ class RetailerSerializer(serializers.ModelSerializer):
         - id: The primary key of the retailer.
         - name: The name of the retailer.
         - contact_info: Contact details of the retailer.
-        - location: The geographic location of the **retailer itself** (store, office, etc.).
+        - location: The geographic location of the retailer.
     """
 
     class Meta:
@@ -67,13 +67,13 @@ class DiscountSerializer(serializers.ModelSerializer):
         - description: Description of the discount.
         - discount_code: Unique code for redeeming the discount.
         - expiration_date: Expiration date of the discount.
-        - location: The specific **valid location** of the discount (can differ from retailer).
-        - image: Optional image for the discount.
+        - location: The valid location of the discount.
+        - image: Optional image for the discount (supports SVG).
     """
 
     retailer = RetailerSerializer(read_only=True)
     category = CategorySerializer(read_only=True)
-    image = serializers.ImageField(required=False, allow_null=True)
+    image = serializers.FileField(required=False, allow_null=True)  # Changed to FileField
 
     class Meta:
         model = Discount
