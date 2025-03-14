@@ -52,7 +52,7 @@ class Category(models.Model):
     image: Optional[models.ImageField] = models.ImageField(
         upload_to="categories/",  # Uses S3 path automatically
         storage=S3Boto3Storage(),
-        validators=[FileExtensionValidator(["jpg", "jpeg", "png"])],
+        validators=[FileExtensionValidator(["jpg", "jpeg", "png","svg"])],
         null=True,
         blank=True,
         help_text="Image representing the category, stored in S3.",
@@ -118,7 +118,7 @@ class Discount(models.Model):
     image: Optional[models.ImageField] = models.ImageField(
         upload_to="discounts/",  # Uses S3 path automatically
         storage=S3Boto3Storage(),  # Uses S3 from settings
-        validators=[FileExtensionValidator(["jpg", "jpeg", "png"])],
+        validators=[FileExtensionValidator(["jpg", "jpeg", "png","svg"])],
         null=True,
         blank=True,
         help_text="Optional image representing the discount, stored in S3.",
