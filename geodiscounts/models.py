@@ -31,9 +31,7 @@ organized into categories.
 from typing import List, Optional
 from django.contrib.gis.db import models
 from django.core.validators import FileExtensionValidator
-from django.conf import settings
 from storages.backends.s3boto3 import S3Boto3Storage
-
 
 class Category(models.Model):
     """
@@ -41,7 +39,7 @@ class Category(models.Model):
 
     Attributes:
         name (str): The name of the category.
-        image (Optional[ImageField]): Image representing the category, stored in S3.
+        image (Optional[FileField]): Image representing the category, stored in S3 (supports SVG).
         created_at (datetime): Timestamp when the category was created.
         updated_at (datetime): Timestamp when the category was last updated.
     """
@@ -49,13 +47,13 @@ class Category(models.Model):
     name: str = models.CharField(
         max_length=255, unique=True, help_text="Name of the discount category."
     )
-    image: Optional[models.ImageField] = models.ImageField(
-        upload_to="categories/",  # Uses S3 path automatically
+    image: Optional[models.FileField] = models.FileField(
+        upload_to="categories/",
         storage=S3Boto3Storage(),
-        validators=[FileExtensionValidator(["jpg", "jpeg", "png","svg"])],
+        validators=[FileExtensionValidator(["jpg", "jpeg", "png", "svg"])],
         null=True,
         blank=True,
-        help_text="Image representing the category, stored in S3.",
+        help_text="Image representing the category, stored in S3 (supports SVG).",
     )
     created_at: models.DateTimeField = models.DateTimeField(auto_now_add=True)
     updated_at: models.DateTimeField = models.DateTimeField(auto_now=True)
@@ -99,15 +97,15 @@ class Discount(models.Model):
         discount_code (str): Unique code for redeeming the discount.
         expiration_date (datetime): Expiration date of the discount.
         location (Point): Geographical location where the discount is valid.
-        image (Optional[ImageField]): An optional image representing the discount.
+        image (Optional[FileField]): An optional image representing the discount (supports SVG).
         created_at (datetime): Timestamp when the discount was created.
         updated_at (datetime): Timestamp when the discount was last updated.
     """
 
-    retailer: Retailer = models.ForeignKey(
+    retailer: models.ForeignKey = models.ForeignKey(
         Retailer, on_delete=models.CASCADE, related_name="discounts"
     )
-    category: Optional[Category] = models.ForeignKey(
+    category: Optional[models.ForeignKey] = models.ForeignKey(
         Category, on_delete=models.SET_NULL, null=True, blank=True, related_name="discounts"
     )
     description: str = models.TextField()
@@ -115,13 +113,13 @@ class Discount(models.Model):
     expiration_date: models.DateTimeField = models.DateTimeField()
     location: models.PointField = models.PointField()
 
-    image: Optional[models.ImageField] = models.ImageField(
-        upload_to="discounts/",  # Uses S3 path automatically
-        storage=S3Boto3Storage(),  # Uses S3 from settings
-        validators=[FileExtensionValidator(["jpg", "jpeg", "png","svg"])],
+    image: Optional[models.FileField] = models.FileField(
+        upload_to="discounts/",
+        storage=S3Boto3Storage(),
+        validators=[FileExtensionValidator(["jpg", "jpeg", "png", "svg"])],
         null=True,
         blank=True,
-        help_text="Optional image representing the discount, stored in S3.",
+        help_text="Optional image representing the discount, stored in S3 (supports SVG).",
     )
 
     created_at: models.DateTimeField = models.DateTimeField(auto_now_add=True)
@@ -139,13 +137,13 @@ class SharedDiscount(models.Model):
     Attributes:
         discount (Discount): The discount being shared.
         group_name (str): Name of the group sharing the discount.
-        participants (list): List of participants in the shared discount.
+        participants (List[str]): List of participants in the shared discount.
         status (str): Status of the shared discount (e.g., active, completed, expired).
         created_at (datetime): Timestamp when the shared discount was created.
         updated_at (datetime): Timestamp when the shared discount was last updated.
     """
 
-    discount: Discount = models.ForeignKey(
+    discount: models.ForeignKey = models.ForeignKey(
         Discount, on_delete=models.CASCADE, related_name="shared_discounts"
     )
     group_name: str = models.CharField(max_length=255)
