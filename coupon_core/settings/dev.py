@@ -2,7 +2,7 @@
 Development settings for the coupon_core project.
 
 This module includes configurations for development environments, such as local
-database settings, Redis caching, Celery, and S3 storage via LocalStack and DigitalOcean Spaces.
+database settings, Redis caching, Celery, and S3 storage via DigitalOcean Spaces.
 
 Environment variables are used where applicable to allow for flexibility and
 customization during development.
@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.1/topics/settings/
 """
 
 import os
+import logging
 from datetime import timedelta
 from pathlib import Path
 from dotenv import load_dotenv
@@ -31,32 +32,43 @@ ALLOWED_HOSTS = ["*"]
 SECRET_KEY = "django-insecure-%x0jerw1u3b91t_$!f22v@lh4=he(*t$&wf+y%%7w@ub+s68^c"
 
 # -----------------------------------------------
+# Static Files Configuration
+# -----------------------------------------------
+# Local path for collectstatic to gather files before uploading
+
+# -----------------------------------------------
 # S3 Storage (DigitalOcean Spaces) - Development
 # -----------------------------------------------
-AWS_S3_ENDPOINT_URL = "https://fra1.digitaloceanspaces.com"  # DigitalOcean Spaces endpoint (Frankfurt)
-AWS_ACCESS_KEY_ID = os.getenv("DO_SPACES_ACCESS_KEY_ID", "your-access-key")
-AWS_SECRET_ACCESS_KEY = os.getenv("DO_SPACES_SECRET_ACCESS_KEY", "your-secret-key")
-AWS_STORAGE_BUCKET_NAME = "dishpal-data"  # DigitalOcean Spaces bucket name
+# Core AWS/DigitalOcean Spaces settings
+AWS_S3_ENDPOINT_URL = "https://fra1.digitaloceanspaces.com"  # Use the regional endpoint
+AWS_S3_REGION_NAME = "fra1"  # Match the region of your Space
+AWS_ACCESS_KEY_ID = os.getenv("DO_SPACES_ACCESS_KEY_ID", "test")  # Your access key
+AWS_SECRET_ACCESS_KEY = os.getenv("DO_SPACES_SECRET_ACCESS_KEY", "test")  # Your secret key
+AWS_STORAGE_BUCKET_NAME = "dishpal-data"  # Your bucket name
 
-AWS_S3_CUSTOM_DOMAIN = f"https://{AWS_STORAGE_BUCKET_NAME}.fra1.digitaloceanspaces.com"
+# Proper domain format without https:// prefix
+AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.fra1.digitaloceanspaces.com"
 
 # Define the `dev/` folder for development assets and media files
 DEV_FOLDER = "dev"
+STATIC_LOCATION = f"{DEV_FOLDER}/static"
+MEDIA_LOCATION = f"{DEV_FOLDER}/media"
 
-# Static files storage (local for development)
-STATIC_URL = "/static/"
-STATICFILES_DIRS = [BASE_DIR / "static"]
-STATIC_ROOT = BASE_DIR / "staticfiles"
+# URL patterns (with https:// explicitly added)
+STATIC_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/{STATIC_LOCATION}/"
+MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/{MEDIA_LOCATION}/"
 
-# Media files storage (S3 via DigitalOcean Spaces)
-MEDIA_URL = f"{AWS_S3_CUSTOM_DOMAIN}/{DEV_FOLDER}/media/"
-DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+# Storage backends - use custom storage classes
+STATICFILES_STORAGE = "custom_storages.StaticStorage"
+DEFAULT_FILE_STORAGE = "custom_storages.MediaStorage"
 
-# Set object ACLs for public access (optional, if required)
+# Cache control and object parameters
 AWS_S3_OBJECT_PARAMETERS = {
     "CacheControl": "max-age=86400",
-    "ACL": "public-read",
 }
+
+# Enable boto3 logging for debugging (comment out in production)
+logging.basicConfig(level=logging.INFO)
 
 # -----------------------------------------------
 # PostgreSQL Database Configuration

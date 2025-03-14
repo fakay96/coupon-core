@@ -1,7 +1,7 @@
 """
 Staging settings for the coupon_core project.
 
-This module includes configurations tailored for the production environment,
+This module includes configurations tailored for the staging environment,
 such as connection details for the PostgreSQL database, Redis caching,
 RabbitMQ for Celery, and S3 storage via DigitalOcean Spaces.
 
@@ -36,23 +36,25 @@ CSRF_COOKIE_SECURE = True
 # DigitalOcean Spaces Configuration
 # -----------------------------------------------
 AWS_S3_ENDPOINT_URL = "https://fra1.digitaloceanspaces.com"  # DigitalOcean Spaces endpoint for Frankfurt region
-AWS_ACCESS_KEY_ID = os.getenv("DO_SPACES_ACCESS_KEY_ID", "your-access-key")
-AWS_SECRET_ACCESS_KEY = os.getenv("DO_SPACES_SECRET_ACCESS_KEY", "your-secret-key")
+AWS_ACCESS_KEY_ID = os.getenv("DO_SPACES_ACCESS_KEY_ID", "DO801XNLGTYEWHUBBEAP")  # Your access key
+AWS_SECRET_ACCESS_KEY = os.getenv("DO_SPACES_SECRET_ACCESS_KEY", "B5d9q33jcImk00jtkF3zJCAKCCEgfKEzJeyuya+uaqI")  # Your secret key
 AWS_STORAGE_BUCKET_NAME = "dishpal-data"  # DigitalOcean Spaces bucket name
 
 # Define a custom domain for assets
-AWS_S3_CUSTOM_DOMAIN = f"https://{AWS_STORAGE_BUCKET_NAME}.fra1.digitaloceanspaces.com"
+AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.fra1.digitaloceanspaces.com"
 
 # Define the `production/` folder for assets and media files
 PRODUCTION_FOLDER = "production"
 
 # Static files storage (for serving CSS, JS, etc.)
-STATIC_URL = f"{AWS_S3_CUSTOM_DOMAIN}/{PRODUCTION_FOLDER}/static/"
-STATICFILES_STORAGE = "storages.backends.s3boto3.S3StaticStorage"
+STATIC_LOCATION = f"{PRODUCTION_FOLDER}/static"
+STATIC_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/{STATIC_LOCATION}/"
+STATICFILES_STORAGE = "custom_storages.StaticStorage"
 
 # Media files storage (for serving uploaded images and other media)
-MEDIA_URL = f"{AWS_S3_CUSTOM_DOMAIN}/{PRODUCTION_FOLDER}/media/"
-DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+MEDIA_LOCATION = f"{PRODUCTION_FOLDER}/media"
+MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/{MEDIA_LOCATION}/"
+DEFAULT_FILE_STORAGE = "custom_storages.MediaStorage"
 
 # Set object ACLs for public access (optional, if required)
 AWS_S3_OBJECT_PARAMETERS = {
@@ -156,7 +158,7 @@ EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 # SimpleJWT Authentication Configuration
 # -----------------------------------------------
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
+    "ACCESS_TOKEN_LIFETIME": timedelta(hours=1),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
