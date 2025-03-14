@@ -213,3 +213,12 @@ REST_AUTH = {
     "JWT_AUTH_REFRESH_COOKIE": "jwt-refresh-auth",
     "SESSION_LOGIN": False,
 }
+
+STORAGES={
+    'default': {
+        'BACKEND': 'coupon_core.settings.custom_storages.S3MediaStorage',
+    },
+    'staticfiles': {
+        'BACKEND': 'coupon_core.settings.custom_storages.StaticStorage',
+        },
+}
