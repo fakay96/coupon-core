@@ -49,7 +49,7 @@ backend:
     logLevel: debug
 
 celery:
-  replicaCount: 2
+  replicaCount: 1
 
   image:
     repository: fakay96/coupon-celery
