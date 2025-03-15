@@ -76,10 +76,11 @@ jobs:
         run: |
           kubectl get namespace $NAMESPACE || kubectl create namespace $NAMESPACE
 
-      - name: Deploy Backend
-        id: deploy_backend
+      - name: Deploy Backend & Celery
+        id: deploy_services
         run: |
           if [ "$NAMESPACE" = "staging" ]; then
+            # Deploy Backend
             helm upgrade --install coupon-service ./k8s/backend \
               --set backend.image.repository=fakay96/coupon-core \
               --set backend.image.tag=$VERSION_TAG \
@@ -87,7 +88,18 @@ jobs:
               -f ./k8s/backend/values/staging-values.yaml \
               --atomic --force --cleanup-on-fail --history-max 5 \
               --timeout 30m0s
+
+            # Deploy Celery
+            helm upgrade --install coupon-celery ./k8s/celery \
+              --set celery.image.repository=fakay96/coupon-celery \
+              --set celery.image.tag=$VERSION_TAG \
+              --namespace staging \
+              -f ./k8s/celery/values/staging-values.yaml \
+              --atomic --force --cleanup-on-fail --history-max 5 \
+              --timeout 30m0s
+
           elif [ "$NAMESPACE" = "production" ]; then
+            # Deploy Backend
             helm upgrade --install coupon-service ./k8s/backend \
               --set backend.image.repository=fakay96/coupon-core \
               --set backend.image.tag=$VERSION_TAG \
@@ -95,6 +107,16 @@ jobs:
               -f ./k8s/backend/values/production-values.yaml \
               --atomic --force --cleanup-on-fail --history-max 5 \
               --timeout 30m0s
+
+            # Deploy Celery
+            helm upgrade --install coupon-celery ./k8s/celery \
+              --set celery.image.repository=fakay96/coupon-celery \
+              --set celery.image.tag=$VERSION_TAG \
+              --namespace production \
+              -f ./k8s/celery/values/production-values.yaml \
+              --atomic --force --cleanup-on-fail --history-max 5 \
+              --timeout 30m0s
+
           else
             echo "Unknown environment: $NAMESPACE"
             exit 1

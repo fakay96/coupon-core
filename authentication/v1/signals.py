@@ -15,11 +15,16 @@ Error Handling:
 
 import logging
 
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save,pre_save
 from django.dispatch import receiver
 from allauth.account.signals import user_signed_up
 
-from authentication.models import CustomUser, UserProfile
+from authentication.models import CustomUser, UserProfile, ProfileVerification
+from django.db.models import Model
+from typing import Type
+from django.utils import timezone
+import uuid
+from authentication.v1.tasks.verification_task import send_verification_email_task
 
 # Set up logging for debugging and error tracking
 logger = logging.getLogger(__name__)
@@ -89,3 +94,88 @@ def social_user_onboarding(sender, request, user: CustomUser, **kwargs) -> None:
             logger.info(f"Social onboarding: UserProfile already exists for user: {user.username}")
     except Exception as e:
         logger.error(f"Social onboarding failed for user {user.username}: {e}")
+
+
+@receiver(post_save, sender=CustomUser)
+def create_profile_verification(sender: Type[Model], instance: CustomUser, created: bool, **kwargs) -> None:
+    """
+    Signal to create a ProfileVerification instance for a new user and set them as inactive.
+
+    This ensures that when a new `CustomUser` is created, it is initially
+    inactive (`is_active=False`), a verification profile is created, and a verification email is sent.
+
+    Args:
+        sender (Type[Model]): The model class that triggered the signal (CustomUser).
+        instance (CustomUser): The specific instance of CustomUser that was saved.
+        created (bool): Indicates whether the instance was created (True) or updated (False).
+        **kwargs: Additional keyword arguments passed by Django's signal mechanism.
+
+    Returns:
+        None
+    """
+    if created:
+        # Ensure the user is inactive at creation
+        instance.activated_profile = False
+        instance.save(update_fields=['activated_profile'])
+
+        # Create a new ProfileVerification instance with a fresh token
+        verification = ProfileVerification.objects.create(
+            user=instance,
+            token=uuid.uuid4(),
+            created_at=timezone.now(),
+            expires_at=timezone.now() + timezone.timedelta(minutes=10),  # 10-minute expiration
+            used=False
+        )
+
+        # Send verification email after creating the token
+        send_verification_email_task.delay(instance.email, verification.token)
+        
+
+
+@receiver(pre_save, sender=ProfileVerification)
+def handle_token_resend(sender: Type[Model], instance: ProfileVerification, **kwargs) -> None:
+    """
+    Signal to handle token renewal and email resend when a ProfileVerification instance is updated.
+
+    This ensures that if a `ProfileVerification` instance:
+    1. Has NOT been used (`used=False`).
+    2. The token HAS expired (`is_expired() == True`).
+    3. The token field is CHANGING (new token being issued).
+
+    Then:
+    - A new token is generated.
+    - The expiration time is reset.
+    - The instance is saved BEFORE sending the email.
+    - The verification email is sent with the new token.
+
+    Args:
+        sender (Type[Model]): The model class that triggered the signal.
+        instance (ProfileVerification): The ProfileVerification instance being updated.
+        **kwargs: Additional keyword arguments passed by Django's signal mechanism.
+
+    Returns:
+        None
+    """
+    if instance.pk:  # Ensure this is an update, not a new object
+        try:
+            previous_instance = ProfileVerification.objects.get(pk=instance.pk)
+
+            # Check if the previous token was expired, unused, and is now changing
+            if (
+                previous_instance.is_expired()
+                and not previous_instance.used
+                and previous_instance.token != instance.token  # Token has changed
+            ):
+                # Issue a new token
+                instance.token = uuid.uuid4()
+                instance.created_at = timezone.now()
+                instance.expires_at = instance.created_at + timezone.timedelta(minutes=10)
+
+                # Save before sending email
+                instance.save(update_fields=["token", "created_at", "expires_at"])
+
+                # Send email with new token
+                send_verification_email_task.delay(instance.user.email, instance.token)
+
+        except ProfileVerification.DoesNotExist:
+            pass  # Ignore if this is a new instance

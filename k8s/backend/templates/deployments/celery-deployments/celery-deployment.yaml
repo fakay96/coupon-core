@@ -1,10 +1,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: backend
+  name: celery
   namespace: {{ .Values.namespace }}
 spec:
-  replicas: {{ .Values.backend.replicaCount | default 1 }}
+  replicas: {{ .Values.celery.replicaCount | default 1 }}
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -12,28 +12,26 @@ spec:
       maxUnavailable: 0
   selector:
     matchLabels:
-      app: backend
+      app: celery
   template:
     metadata:
       labels:
-        app: backend
+        app: celery
         release: {{ .Release.Name }}
       annotations:
-        checksum/image: {{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag | sha256sum }}
+        checksum/image: {{ .Values.celery.image.repository }}:{{ .Values.celery.image.tag | sha256sum }}
     spec:
       containers:
-      - name: backend
-        image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
-        imagePullPolicy: "{{ .Values.backend.image.pullPolicy }}"
-        ports:
-        - containerPort: {{ .Values.backend.service.port }}
+      - name: celery
+        image: "{{ .Values.celery.image.repository }}:{{ .Values.celery.image.tag }}"
+        imagePullPolicy: "{{ .Values.celery.image.pullPolicy }}"
         resources:
           requests:
-            memory: "{{ .Values.backend.resources.requests.memory }}"
-            cpu: "{{ .Values.backend.resources.requests.cpu }}"
+            memory: "{{ .Values.celery.resources.requests.memory }}"
+            cpu: "{{ .Values.celery.resources.requests.cpu }}"
           limits:
-            memory: "{{ .Values.backend.resources.limits.memory }}"
-            cpu: "{{ .Values.backend.resources.limits.cpu }}"
+            memory: "{{ .Values.celery.resources.limits.memory }}"
+            cpu: "{{ .Values.celery.resources.limits.cpu }}"
         env:
         - name: DB_PORT
           valueFrom:
@@ -125,4 +123,3 @@ spec:
             secretKeyRef:
               name: app-secrets
               key: CELERY_DB
-        

@@ -152,7 +152,7 @@ CELERY_BROKER_URL = (
 # -----------------------------------------------
 # Email Backend (Console for Staging)
 # -----------------------------------------------
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 
 # -----------------------------------------------
 # SimpleJWT Authentication Configuration

@@ -26,8 +26,11 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from authentication.models import CustomUser, UserProfile
+from authentication.models import CustomUser, UserProfile,ProfileVerification
 from authentication.v1.serializers import RegisterSerializer, UserProfileSerializer
+from django.shortcuts import get_object_or_404
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from rest_framework.request import Request
 
 # drf-yasg imports for OpenAPI documentation
 from drf_yasg.utils import swagger_auto_schema
@@ -375,3 +378,105 @@ class UserDeleteView(APIView):
                 {"error": "An unexpected error occurred.", "details": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+class TokenVerificationView(APIView):
+    """
+    API endpoint to verify user tokens and resend new tokens.
+    
+    Methods:
+        - GET: Verify a user token using email and token parameters.
+        - PUT: Resend a new token if expired or forced.
+    """
+    permission_classes: list[Any] = [AllowAny]
+    @swagger_auto_schema(
+        operation_summary="Verify a user token",
+        operation_description="Verify a token associated with a user's email.",
+        manual_parameters=[
+            openapi.Parameter("email", openapi.IN_QUERY, description="User's email address", type=openapi.TYPE_STRING, required=True),
+            openapi.Parameter("token", openapi.IN_QUERY, description="Token to verify", type=openapi.TYPE_STRING, required=True),
+        ],
+        responses={
+            200: openapi.Response("Token verified successfully", examples={"application/json": {"message": "Token verified successfully."}}),
+            400: openapi.Response("Token expired or already used", examples={"application/json": {"error": "Token has expired."}}),
+            404: openapi.Response("Invalid email or token", examples={"application/json": {"error": "Invalid email or token."}}),
+        },
+    )
+    def get(self, request: Request) -> Response:
+        
+        
+        """Verify a user token."""
+        try:
+           
+            email: str | None = request.query_params.get("email")
+            token: str | None = request.query_params.get("token")
+            print(request.query_params)
+            
+            
+            if not email or not token:
+                return Response({"error": "Email and token are required."}, status=status.HTTP_400_BAD_REQUEST)
+            
+            verification = get_object_or_404(ProfileVerification, user__email=email, token=token)
+            
+            
+            if verification.used:
+                return Response({"error": "Token has already been used."}, status=status.HTTP_400_BAD_REQUEST)
+            
+            if verification.is_expired():
+                return Response({"error": "Token has expired."}, status=status.HTTP_400_BAD_REQUEST)
+            
+            verification.mark_as_used()
+            verification.user.activated_profile=True
+            verification.user.save()
+            return Response({"message": "Token verified successfully."}, status=status.HTTP_200_OK)
+        
+        except ObjectDoesNotExist:
+            return Response({"error": "Invalid email or token."}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+         
+            return Response({"error": "An unexpected error occurred."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @swagger_auto_schema(
+        operation_summary="Resend a new token",
+        operation_description="Resend a new token if expired or forced.",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                "email": openapi.Schema(type=openapi.TYPE_STRING, description="User's email address"),
+                "force_resend": openapi.Schema(type=openapi.TYPE_BOOLEAN, description="Force resend a new token", default=False),
+            },
+            required=["email"]
+        ),
+        responses={
+            200: openapi.Response("New token sent successfully", examples={"application/json": {"message": "New token sent successfully."}}),
+            400: openapi.Response("Invalid email format", examples={"application/json": {"error": "Invalid email format."}}),
+            404: openapi.Response("User not found", examples={"application/json": {"error": "User with the given email not found."}}),
+        },
+    )
+    def put(self, request: Request) -> Response:
+        """Resend a new token if expired or forced."""
+        try:
+            email: str | None = request.data.get("email")
+            force_resend: bool = request.data.get("force_resend", False)
+            
+            if not email:
+                return Response({"error": "Email is required."}, status=status.HTTP_400_BAD_REQUEST)
+            
+            verification = get_object_or_404(ProfileVerification, user__email=email)
+            
+            if force_resend or (verification.is_expired() and not verification.used):
+                verification.resend_new_token()
+                return Response({"message": "New token sent successfully."}, status=status.HTTP_200_OK)
+            
+            return Response({"message": "Current token is still valid."}, status=status.HTTP_200_OK)
+        
+        except ObjectDoesNotExist:
+            return Response({"error": "User with the given email not found."}, status=status.HTTP_404_NOT_FOUND)
+        except ValidationError:
+            return Response({"error": "Invalid email format."}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": "An unexpected error occurred."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+#CustomUser.objects.get(email="fakay96@gmail.com").delete()

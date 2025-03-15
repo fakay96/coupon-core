@@ -24,7 +24,8 @@ from authentication.v1.views.guest_views import GuestTokenView
 from authentication.v1.views.userprofile_views import (
     UserProfileView,
     UserRegistrationView,
-    UserDeleteView
+    UserDeleteView,
+    TokenVerificationView,
 )
 from authentication.v1.views.social_auth_views import (
     GoogleLogin,
@@ -49,6 +50,9 @@ urlpatterns = [
     path("v1/user-delete/", 
          UserDeleteView.as_view(), 
          name="user-delete"),
+    path("v1/activate/",
+         TokenVerificationView.as_view(),
+         name="profile-verification"),
 
     # Social authentication routes
     path("v1/auth/google/", GoogleLogin.as_view(), name="google-login"),
@@ -56,3 +60,5 @@ urlpatterns = [
     path("v1/auth/twitter/", TwitterLogin.as_view(), name="twitter-login"),
     path("v1/auth/providers/", SocialAuthProviders.as_view(), name="social-auth-providers"),
 ]
+
+

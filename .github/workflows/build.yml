@@ -56,16 +56,36 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-
-          
-      - name: Build and push the backend image
+      - name: Build and push base image (shared layers)
         run: |
           docker buildx build \
-            -f docker/Dockerfile.core \
-            -t fakay96/coupon-core:${{ env.VERSION_TAG }} \
+            -f docker/Dockerfile \
+            --build-arg SERVICE_TYPE=base \
+            -t fakay96/coupon-base:${{ env.VERSION_TAG }} \
             --platform linux/amd64 \
             --no-cache \
             --push .
+
+      - name: Build and push the backend image
+        run: |
+          docker buildx build \
+            -f docker/Dockerfile \
+            --build-arg SERVICE_TYPE=backend \
+            --cache-from type=registry,ref=fakay96/coupon-base:${{ env.VERSION_TAG }} \
+            -t fakay96/coupon-core:${{ env.VERSION_TAG }} \
+            --platform linux/amd64 \
+            --push .
+
+      - name: Build and push the celery image
+        run: |
+          docker buildx build \
+            -f docker/Dockerfile \
+            --build-arg SERVICE_TYPE=celery \
+            --cache-from type=registry,ref=fakay96/coupon-base:${{ env.VERSION_TAG }} \
+            -t fakay96/coupon-celery:${{ env.VERSION_TAG }} \
+            --platform linux/amd64 \
+            --push .
+                
       - name: Build and push the frontend image
         run: |
           docker buildx build \

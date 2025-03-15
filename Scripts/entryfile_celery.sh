@@ -1,48 +1,70 @@
 #!/bin/bash
 
-# Simplified Celery initialization script with RabbitMQ as the broker
-# All configurations are provided through environment variables.
+# Celery initialization script using Redis as the broker and PostgreSQL as the result backend.
+# Configurations are provided through environment variables.
 
-# Load environment variables (optional: if using a .env file)
+# Load environment variables (if using a .env file)
 if [ -f .env ]; then
     export $(grep -v '^#' .env | xargs)
 fi
 
 # Configuration from environment variables
-APP_NAME=${CELERY_APP_NAME:-"my_celery_app"}  # Default to "my_celery_app" if not set
-BROKER_URL=${CELERY_BROKER_URL:-"amqp://guest:guest@localhost:5672//"}  # Default RabbitMQ URL
-CONCURRENCY=${CELERY_CONCURRENCY:-2}  # Default to 2 workers if not set
-LOG_LEVEL=${CELERY_LOG_LEVEL:-"info"}  # Default log level is "info"
-LOG_DIR=${CELERY_LOG_DIR:-"./logs"}  # Directory for logs
-LOG_FILE="$LOG_DIR/celery.log"  # Log file path
+APP_NAME=${CELERY_APP_NAME:-"my_celery_app"}  
+REDIS_HOST=${REDIS_HOST:-"localhost"}  
+REDIS_PORT=${REDIS_PORT:-6379}  
+REDIS_PASSWORD=${REDIS_PASSWORD:-""} 
+CELERY_DB=${CELERY_DB:-"test_db"} 
+CONCURRENCY=${CELERY_CONCURRENCY:-2} 
+LOG_LEVEL=${CELERY_LOG_LEVEL:-"info"}  
+LOG_DIR=${CELERY_LOG_DIR:-"./logs"}  
+LOG_FILE="$LOG_DIR/celery.log"  
 
 # Ensure log directory exists
 mkdir -p "$LOG_DIR"
 
-# Check if RabbitMQ broker is running
-BROKER_HOST=$(echo "$BROKER_URL" | sed -n 's|.*://.*@\(.*\):.*|\1|p')  
-BROKER_PORT=$(echo "$BROKER_URL" | sed -n 's|.*://.*:\(.*\)/.*|\1|p') 
-
-echo "Checking RabbitMQ broker at $BROKER_HOST:$BROKER_PORT..."
-if ! nc -z "$BROKER_HOST" "$BROKER_PORT"; then
-    echo "Error: RabbitMQ broker is not running or unreachable at $BROKER_HOST:$BROKER_PORT."
-    echo "Please start RabbitMQ and try again."
-    exit 1
+# Dynamically build the Redis Broker URL
+if [[ -n "$REDIS_PASSWORD" ]]; then
+    BROKER_URL="redis://:$REDIS_PASSWORD@$REDIS_HOST:$REDIS_PORT/0"
+else
+    BROKER_URL="redis://$REDIS_HOST:$REDIS_PORT/0"
 fi
 
-echo "RabbitMQ broker is running. Starting Celery worker..."
+RESULT_BACKEND="django-db"
 
-# Start Celery worker
+# Check if Redis is running
+echo "🔍 Checking Redis broker at $REDIS_HOST:$REDIS_PORT..."
+if ! nc -z "$REDIS_HOST" "$REDIS_PORT"; then
+    echo "❌ Error: Redis broker is not running or unreachable at $REDIS_HOST:$REDIS_PORT."
+    echo "Please start Redis and try again."
+    exit 1
+fi
+echo "✅ Redis broker is running."
+
+# Ensure PostgreSQL Result Backend is available
+echo "🔍 Checking PostgreSQL result backend ($CELERY_DB)..."
+DB_HOST=$(echo "$CELERY_DB" | sed -n 's|.*://\([^:/]\+\).*|\1|p')
+DB_PORT=$(echo "$CELERY_DB" | sed -n 's|.*:\([0-9]\+\)/.*|\1|p')
+
+if ! nc -z "$DB_HOST" "$DB_PORT"; then
+    echo "❌ Error: PostgreSQL backend is not running or unreachable at $DB_HOST:$DB_PORT."
+    echo "Please start PostgreSQL and try again."
+    exit 1
+fi
+echo "✅ PostgreSQL backend is running."
+
+# Start Celery worker with Redis as the broker and PostgreSQL as result backend
+echo "🚀 Starting Celery worker..."
 celery -A $APP_NAME worker \
+    --broker="$BROKER_URL" \
     --loglevel=$LOG_LEVEL \
     --concurrency=$CONCURRENCY \
     --logfile=$LOG_FILE &
 
 # Check if Celery started successfully
 if [ $? -eq 0 ]; then
-    echo "Celery worker started successfully with $CONCURRENCY workers."
-    echo "Logs are being written to $LOG_FILE"
+    echo "✅ Celery worker started successfully with $CONCURRENCY workers."
+    echo "📄 Logs are being written to $LOG_FILE"
 else
-    echo "Failed to start Celery worker."
+    echo "❌ Failed to start Celery worker."
     exit 1
 fi

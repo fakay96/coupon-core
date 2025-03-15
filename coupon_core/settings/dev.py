@@ -123,7 +123,7 @@ CACHES = {
     },
     "results": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:6379/1",
+        "LOCATION": f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:6379/0",
     },
 }
 
@@ -139,16 +139,20 @@ CHANNEL_LAYERS = {
 # -----------------------------------------------
 # Celery Configuration (RabbitMQ)
 # -----------------------------------------------
-CELERY_BROKER_URL = (
-    f"amqp://{os.getenv('DEV_RABBITMQ_USER', 'guest')}:" 
-    f"{os.getenv('DEV_RABBITMQ_PASSWORD', 'guest')}@"
-    f"{os.getenv('DEV_RABBITMQ_HOST', 'localhost')}:5672/"
-)
+CELERY_BROKER_URL = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:6379/0"
+
+# PostgreSQL as Celery Result Backend
+CELERY_RESULT_BACKEND = os.getenv("CELERY_DB","test_db")
+
+# Additional Celery Settings
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_CACHE_BACKEND = "django-cache"
 
 # -----------------------------------------------
 # Email Backend (Console for Development)
 # -----------------------------------------------
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 
 # -----------------------------------------------
 # SimpleJWT Authentication Configuration
