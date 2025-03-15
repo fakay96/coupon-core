@@ -59,7 +59,7 @@ jobs:
       - name: Build and push base image (shared layers)
         run: |
           docker buildx build \
-            -f docker/Dockerfile \
+            -f docker/Dockerfile.core \
             --build-arg SERVICE_TYPE=base \
             -t fakay96/coupon-base:${{ env.VERSION_TAG }} \
             --platform linux/amd64 \
@@ -69,7 +69,7 @@ jobs:
       - name: Build and push the backend image
         run: |
           docker buildx build \
-            -f docker/Dockerfile \
+            -f docker/Dockerfile.core \
             --build-arg SERVICE_TYPE=backend \
             --cache-from type=registry,ref=fakay96/coupon-base:${{ env.VERSION_TAG }} \
             -t fakay96/coupon-core:${{ env.VERSION_TAG }} \
@@ -79,7 +79,7 @@ jobs:
       - name: Build and push the celery image
         run: |
           docker buildx build \
-            -f docker/Dockerfile \
+            -f docker/Dockerfile.core \
             --build-arg SERVICE_TYPE=celery \
             --cache-from type=registry,ref=fakay96/coupon-base:${{ env.VERSION_TAG }} \
             -t fakay96/coupon-celery:${{ env.VERSION_TAG }} \
