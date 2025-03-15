@@ -39,6 +39,8 @@ django-allauth = "^65.4.1"
 dj-rest-auth = "^7.0.1"
 requests-oauthlib = "^2.0.0"
 pillow = "^11.1.0"
+sentry-sdk = "^2.22.0"
+django-celery-results = "^2.5.1"
 
 [[tool.poetry.source]]
 name = "pytorch"

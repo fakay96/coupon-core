@@ -76,20 +76,14 @@ WORKDIR /app
 # Copy Application Files
 COPY --from=builder /app /app
 
-# Expose Port
+# Expose Port (Only needed for Backend)
 EXPOSE 8000
 
-# Copy and Set Permissions for Entry Script
-COPY Scripts/entryfile_backend.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+# Copy and Set Permissions for Entry Scripts
+COPY Scripts/entryfile_backend.sh /app/entryfile_backend.sh
+COPY Scripts/entryfile_celery.sh /app/entryfile_celery.sh
+COPY Scripts/start.sh /app/start.sh
+RUN chmod +x /app/entryfile_backend.sh /app/entryfile_celery.sh /app/start.sh
 
-# Debugging Steps
-RUN python -m pip list
-RUN poetry show
-RUN gdalinfo --version
-RUN ldconfig -p | grep gdal
-RUN pip install torch
-
-ENTRYPOINT ["/app/entrypoint.sh"]
-
-
+# Set the single ENTRYPOINT
+ENTRYPOINT ["/app/start.sh"]

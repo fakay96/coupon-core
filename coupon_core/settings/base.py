@@ -50,6 +50,9 @@ INSTALLED_APPS = [
     "allauth.socialaccount.providers.twitter",
     "dj_rest_auth",
     "dj_rest_auth.registration",
+    
+    #celery apps
+    "django_celery_results"
 ]
 
 MIDDLEWARE = [
@@ -201,3 +204,13 @@ STORAGES={
         'BACKEND': 'coupon_core.settings.custom_storages.StaticStorage',
         },
 }
+
+BASE_DOMAIN=os.getenv("BASE_DOMAIN")
+
+
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = os.getenv("DISHPAL_EMAIL")
+EMAIL_HOST_PASSWORD = os.getenv("DISHPAL_EMAIL_PASSWORD")
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER

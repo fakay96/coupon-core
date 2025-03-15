@@ -35,21 +35,44 @@ backend:
       requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
         - matchExpressions:
-          - key: workload
-            operator: In
-            values:
-            - backend
+            - key: workload
+              operator: In
+              values:
+                - backend
   env:
-    environment: production
+    environment: staging
     logLevel: debug
 
-resources:
-  requests:
-    cpu: "500m"
-    memory: "512Mi"
-  limits:
-    cpu: "1000m"
-    memory: "1Gi"
+celery:
+  replicaCount: 1
+  image:
+    repository: fakay96/coupon-celery
+    tag: ""
+    pullPolicy: Always
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  nodeSelector:
+    workload: celery
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+            - key: workload
+              operator: In
+              values:
+                - celery
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 3  
+    targetCPUUtilizationPercentage: 50
+    targetMemoryUtilizationPercentage: 85
 
 redis:
   enabled: true

@@ -41,11 +41,12 @@ schema_view = get_schema_view(
     permission_classes=(permissions.AllowAny,),
 )
 
+
+
 # Base URL patterns
 urlpatterns = [
     path("admin/", admin.site.urls),  # Admin panel
-   # path("healthz/", health_check, name="health-check"),  # Health check endpoint
-
+ 
 ]
 
 # Mapping of applications to their URL configurations

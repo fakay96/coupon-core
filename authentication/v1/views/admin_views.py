@@ -20,7 +20,7 @@ from authentication.v1.utils.token_manager import TokenManager
 # drf-yasg imports for OpenAPI documentation
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
-
+from authentication.models import CustomUser
 logger = logging.getLogger(__name__)
 
 
@@ -63,6 +63,14 @@ class LoginView(APIView):
             Response: A DRF Response with tokens or error messages.
         """
         try:
+            username=request.data["username"]
+            user=CustomUser(username=username)
+            if not user.activated_profile:
+               
+                return Response(
+                    {"error": "Your account is not verified. Please check your email for verification instructions."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
             serializer: LoginSerializer = LoginSerializer(data=request.data)
             serializer.is_valid(raise_exception=True)
 

@@ -15,7 +15,8 @@ from django.contrib.gis.db.models import PointField
 from django.core.validators import EmailValidator, MinLengthValidator, RegexValidator
 from django.db import models
 
-
+import uuid
+from django.utils import timezone
 class CustomUser(AbstractUser):
     """
     Custom user model with additional fields for extended functionality.
@@ -64,6 +65,13 @@ class CustomUser(AbstractUser):
         help_text="Specific permissions for this user.",
         verbose_name="user permissions",
     )
+    activated_profile = models.BooleanField(
+        null=True, 
+        blank=True, 
+        default=None, 
+        help_text="Indicates if the user has activated their profile."
+        )
+
 
     def __str__(self) -> str:
         """
@@ -158,3 +166,85 @@ class UserProfile(models.Model):
         verbose_name = "User Profile"
         verbose_name_plural = "User Profiles"
         ordering = ["-created_at"]
+
+
+
+class ProfileVerification(models.Model):
+    """
+    Model for verifying user profiles via a token-based mechanism.
+    
+    This model stores verification tokens with expiration times and ensures they can only be used once.
+    """
+    user = models.OneToOneField(
+        CustomUser,
+        on_delete=models.CASCADE,
+        related_name="verification",
+        help_text="The user associated with this verification record."
+    )
+    token = models.UUIDField(
+        default=uuid.uuid4,
+        unique=True,
+        help_text="Unique verification token for the user."
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        help_text="Timestamp when the verification token was created."
+    )
+    expires_at = models.DateTimeField(
+        help_text="Timestamp when the verification token expires."
+    )
+    used = models.BooleanField(
+        default=False,
+        help_text="Indicates whether the verification token has been used."
+    )
+
+    def save(self, *args, **kwargs) -> None:
+        """
+        Automatically set expiration time to 10 minutes after creation.
+        """
+        if not self.expires_at:
+            self.expires_at = self.created_at + timezone.timedelta(minutes=10)
+        super().save(*args, **kwargs)
+    
+    def is_expired(self) -> bool:
+        """
+        Check if the verification token has expired.
+        
+        Returns:
+            bool: True if the token has expired, False otherwise.
+        """
+        return timezone.now() > self.expires_at
+    
+    def mark_as_used(self) -> None:
+        """
+        Mark the verification token as used to prevent reuse.
+        """
+        if not self.used:
+            self.used = True
+            self.save()
+    
+    def resend_new_token(self) -> None:
+        """
+        Resend a new verification token if the current one is expired and not used.
+        Otherwise, retain the existing token.
+        """
+        if self.is_expired() and not self.used:
+            self.token = uuid.uuid4()
+            self.created_at = timezone.now()
+            self.expires_at = self.created_at + timezone.timedelta(minutes=10)
+            self.used = False
+            self.save()
+    
+    def __str__(self) -> str:
+        """
+        Return a string representation of the ProfileVerification instance.
+        
+        Returns:
+            str: A message indicating the verification status.
+        """
+        return f"Verification for {self.user.username} - {'Used' if self.used else 'Pending'}"
+
+
+
+
+
