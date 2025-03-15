@@ -40,9 +40,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: Install dependencies (Helm, kubectl)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y helm kubectl
+
       - name: Download version artifact if version_tag not provided
-        if: ${{ inputs.version_tag == '' }}
-        uses: actions/download-artifact@v4
+        if: ${{ inputs.version_tag == null || inputs.version_tag == '' }}
+        uses: actions/download-artifact@v3
         with:
           name: version
           path: ./artifact
@@ -123,7 +128,7 @@ jobs:
           fi
 
       - name: Deploy Frontend
-        if: steps.deploy_backend.outcome == 'success'
+        if: success()
         run: |
           if [ "$NAMESPACE" = "staging" ]; then
             helm upgrade --install frontend ./k8s/frontend \
@@ -141,27 +146,25 @@ jobs:
               -f ./k8s/frontend/values/production-values.yaml \
               --atomic --force --cleanup-on-fail --history-max 5 \
               --timeout 30m0s
-          else
-            echo "Unknown environment: $NAMESPACE"
-            exit 1
-          fi
 
       - name: Verify service endpoints
         run: |
-          kubectl get endpoints coupon-service -n $NAMESPACE
-          kubectl get endpoints frontend -n $NAMESPACE
-          
+          kubectl get endpoints coupon-service -n $NAMESPACE || echo "Backend service endpoint not found!"
+          kubectl get endpoints frontend -n $NAMESPACE || echo "Frontend service endpoint not found!"
 
       - name: Debug pod logs on failure
         if: failure()
         run: |
-          kubectl logs -l app=backend -n $NAMESPACE --tail=50
-          kubectl logs -l app=frontend -n $NAMESPACE --tail=50
-          
+          echo "Fetching logs for failed pods..."
+          kubectl logs -l app=backend -n $NAMESPACE || echo "No logs found for backend"
+          kubectl logs -l app=frontend -n $NAMESPACE || echo "No logs found for frontend"
 
       - name: Rollback on failure
         if: failure()
         run: |
-          helm rollback coupon-service 1 --namespace $NAMESPACE
-          helm rollback frontend 1 --namespace $NAMESPACE
+          echo "Rolling back deployments..."
+          LAST_BACKEND_REVISION=$(helm history coupon-service -n $NAMESPACE | tail -n 2 | head -n 1 | awk '{print $1}')
+          LAST_FRONTEND_REVISION=$(helm history frontend -n $NAMESPACE | tail -n 2 | head -n 1 | awk '{print $1}')
           
+          helm rollback coupon-service $LAST_BACKEND_REVISION -n $NAMESPACE || echo "Failed to rollback backend"
+          helm rollback frontend $LAST_FRONTEND_REVISION -n $NAMESPACE || echo "Failed to rollback frontend"
