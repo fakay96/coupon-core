@@ -123,3 +123,6 @@ spec:
             secretKeyRef:
               name: app-secrets
               key: CELERY_DB
+
+        - name: SERVICE_TYPE
+          value: "celery"
