@@ -97,7 +97,7 @@ jobs:
             --namespace $NAMESPACE --create-namespace \
             -f ./k8s/backend/values/$NAMESPACE-values.yaml \
             --atomic --force --cleanup-on-fail --history-max 5 \
-            --timeout 30m0s
+            --timeout 8m0s
 
       - name: Deploy Frontend
         run: |
@@ -107,7 +107,7 @@ jobs:
             --namespace $NAMESPACE --create-namespace \
             -f ./k8s/frontend/values/$NAMESPACE-values.yaml \
             --atomic --force --cleanup-on-fail --history-max 5 \
-            --timeout 30m0s
+            --timeout 5m0s
 
       - name: Verify service endpoints
         run: |
