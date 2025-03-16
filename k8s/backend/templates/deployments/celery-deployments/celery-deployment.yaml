@@ -126,3 +126,6 @@ spec:
 
         - name: SERVICE_TYPE
           value: "celery"
+
+        - name: CELERY_APP_NAME
+          value: "coupon_core"
