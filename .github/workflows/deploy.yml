@@ -82,42 +82,32 @@ jobs:
         id: deploy_services
         run: |
           if [ "$NAMESPACE" = "staging" ]; then
-            # Deploy Backend
+            # Deploy Backend and Celery
             helm upgrade --install coupon-service ./k8s/backend \
               --set backend.image.repository=fakay96/coupon-core \
               --set backend.image.tag=$VERSION_TAG \
+              --set celery.image.repository=fakay96/coupon-celery \
+              --set celery.image.tag=$VERSION_TAG \ 
               --namespace staging --create-namespace \
               -f ./k8s/backend/values/staging-values.yaml \
               --atomic --force --cleanup-on-fail --history-max 5 \
               --timeout 30m0s
 
-            # Deploy Celery
-            helm upgrade --install coupon-celery ./k8s/celery \
-              --set celery.image.repository=fakay96/coupon-celery \
-              --set celery.image.tag=${{ env.VERSION_TAG }} \ 
-              --namespace staging \
-              -f ./k8s/celery/values/staging-values.yaml \
-              --atomic --force --cleanup-on-fail
 
 
           elif [ "$NAMESPACE" = "production" ]; then
-            # Deploy Backend
+            # Deploy Backend and Celery
             helm upgrade --install coupon-service ./k8s/backend \
               --set backend.image.repository=fakay96/coupon-core \
               --set backend.image.tag=$VERSION_TAG \
+              --set celery.image.repository=fakay96/coupon-celery \
+              --set celery.image.tag=VERSION_TAG \ 
               --namespace production --create-namespace \
               -f ./k8s/backend/values/production-values.yaml \
               --atomic --force --cleanup-on-fail --history-max 5 \
               --timeout 30m0s
 
-            # Deploy Celery
-            helm upgrade --install coupon-celery ./k8s/celery \
-              --set celery.image.repository=fakay96/coupon-celery \
-              --set celery.image.tag=${{ env.VERSION_TAG }} \ 
-              --namespace production \
-              -f ./k8s/celery/values/production-values.yaml \
-              --atomic --force --cleanup-on-fail --history-max 5 \
-              --timeout 30m0s
+        
 
           else
             echo "Unknown environment: $NAMESPACE"
