@@ -75,11 +75,11 @@ const ReservationPage = () => {
                       )}
                     </div>
                   </div>
-                  <p className="font-monst ml-auto w-fit">
+                  <p className="font-monst font-bold ml-auto w-fit">
                     {formatCurrency(item.price)}
                   </p>
                 </div>
-                <Button className="bg-green-500 rounded-none">{item.cta}</Button>
+                <Button className="bg-green-500 rounded-none mt-4 w-full">{item.cta}</Button>
               </div>
             ))}
           </div>
@@ -237,7 +237,7 @@ const CardComponent = ({
             <p className="font-bold font-monst">{totalPrice}€</p>
           </div>
         </div>
-        <div className="mt-8">
+        <div className="mt-8 ">
           <Button className="bg-buttonGreen w-full rounded-none h-12 ">
             Buy Now
           </Button>

@@ -1,6 +1,6 @@
 import SearchInputNavbar from "@/components/globals/searchInputNavbar";
 import { Button } from "@/components/ui/button";
-import { imgs, options } from "@/constants";
+import { categoryImages } from "@/constants";
 import { useState } from "react";
 import { BsFillSendFill } from "react-icons/bs";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -11,6 +11,8 @@ import "swiper/css/pagination";
 
 import { Autoplay, Mousewheel, Keyboard } from "swiper/modules";
 import { Link, useNavigate } from "react-router-dom";
+import { categoriesApiQuery } from "@/queries/geo-discount-queries";
+import { categoriesT } from "@/types";
 const CategorySearchPage = () => {
   const navigate = useNavigate();
   return (
@@ -27,7 +29,7 @@ const CategorySearchPage = () => {
                   </h1>
                 </div>
                 <div className="hidden lg:grid grid-cols-2 gap-4 sxx:grid-cols-4 sm:grid-cols-5 md:ml-auto">
-                  {imgs.map((item, index) => (
+                  {categoryImages.map((item, index) => (
                     <div
                       onClick={() => {
                         navigate(`/dashboard/category?category=${item.href}`);
@@ -43,7 +45,7 @@ const CategorySearchPage = () => {
                   ))}
                 </div>
                 <div className="lg:hidden w-full">
-                  <CategorySwiper imgs={imgs} />
+                  <CategorySwiper imgs={categoryImages} />
                 </div>
               </div>
               <SearchInputAndCategory />
@@ -59,6 +61,8 @@ export default CategorySearchPage;
 
 export const SearchInputAndCategory = () => {
   const navigate = useNavigate();
+  const { data: categories } = categoriesApiQuery();
+
   const [value, setValue] = useState("");
 
   return (
@@ -91,33 +95,32 @@ export const SearchInputAndCategory = () => {
         </Button>
       </div>
       <div className="flex flex-wrap gap-1.5 sm:gap-6 mx-auto max-w-screen-lg items-center justify-center sm:hidden">
-        {options.slice(0, 4).map(({ img, text }, index) => (
+        {categories?.slice(0, 4).map(({ id, image, name }: categoriesT) => (
           <Link
-            to={`/dashboard/category?category=${text}`}
-            key={index}
+            to={`/dashboard/category?category=${name}`}
+            key={id}
             className="border-[1px] flex gap-1 py-1 px-2 rounded-full border-gray-400 items-center"
           >
-            <img src={img} alt="items" className="size-3" />
-            <span className="text-[10px]">{text}</span>
+            <img src={image} alt="items" className="size-3" />
+            <span className="text-[10px]">{name}</span>
           </Link>
         ))}
       </div>
       <div className="hidden sm:flex flex-wrap gap-4 sm:gap-6 mx-auto max-w-screen-lg items-center justify-center">
-        {options.map(({ img, text }, index) => (
+        {categories?.map(({ id, image, name }: categoriesT) => (
           <Link
-            to={`/dashboard/category?category=${text}`}
-            key={index}
+            to={`/dashboard/category?category=${name}`}
+            key={id}
             className="border-[1px] border-gray-400 flex gap-4 py-2 px-4 sm:px-8 rounded-full"
           >
-            <img src={img} alt="" />
-            {text}
+            <img src={image} alt="" />
+            {name}
           </Link>
         ))}
       </div>
     </div>
   );
 };
-
 
 const CategorySwiper = ({
   imgs,
@@ -149,10 +152,7 @@ const CategorySwiper = ({
           modules={[Autoplay, Mousewheel, Keyboard]}
         >
           {imgs?.map(({ img, href }, index) => (
-            <SwiperSlide
-              key={index}
-              className="!h-[20svh]  !w-auto"
-            >
+            <SwiperSlide key={index} className="!h-[20svh]  !w-auto">
               <div
                 className="h-full w-auto hover:cursor-pointer"
                 onClick={() => {
@@ -168,4 +168,3 @@ const CategorySwiper = ({
     </div>
   );
 };
-

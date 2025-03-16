@@ -61,7 +61,7 @@ const SignInPage = () => {
         {
           loading: `${name}, Dishpal AI is logging you into your account now.`,
           success: `${name}, Here is your dashboard! Explore!`,
-          error: `${name}, Your email is not yet registered! Please visit the sign-up page and click the google button there.`,
+          error: (error) => error.message,
         }
       );
     },
@@ -82,9 +82,7 @@ const SignInPage = () => {
         success: `${
           firstname || userInfo?.username
         }, Here is your dashboard! Explore!`,
-        error: `${
-          firstname || userInfo?.username
-        }, Check your email and password and try again!`,
+        error: (error) => error.message,
       }
     );
   };

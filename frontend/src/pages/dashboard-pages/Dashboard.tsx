@@ -1,9 +1,12 @@
 import SearchInputNavbar from "@/components/globals/searchInputNavbar";
 import { Button } from "@/components/ui/button";
-import { imgGrid, options } from "@/constants";
+import { imgGrid } from "@/constants";
+import { categoriesApiQuery } from "@/queries/geo-discount-queries";
+import { categoriesT } from "@/types";
 import { useState } from "react";
 import { BsFillSendFill } from "react-icons/bs";
 import { Link, useNavigate } from "react-router-dom";
+
 const DashboardPage = () => {
   return (
     <div className="">
@@ -56,6 +59,8 @@ export default DashboardPage;
 
 export const SearchInputAndCategory = () => {
   const navigate = useNavigate();
+  const { data: categories } = categoriesApiQuery();
+
   const [value, setValue] = useState("");
 
   return (
@@ -88,26 +93,26 @@ export const SearchInputAndCategory = () => {
         </Button>
       </div>
       <div className="flex flex-wrap gap-1.5 sm:gap-6 mx-auto max-w-screen-lg items-center justify-center sm:hidden">
-        {options.slice(0, 4).map(({ img, text }, index) => (
+        {categories?.slice(0, 4).map(({ id, image, name }: categoriesT) => (
           <Link
-            to={`/dashboard/category?category=${text}`}
-            key={index}
+            to={`/dashboard/category?category=${name}`}
+            key={id}
             className="border-[1px] flex gap-1 py-1 px-2 rounded-full border-gray-400 items-center"
           >
-            <img src={img} alt="items" className="size-3" />
-            <span className="text-[10px]">{text}</span>
+            <img src={image} alt="items" className="size-3" />
+            <span className="text-[10px]">{name}</span>
           </Link>
         ))}
       </div>
       <div className="hidden sm:flex flex-wrap gap-4 sm:gap-6 mx-auto max-w-screen-lg items-center justify-center">
-        {options.map(({ img, text }, index) => (
+        {categories?.slice(0, 4).map(({ id, image, name }: categoriesT) => (
           <Link
-            to={`/dashboard/category?category=${text}`}
-            key={index}
+            to={`/dashboard/category?category=${name}`}
+            key={id}
             className="border-[1px] border-gray-400 flex gap-4 py-2 px-4 sm:px-8 rounded-full"
           >
-            <img src={img} alt="" />
-            {text}
+            <img src={image} alt="" />
+            {name}
           </Link>
         ))}
       </div>

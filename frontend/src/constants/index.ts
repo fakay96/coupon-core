@@ -63,41 +63,36 @@ export const authContextDefault = {
 };
 
 export const cardNavLinks = [
-  {
-    title: "Discount",
-    href: "/dashboard/discount",
-    img: "/images/discount.svg",
-  },
-  {
-    title: "Price",
-    href: "/dashboard/price",
-    img: "/images/share.svg",
-  },
-  {
-    title: "Cart",
-    href: "/dashboard/category",
-    img: "/images/shopping-cart.svg",
-  },
-  {
-    title: "Reservation",
-    href: "/dashboard/reservation",
-    img: "/images/discount.svg",
-  },
-  {
-    title: "People",
-    href: "/dashboard/together",
-    img: "/images/people.svg",
-  },
-  {
-    title: "Plans",
-    href: "/dashboard/plans",
-    img: "/images/plans.svg",
-  },
-  {
-    title: "History",
-    href: "/dashboard/history",
-    img: "/images/history.svg",
-  },
+  // {
+  //   title: "Discount",
+  //   href: "/dashboard/discount",
+  //   img: "/images/discount.svg",
+  // },
+  // {
+  //   title: "Price",
+  //   href: "/dashboard/price",
+  //   img: "/images/share.svg",
+  // },
+  // {
+  //   title: "Cart",
+  //   href: "/dashboard/category",
+  //   img: "/images/shopping-cart.svg",
+  // },
+  // {
+  //   title: "Reservation",
+  //   href: "/dashboard/reservation",
+  //   img: "/images/discount.svg",
+  // },
+  // {
+  //   title: "People",
+  //   href: "/dashboard/together",
+  //   img: "/images/people.svg",
+  // },
+  // {
+  //   title: "Plans",
+  //   href: "/dashboard/plans",
+  //   img: "/images/plans.svg",
+  // },
   {
     title: "Account",
     href: "/dashboard/settings",
@@ -283,10 +278,9 @@ export const discountProducts = [
     title: "Bread",
     img: "/images/bread.svg",
   },
-  
 ];
 
-export const imgs = [
+export const categoryImages = [
   { img: "/images/groceries.png", href: "Grocery" },
   { img: "/images/aeroplane.png", href: "Flights" },
   { img: "/images/fashionGirl.png", href: "Fashion" },
