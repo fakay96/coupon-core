@@ -85,8 +85,8 @@ celery:
   autoscaling:
     enabled: true
     minReplicas: 1
-    maxReplicas: 3  
-    targetCPUUtilizationPercentage: 50
+    maxReplicas: 2
+    targetCPUUtilizationPercentage: 70
     targetMemoryUtilizationPercentage: 85
 
 frontend:
@@ -127,7 +127,7 @@ redis:
     size: "512Mi"
 
 autoscaling:
-  enabled: false
+  enabled: true
   minReplicas: 1
   maxReplicas: 2
   targetCPUUtilizationPercentage: 40
