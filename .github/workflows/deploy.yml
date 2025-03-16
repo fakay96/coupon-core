@@ -72,62 +72,42 @@ jobs:
       - name: Verify kubeconfig access
         run: kubectl get nodes
 
+      - name: Validate Namespace
+        run: |
+          if [ -z "$NAMESPACE" ]; then
+            echo "Error: NAMESPACE is not set"
+            exit 1
+          fi
+          if [[ "$NAMESPACE" != "staging" && "$NAMESPACE" != "production" ]]; then
+            echo "Error: Invalid NAMESPACE value: $NAMESPACE"
+            exit 1
+          fi
+
       - name: Ensure namespace exists
         run: |
           kubectl get namespace $NAMESPACE || kubectl create namespace $NAMESPACE
 
       - name: Deploy Backend & Celery
-        id: deploy_services
         run: |
-          if [ "$NAMESPACE" = "staging" ]; then
-            # Deploy Backend and Celery
-            helm upgrade --install coupon-service ./k8s/backend \
-              --set backend.image.repository=fakay96/coupon-core \
-              --set backend.image.tag=$VERSION_TAG \
-              --set celery.image.repository=fakay96/coupon-celery \
-              --set celery.image.tag=$VERSION_TAG \
-              --namespace staging --create-namespace \
-              -f ./k8s/backend/values/staging-values.yaml \
-              --atomic --force --cleanup-on-fail --history-max 5 \
-              --timeout 30m0s
-
-          elif [ "$NAMESPACE" = "production" ]; then
-            # Deploy Backend and Celery
-            helm upgrade --install coupon-service ./k8s/backend \
-              --set backend.image.repository=fakay96/coupon-core \
-              --set backend.image.tag=$VERSION_TAG \
-              --set celery.image.repository=fakay96/coupon-celery \
-              --set celery.image.tag=$VERSION_TAG \
-              --namespace production --create-namespace \
-              -f ./k8s/backend/values/production-values.yaml \
-              --atomic --force --cleanup-on-fail --history-max 5 \
-              --timeout 30m0s
-
-          else
-            echo "Unknown environment: $NAMESPACE"
-            exit 1
-          fi
+          helm upgrade --install coupon-service ./k8s/backend \
+            --set backend.image.repository=fakay96/coupon-core \
+            --set backend.image.tag=$VERSION_TAG \
+            --set celery.image.repository=fakay96/coupon-celery \
+            --set celery.image.tag=$VERSION_TAG \
+            --namespace $NAMESPACE --create-namespace \
+            -f ./k8s/backend/values/$NAMESPACE-values.yaml \
+            --atomic --force --cleanup-on-fail --history-max 5 \
+            --timeout 30m0s
 
       - name: Deploy Frontend
-        if: success()
         run: |
-          if [ "$NAMESPACE" = "staging" ]; then
-            helm upgrade --install frontend ./k8s/frontend \
-              --set frontend.image.repository=fakay96/coupon-frontend \
-              --set frontend.image.tag=$VERSION_TAG \
-              --namespace staging --create-namespace \
-              -f ./k8s/frontend/values/staging-values.yaml \
-              --atomic --force --cleanup-on-fail --history-max 5 \
-              --timeout 30m0s
-          elif [ "$NAMESPACE" = "production" ]; then
-            helm upgrade --install frontend ./k8s/frontend \
-              --set frontend.image.repository=fakay96/coupon-frontend \
-              --set frontend.image.tag=$VERSION_TAG \
-              --namespace production --create-namespace \
-              -f ./k8s/frontend/values/production-values.yaml \
-              --atomic --force --cleanup-on-fail --history-max 5 \
-              --timeout 30m0s
-          fi
+          helm upgrade --install frontend ./k8s/frontend \
+            --set frontend.image.repository=fakay96/coupon-frontend \
+            --set frontend.image.tag=$VERSION_TAG \
+            --namespace $NAMESPACE --create-namespace \
+            -f ./k8s/frontend/values/$NAMESPACE-values.yaml \
+            --atomic --force --cleanup-on-fail --history-max 5 \
+            --timeout 30m0s
 
       - name: Verify service endpoints
         run: |
