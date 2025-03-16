@@ -11,91 +11,125 @@ ingress:
     - hosts:
         - api.dishpal.ai
       secretName: api-dishpal-ai-tls
-
 backend:
   replicaCount: 1
+
   image:
     repository: fakay96/backend  
     tag: ""
     pullPolicy: Always
+
   service:
     type: ClusterIP
     port: 8000
+
   resources:
     requests:
       memory: "512Mi"
-      cpu: "200m"
+      cpu: "500m"  # Increased from 100m → 500m
     limits:
-      memory: "1Gi"
-      cpu: "1000m"
+      memory: "768Mi"  # Increased from 512Mi → 768Mi
+      cpu: "1200m"  # Increased from 800m → 1200m
+
   nodeSelector:
     workload: backend
+
   affinity:
     nodeAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
         - matchExpressions:
-            - key: workload
-              operator: In
-              values:
-                - backend
+          - key: workload
+            operator: In
+            values:
+            - backend
+
   env:
-    environment: staging
+    environment: production
     logLevel: debug
 
 celery:
   replicaCount: 1
+
   image:
     repository: fakay96/coupon-celery
     tag: ""
     pullPolicy: Always
+
+  service:
+    type: ClusterIP
+    port: 8000
+
   resources:
     requests:
       memory: "256Mi"
-      cpu: "100m"
+      cpu: "50m"
     limits:
-      memory: "512Mi"
-      cpu: "500m"
+      memory: "768Mi"  # Increased from 512Mi → 768Mi
+      cpu: "250m"
+
   nodeSelector:
     workload: celery
+
   affinity:
     nodeAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
         - matchExpressions:
-            - key: workload
-              operator: In
-              values:
-                - celery
+          - key: workload
+            operator: In
+            values:
+            - celery
+
   autoscaling:
     enabled: true
     minReplicas: 1
-    maxReplicas: 3  
-    targetCPUUtilizationPercentage: 50
+    maxReplicas: 2
+    targetCPUUtilizationPercentage: 70
     targetMemoryUtilizationPercentage: 85
+
+frontend:
+  replicaCount: 1
+
+  image:
+    repository: fakay96/coupon-frontend
+    tag: ""
+    pullPolicy: Always
+
+  service:
+    type: ClusterIP
+    port: 3000
+
+  resources:
+    requests:
+      memory: "64Mi"  # Reduced from 192Mi → 64Mi
+      cpu: "50m"  # Reduced from 150m → 50m
+    limits:
+      memory: "384Mi"
+      cpu: "300m"
 
 redis:
   enabled: true
   replicaCount: 1
   imageTag: "7.0"
+
   resources:
     requests:
-      cpu: "100m"
-      memory: "128Mi"
+      cpu: "50m"
+      memory: "64Mi"
     limits:
-      cpu: "500m"
-      memory: "512Mi"
+      cpu: "250m"
+      memory: "256Mi"
+
   persistence:
     enabled: true
-    size: "1Gi"
+    size: "512Mi"
 
 autoscaling:
-  enabled: false
+  enabled: true
   minReplicas: 1
-  maxReplicas: 3
+  maxReplicas: 2
   targetCPUUtilizationPercentage: 40
   targetMemoryUtilizationPercentage: 80
 
 tolerations: []
-
-affinity: {}
