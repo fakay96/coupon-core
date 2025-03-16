@@ -41,6 +41,7 @@ jobs:
         uses: actions/checkout@v3
 
 
+
       - name: Download version artifact if version_tag not provided
         if: ${{ inputs.version_tag == null || inputs.version_tag == '' }}
         uses: actions/download-artifact@v4
@@ -93,11 +94,11 @@ jobs:
             # Deploy Celery
             helm upgrade --install coupon-celery ./k8s/celery \
               --set celery.image.repository=fakay96/coupon-celery \
-              --set celery.image.tag=$VERSION_TAG \
+              --set celery.image.tag=${{ env.VERSION_TAG }} \ 
               --namespace staging \
               -f ./k8s/celery/values/staging-values.yaml \
-              --atomic --force --cleanup-on-fail --history-max 5 \
-              --timeout 30m0s
+              --atomic --force --cleanup-on-fail
+
 
           elif [ "$NAMESPACE" = "production" ]; then
             # Deploy Backend
@@ -112,7 +113,7 @@ jobs:
             # Deploy Celery
             helm upgrade --install coupon-celery ./k8s/celery \
               --set celery.image.repository=fakay96/coupon-celery \
-              --set celery.image.tag=$VERSION_TAG \
+              --set celery.image.tag=${{ env.VERSION_TAG }} \ 
               --namespace production \
               -f ./k8s/celery/values/production-values.yaml \
               --atomic --force --cleanup-on-fail --history-max 5 \
