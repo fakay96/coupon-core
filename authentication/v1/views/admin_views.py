@@ -23,69 +23,39 @@ from drf_yasg import openapi
 from authentication.models import CustomUser
 logger = logging.getLogger(__name__)
 
+def post(self, request: Any) -> Response:
+    """
+    Handle POST requests for admin login.
 
-class LoginView(APIView):
-    """Handles admin login and token generation."""
+    Args:
+        request (Any): The HTTP request containing login data.
 
-    permission_classes: list[Any] = [AllowAny]
-
-    # Define the response schema for token generation.
-    token_response_schema = openapi.Schema(
-        type=openapi.TYPE_OBJECT,
-        properties={
-            "access_token": openapi.Schema(
-                type=openapi.TYPE_STRING, description="JWT access token"
-            ),
-            "refresh_token": openapi.Schema(
-                type=openapi.TYPE_STRING, description="JWT refresh token"
-            ),
-        }
-    )
-
-    @swagger_auto_schema(
-        operation_description="Handle POST requests for admin login.",
-        request_body=LoginSerializer,
-        responses={
-            200: openapi.Response(
-                "Successfully generated tokens.", schema=token_response_schema
-            ),
-            500: "An unexpected error occurred. Please try again later.",
-        },
-    )
-    def post(self, request: Any) -> Response:
-        """
-        Handle POST requests for admin login.
-
-        Args:
-            request (Any): The HTTP request containing login data.
-
-        Returns:
-            Response: A DRF Response with tokens or error messages.
-        """
-        try:
-            username=request.data["username"]
-            user=CustomUser(username=username)
-            if not user.activated_profile:
-               
-                return Response(
-                    {"error": "Your account is not verified. Please check your email for verification instructions."},
-                    status=status.HTTP_403_FORBIDDEN
-                )
-            serializer: LoginSerializer = LoginSerializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-
-            # Retrieve the validated user from the serializer.
-            user = serializer.validated_data["user"]
-            tokens: Dict[str, str] = TokenManager.create_admin_tokens(user)
-
-            return Response(tokens, status=status.HTTP_200_OK)
-
-        except Exception as e:
-            logger.error(f"Unexpected error during login: {str(e)}")
+    Returns:
+        Response: A DRF Response with tokens or error messages.
+    """
+    try:
+        serializer: LoginSerializer = LoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        # Retrieve the validated user from the serializer.
+        user = serializer.validated_data["user"]
+        
+        # Check the actual user's activated_profile status.
+        if not user.activated_profile:
             return Response(
-                {"error": "An unexpected error occurred. Please try again later."},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                {"error": "Your account is not verified. Please check your email for verification instructions."},
+                status=status.HTTP_403_FORBIDDEN
             )
+        
+        tokens: Dict[str, str] = TokenManager.create_admin_tokens(user)
+        return Response(tokens, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        logger.error(f"Unexpected error during login: {str(e)}")
+        return Response(
+            {"error": "An unexpected error occurred. Please try again later."},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
 
 class RegisterView(APIView):
