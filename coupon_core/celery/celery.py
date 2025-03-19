@@ -10,10 +10,14 @@ from __future__ import absolute_import, unicode_literals
 import os
 
 from celery import Celery
-
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "coupon_core.settings")
 
 app = Celery("coupon_core")
-app.config_from_object("django.conf:settings", namespace="CELERY")
-app.autodiscover_tasks()
+app.config_from_object("coupon_core.settings", namespace="CELERY")
+app.autodiscover_tasks(
+    packages=[
+        "authentication.v1.tasks"
+    ]
+)
 app.conf.broker_connection_retry_on_startup = True
+

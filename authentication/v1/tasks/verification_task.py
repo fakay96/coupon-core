@@ -1,12 +1,15 @@
-from coupon_core.celery import app
+from coupon_core.celery import celery_app  as app
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
-from django.conf import settings
+from coupon_core.settings import (
+    BASE_DOMAIN,
+    DEFAULT_FROM_EMAIL
+)
 import logging
 
 logger = logging.getLogger(__name__)
 
-@app.task(bind=True, max_retries=3, default_retry_delay=60)
+@app.task
 def send_verification_email_task(user_email: str, token: str, logo_url: str = None) -> None:
     """
     Celery task to send a verification email asynchronously using an HTML-styled template.
@@ -21,7 +24,7 @@ def send_verification_email_task(user_email: str, token: str, logo_url: str = No
     """
     try:
         subject: str = "Verify Your Account"
-        verification_link: str = f"{settings.BASE_DOMAIN}authentication/v1/activate/?token={token}&email={user_email}"
+        verification_link: str = f"{BASE_DOMAIN}authentication/v1/activate/?token={token}&email={user_email}"
 
         # Context for template rendering
         context = {
@@ -29,12 +32,13 @@ def send_verification_email_task(user_email: str, token: str, logo_url: str = No
             "verification_link": verification_link,
             "logo_url": logo_url or f"/static/logo.png",
         }
+  
 
         # Render both HTML and plain-text versions of the email
         html_message: str = render_to_string("emails/verification_email.html", context)
         plain_message: str = render_to_string("emails/verification_email.txt", context)
 
-        from_email: str = settings.DEFAULT_FROM_EMAIL
+        from_email: str = DEFAULT_FROM_EMAIL
 
         # Create email with both HTML and plain-text content
         email = EmailMultiAlternatives(subject, plain_message, from_email, [user_email])

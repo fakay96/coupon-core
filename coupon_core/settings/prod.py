@@ -143,11 +143,9 @@ CHANNEL_LAYERS = {
 # -----------------------------------------------
 # Celery Configuration (RabbitMQ)
 # -----------------------------------------------
-CELERY_BROKER_URL = (
-    f"amqp://{os.getenv('DEV_RABBITMQ_USER', 'guest')}:" 
-    f"{os.getenv('DEV_RABBITMQ_PASSWORD', 'guest')}@"
-    f"{os.getenv('DEV_RABBITMQ_HOST', 'localhost')}:5672/"
-)
+CELERY_BROKER_URL = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:6379/0"
+CELERY_RESULT_BACKEND = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:6379/0"
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
 # -----------------------------------------------
 # Email Backend (Console for Staging)
