@@ -17,6 +17,11 @@ from django.db import models
 
 import uuid
 from django.utils import timezone
+import logging
+from datetime import datetime
+
+logger = logging.getLogger(__name__)
+
 class CustomUser(AbstractUser):
     """
     Custom user model with additional fields for extended functionality.
@@ -172,79 +177,111 @@ class UserProfile(models.Model):
 class ProfileVerification(models.Model):
     """
     Model for verifying user profiles via a token-based mechanism.
-    
+
     This model stores verification tokens with expiration times and ensures they can only be used once.
+
+    Attributes:
+        user (CustomUser): The user associated with this verification record.
+        token (UUID): Unique verification token for the user.
+        created_at (datetime): Timestamp when the verification token was created.
+        expires_at (datetime): Timestamp when the verification token expires.
+        used (bool): Indicates whether the verification token has been used.
     """
-    user = models.OneToOneField(
+
+    user: CustomUser = models.OneToOneField(
         CustomUser,
         on_delete=models.CASCADE,
         related_name="verification",
         help_text="The user associated with this verification record."
     )
-    token = models.UUIDField(
+    token: uuid.UUID = models.UUIDField(
         default=uuid.uuid4,
         unique=True,
         help_text="Unique verification token for the user."
     )
-    created_at = models.DateTimeField(
+    created_at: datetime = models.DateTimeField(
         auto_now_add=True,
         help_text="Timestamp when the verification token was created."
     )
-    expires_at = models.DateTimeField(
+    expires_at: datetime = models.DateTimeField(
         help_text="Timestamp when the verification token expires."
     )
-    used = models.BooleanField(
+    used: bool = models.BooleanField(
         default=False,
         help_text="Indicates whether the verification token has been used."
     )
 
     def save(self, *args, **kwargs) -> None:
         """
-        Automatically set expiration time to 10 minutes after creation.
+        Ensure `expires_at` is always set correctly when saving.
+
+        If `expires_at` is not already set, it will be assigned a value of 10 minutes from the current time.
         """
         if not self.expires_at:
-            self.expires_at = self.created_at + timezone.timedelta(minutes=10)
+            self.expires_at = timezone.now() + timezone.timedelta(minutes=10)
         super().save(*args, **kwargs)
-    
+
     def is_expired(self) -> bool:
         """
-        Check if the verification token has expired.
-        
+        Check whether the verification token has expired.
+
         Returns:
             bool: True if the token has expired, False otherwise.
         """
-        return timezone.now() > self.expires_at
-    
+        return timezone.now() > self.expires_at if self.expires_at else True
+
     def mark_as_used(self) -> None:
         """
         Mark the verification token as used to prevent reuse.
+
+        If the token is not already marked as used, it updates the `used` field and saves the instance.
         """
         if not self.used:
             self.used = True
-            self.save()
-    
-    def resend_new_token(self) -> None:
+            self.save(update_fields=["used"])
+
+    def resend_new_token(self, force_resend: bool = False) -> None:
         """
-        Resend a new verification token if the current one is expired and not used.
-        Otherwise, retain the existing token.
+        Resend a new verification token.
+
+        If `force_resend` is True, a new token is generated regardless of expiration status.
+        Otherwise, a new token is only generated if the current token is expired and unused.
+
+        Args:
+            force_resend (bool, optional): Whether to forcefully resend a new token. Defaults to False.
+
+        Logs:
+            - If the token is resent, logs success.
+            - If force resend is blocked due to an already used token, logs a warning.
+            - If no action is needed, logs that the token is still valid.
+
         """
-        if self.is_expired() and not self.used:
-            self.token = uuid.uuid4()
-            self.created_at = timezone.now()
-            self.expires_at = self.created_at + timezone.timedelta(minutes=10)
-            self.used = False
-            self.save()
-    
+        if force_resend or (self.is_expired() and not self.used):
+            new_token: uuid.UUID = uuid.uuid4()
+
+            # Avoid unnecessary updates if the token is already new
+            if self.token != new_token:
+                self.token = new_token
+                self.created_at = timezone.now()
+                self.expires_at = self.created_at + timezone.timedelta(minutes=10)
+                self.used = False
+                self.save(update_fields=["token", "created_at", "expires_at", "used"])
+            else:
+                logger.info(f"Token for user {self.user.email} was already updated recently.")
+        
+        else:
+            if self.used:
+                logger.warning(f"Token for user {self.user.email} has already been used. Resend blocked.")
+            else:
+                logger.info(f"Token for user {self.user.email} is still valid. No need to resend.")     
     def __str__(self) -> str:
         """
-        Return a string representation of the ProfileVerification instance.
-        
+        Return a string representation of the `ProfileVerification` instance.
+
         Returns:
             str: A message indicating the verification status.
         """
-        return f"Verification for {self.user.username} - {'Used' if self.used else 'Pending'}"
-
-
-
+        status: str = "Used" if self.used else "Pending"
+        return f"Verification for {self.user.username} - {status}"
 
 

@@ -27,13 +27,8 @@ class LoginSerializer(serializers.Serializer):
 
     Validates username and password, ensuring the user is not a guest.
     """
-
-    username: serializers.CharField = serializers.CharField(
-        max_length=150, required=True
-    )
-    password: serializers.CharField = serializers.CharField(
-        write_only=True, required=True
-    )
+    username = serializers.CharField(max_length=150, required=True)
+    password = serializers.CharField(write_only=True, required=True)
 
     def validate(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -56,10 +51,8 @@ class LoginSerializer(serializers.Serializer):
         if user is None:
             raise serializers.ValidationError(_("Invalid username or password."))
 
-        if user.is_guest:
-            raise serializers.ValidationError(
-                _("Guest accounts are not allowed to log in.")
-            )
+        if getattr(user, "is_guest", False):
+            raise serializers.ValidationError(_("Guest accounts are not allowed to log in."))
 
         data["user"] = user
         return data
@@ -71,11 +64,10 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     Handles validation of email and username, and creation of new users.
     """
-
     class Meta:
-        model: type = CustomUser
-        fields: list[str] = ["username", "password", "email"]
-        extra_kwargs: Dict[str, Dict[str, Any]] = {"password": {"write_only": True}}
+        model = CustomUser
+        fields = ["username", "password", "email"]
+        extra_kwargs = {"password": {"write_only": True}}
 
     def validate_email(self, value: str) -> str:
         """
@@ -131,8 +123,7 @@ class GuestTokenSerializer(serializers.Serializer):
 
     Ensures the email is valid and retrieves or creates a guest user.
     """
-
-    email: serializers.EmailField = serializers.EmailField(required=True)
+    email = serializers.EmailField(required=True)
 
     def validate_email(self, value: str) -> str:
         """
@@ -145,7 +136,7 @@ class GuestTokenSerializer(serializers.Serializer):
             str: Validated email after ensuring a guest user exists.
 
         Side Effects:
-            - Creates a guest user if one doesn't exist.
+            Creates a guest user if one doesn't exist.
         """
         user, created = CustomUser.objects.get_or_create(
             email=value,
@@ -175,9 +166,7 @@ class GuestTokenSerializer(serializers.Serializer):
         try:
             return CustomUser.objects.get(email=email)
         except CustomUser.DoesNotExist:
-            raise serializers.ValidationError(
-                _("No user found with the provided email.")
-            )
+            raise serializers.ValidationError(_("No user found with the provided email."))
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -186,11 +175,11 @@ class UserSerializer(serializers.ModelSerializer):
 
     Provides basic user details such as username and email.
     """
-
     class Meta:
-        model: type = CustomUser
+        model = CustomUser
         fields = ["id", "username", "email", "first_name", "last_name", "phone_number"]
-        read_only_fields: list[str] = ["id"]
+        read_only_fields = ["id"]
+
 
 class UserProfileSerializer(serializers.ModelSerializer):
     """
@@ -210,7 +199,6 @@ class UserProfileSerializer(serializers.ModelSerializer):
         - created_at (datetime, read-only): Timestamp when the profile was created.
         - updated_at (datetime, read-only): Timestamp when the profile was last updated.
     """
-
     user = UserSerializer(read_only=True)
     phone_number = serializers.CharField(
         source="user.phone_number",
@@ -231,7 +219,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
-    def update(self, instance, validated_data):
+    def update(self, instance: UserProfile, validated_data: Dict[str, Any]) -> UserProfile:
         """
         Update the UserProfile and the associated User model.
 
@@ -246,24 +234,23 @@ class UserProfileSerializer(serializers.ModelSerializer):
         Returns:
             UserProfile: The updated user profile instance.
         """
-        # Extract user data from validated data
+        # Extract user data from validated data; if not provided, an empty dict is used.
         user_data = validated_data.pop("user", {})
 
-        # Update user fields if provided
         user = instance.user
+        # Update user fields if provided.
         phone_number = user_data.get("phone_number")
         first_name = user_data.get("first_name")
         last_name = user_data.get("last_name")
 
-        if phone_number:
+        if phone_number is not None:
             user.phone_number = phone_number
-        if first_name:
+        if first_name is not None:
             user.first_name = first_name
-        if last_name:
+        if last_name is not None:
             user.last_name = last_name
 
-        # Save updated user details
         user.save()
 
-        # Update UserProfile fields
+        # Update the rest of the profile fields.
         return super().update(instance, validated_data)
