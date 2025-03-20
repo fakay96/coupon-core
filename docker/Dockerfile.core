@@ -35,6 +35,9 @@ WORKDIR /app
 COPY pyproject.toml poetry.lock ./
 RUN poetry install --no-root --no-interaction --no-ansi
 
+# Install PyTorch (CPU Version by default)
+RUN pip install torch --extra-index-url https://download.pytorch.org/whl/cpu
+
 # Copy Application Code
 COPY coupon_core/ coupon_core/
 COPY authentication/ authentication/

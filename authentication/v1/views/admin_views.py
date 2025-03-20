@@ -21,12 +21,16 @@ from authentication.v1.utils.token_manager import TokenManager
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from authentication.models import CustomUser
+
+import traceback
+from rest_framework.exceptions import ValidationError
 logger = logging.getLogger(__name__)
+
 
 
 class LoginView(APIView):
     """Handles admin login and token generation."""
-
+    
     permission_classes: list[Any] = [AllowAny]
 
     # Define the response schema for token generation.
@@ -49,6 +53,8 @@ class LoginView(APIView):
             200: openapi.Response(
                 "Successfully generated tokens.", schema=token_response_schema
             ),
+            400: "Bad request due to validation errors.",
+            403: "Account not verified.",
             500: "An unexpected error occurred. Please try again later.",
         },
     )
@@ -63,29 +69,39 @@ class LoginView(APIView):
             Response: A DRF Response with tokens or error messages.
         """
         try:
-            username=request.data["username"]
-            user=CustomUser(username=username)
+            serializer: LoginSerializer = LoginSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            user = serializer.validated_data["user"]
+
             if not user.activated_profile:
-               
                 return Response(
                     {"error": "Your account is not verified. Please check your email for verification instructions."},
                     status=status.HTTP_403_FORBIDDEN
                 )
-            serializer: LoginSerializer = LoginSerializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
 
-            # Retrieve the validated user from the serializer.
-            user = serializer.validated_data["user"]
             tokens: Dict[str, str] = TokenManager.create_admin_tokens(user)
-
             return Response(tokens, status=status.HTTP_200_OK)
 
+        except ValidationError as ve:
+            logger.error(f"Validation error during login: {str(ve)}")
+            # DRF ValidationError has a .detail attribute that often holds more granular info.
+            return Response({"error": ve.detail}, status=status.HTTP_400_BAD_REQUEST)
+
+        except KeyError as ke:
+            logger.error(f"Missing required field: {str(ke)}")
+            return Response(
+                {"error": f"Missing required field: {str(ke)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         except Exception as e:
-            logger.error(f"Unexpected error during login: {str(e)}")
+            # Capture the complete traceback for debugging.
+            logger.error(f"Unexpected error during login: {traceback.format_exc()}")
             return Response(
                 {"error": "An unexpected error occurred. Please try again later."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
 
 
 class RegisterView(APIView):

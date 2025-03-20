@@ -25,7 +25,7 @@ from typing import Type
 from django.utils import timezone
 import uuid
 from authentication.v1.tasks.verification_task import send_verification_email_task
-
+from django.db import transaction
 # Set up logging for debugging and error tracking
 logger = logging.getLogger(__name__)
 
@@ -130,52 +130,69 @@ def create_profile_verification(sender: Type[Model], instance: CustomUser, creat
         # Send verification email after creating the token
         send_verification_email_task.delay(instance.email, verification.token)
         
-
-
 @receiver(pre_save, sender=ProfileVerification)
-def handle_token_resend(sender: Type[Model], instance: ProfileVerification, **kwargs) -> None:
+def handle_token_resend(sender: Type[ProfileVerification], instance: ProfileVerification, **kwargs) -> None:
     """
     Signal to handle token renewal and email resend when a ProfileVerification instance is updated.
-
+    
     This ensures that if a `ProfileVerification` instance:
     1. Has NOT been used (`used=False`).
     2. The token HAS expired (`is_expired() == True`).
     3. The token field is CHANGING (new token being issued).
-
+    
     Then:
     - A new token is generated.
     - The expiration time is reset.
-    - The instance is saved BEFORE sending the email.
+    - The instance is updated BEFORE sending the email.
     - The verification email is sent with the new token.
-
+    
     Args:
         sender (Type[Model]): The model class that triggered the signal.
         instance (ProfileVerification): The ProfileVerification instance being updated.
         **kwargs: Additional keyword arguments passed by Django's signal mechanism.
-
+    
     Returns:
         None
     """
-    if instance.pk:  # Ensure this is an update, not a new object
-        try:
-            previous_instance = ProfileVerification.objects.get(pk=instance.pk)
-
-            # Check if the previous token was expired, unused, and is now changing
-            if (
-                previous_instance.is_expired()
-                and not previous_instance.used
-                and previous_instance.token != instance.token  # Token has changed
-            ):
-                # Issue a new token
-                instance.token = uuid.uuid4()
-                instance.created_at = timezone.now()
-                instance.expires_at = instance.created_at + timezone.timedelta(minutes=10)
-
-                # Save before sending email
-                instance.save(update_fields=["token", "created_at", "expires_at"])
-
-                # Send email with new token
-                send_verification_email_task.delay(instance.user.email, instance.token)
-
-        except ProfileVerification.DoesNotExist:
-            pass  # Ignore if this is a new instance
+    
+    # Skip for new instances being created
+    if not instance.pk:
+        return
+    
+    try:
+        # Get the previous state of the instance
+        previous_instance = ProfileVerification.objects.get(pk=instance.pk)
+        
+        # Case 1: Token was already changed externally
+        if instance.token != previous_instance.token:
+            logger.debug(f"Token for user {instance.user.email} was already updated externally.")
+            # We should use instance.token here, not new_token (which isn't defined yet)
+            send_verification_email_task.delay(instance.user.email, instance.token)
+            return
+        
+        # Case 2: Token needs renewal (is expired and not used)
+        if previous_instance.is_expired() and not previous_instance.used:
+            # Generate new token
+            new_token = str(uuid.uuid4())
+            
+            # Update instance with a new token and reset expiration
+            instance.token = new_token
+            instance.created_at = timezone.now()
+            instance.expires_at = instance.created_at + timezone.timedelta(minutes=10)
+            
+            # Ensure user exists before sending email (will be sent after save)
+            if instance.user and instance.user.email:
+                logger.info(f"Token expired for {instance.user.email}. New token generated and will be sent.")
+                # We'll schedule this task, but the email will be sent after the save completes
+                # to ensure the database is updated first
+                def send_email_after_save():
+                    send_verification_email_task.delay(instance.user.email, new_token)
+                    logger.info(f"New verification token sent to {instance.user.email}.")
+                
+                # Use transaction.on_commit to ensure email is sent after successful save
+                transaction.on_commit(send_email_after_save)
+            else:
+                logger.warning(f"Failed to send verification email: User or email is missing for {instance.pk}.")
+    
+    except ProfileVerification.DoesNotExist:
+        logger.warning(f"ProfileVerification instance not found for pk={instance.pk}. Skipping signal.")

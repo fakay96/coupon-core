@@ -8,8 +8,9 @@ load_dotenv()
 
 # Determine the current environment (defaults to 'development')
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
-
 # Import base settings
+
+
 from .base import *
 
 # Import environment-specific settings
@@ -17,9 +18,10 @@ if ENVIRONMENT == "production":
     from .prod import *
 elif ENVIRONMENT == "staging":
     from .staging import *
-else:
+elif ENVIRONMENT== "development":
     from .dev import *
-
+else:
+    raise("environment not defined")
 # Configure Sentry (applies to all environments)
 SENTRY_DSN = os.getenv("SENTRY_DSN", "")
 

@@ -19,22 +19,27 @@ Date: YYYY-MM-DD
 """
 
 from typing import Any
+import logging
 
 from django.contrib.auth.hashers import make_password
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.http import Http404
+from django.shortcuts import get_object_or_404
+from django.core.validators import validate_email
+
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from authentication.models import CustomUser, UserProfile,ProfileVerification
-from authentication.v1.serializers import RegisterSerializer, UserProfileSerializer
-from django.shortcuts import get_object_or_404
-from django.core.exceptions import ObjectDoesNotExist, ValidationError
-from rest_framework.request import Request
-
-# drf-yasg imports for OpenAPI documentation
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
+
+from authentication.models import CustomUser, UserProfile, ProfileVerification
+from authentication.v1.serializers import RegisterSerializer, UserProfileSerializer
+
+# Configure a logger for this module.
+logger = logging.getLogger(__name__)
 
 # Define common response schema for error responses.
 error_response_schema = openapi.Schema(
@@ -100,9 +105,11 @@ class UserProfileView(APIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
         except UserProfile.DoesNotExist:
             return Response(
-                {"error": "Profile not found."}, status=status.HTTP_404_NOT_FOUND
+                {"error": "Profile not found."},
+                status=status.HTTP_404_NOT_FOUND
             )
         except Exception as e:
+            logger.error("Error retrieving user profile: %s", str(e), exc_info=True)
             return Response(
                 {"error": "An unexpected error occurred.", "details": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -148,16 +155,16 @@ class UserProfileView(APIView):
             serializer = UserProfileSerializer(profile, data=request.data, partial=True)
             
             if serializer.is_valid():
-                
                 serializer.save()  # Save the updated profile data.
-                print(serializer.data)
                 return Response(serializer.data, status=status.HTTP_200_OK)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except UserProfile.DoesNotExist:
             return Response(
-                {"error": "Profile not found."}, status=status.HTTP_404_NOT_FOUND
+                {"error": "Profile not found."},
+                status=status.HTTP_404_NOT_FOUND
             )
         except Exception as e:
+            logger.error("Error updating user profile: %s", str(e), exc_info=True)
             return Response(
                 {"error": "An unexpected error occurred.", "details": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -240,12 +247,10 @@ class UserRegistrationView(APIView):
             # Check if the user is authenticated.
             if request.user.is_authenticated:
                 # Check if the user is a guest user.
-                if request.user.is_guest:
-                    # Fetch the password and confirm password.
+                if getattr(request.user, "is_guest", False):
                     password = request.data.get("password")
                     confirm_password = request.data.get("confirm_password")
 
-                    # Validate the password inputs.
                     if not password or not confirm_password:
                         return Response(
                             {"error": "Password and confirm password are required."},
@@ -278,7 +283,6 @@ class UserRegistrationView(APIView):
             password = request.data.get("password")
             confirm_password = request.data.get("confirm_password")
 
-            # Validate input.
             if not email or not password or not confirm_password:
                 return Response(
                     {"error": "Email, password, and confirm password are required."},
@@ -288,6 +292,15 @@ class UserRegistrationView(APIView):
             if password != confirm_password:
                 return Response(
                     {"error": "Password and confirm password do not match."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Validate email format before proceeding.
+            try:
+                validate_email(email)
+            except ValidationError:
+                return Response(
+                    {"error": "Invalid email format."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -314,11 +327,11 @@ class UserRegistrationView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         except Exception as e:
+            logger.error("Error in user registration: %s", str(e), exc_info=True)
             return Response(
                 {"error": "An unexpected error occurred.", "details": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-
 
 
 class UserDeleteView(APIView):
@@ -364,16 +377,11 @@ class UserDeleteView(APIView):
         """
         try:
             user = request.user  # Get authenticated user
-            
             CustomUser.objects.filter(id=user.id).delete()
-
-            
-            return Response(
-                {"message": "User account deleted successfully."},
-                status=status.HTTP_204_NO_CONTENT
-            )
-
+            # Return 204 No Content without a response body.
+            return Response(status=status.HTTP_204_NO_CONTENT)
         except Exception as e:
+            logger.error("Error deleting user account: %s", str(e), exc_info=True)
             return Response(
                 {"error": "An unexpected error occurred.", "details": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -389,6 +397,7 @@ class TokenVerificationView(APIView):
         - PUT: Resend a new token if expired or forced.
     """
     permission_classes: list[Any] = [AllowAny]
+
     @swagger_auto_schema(
         operation_summary="Verify a user token",
         operation_description="Verify a token associated with a user's email.",
@@ -402,39 +411,53 @@ class TokenVerificationView(APIView):
             404: openapi.Response("Invalid email or token", examples={"application/json": {"error": "Invalid email or token."}}),
         },
     )
-    def get(self, request: Request) -> Response:
-        
-        
-        """Verify a user token."""
+    def get(self, request: Any) -> Response:
+        """
+        Verify a user token.
+        """
         try:
-           
             email: str | None = request.query_params.get("email")
             token: str | None = request.query_params.get("token")
-            print(request.query_params)
-            
             
             if not email or not token:
-                return Response({"error": "Email and token are required."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    {"error": "Email and token are required."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
             
+            # Fetch the verification instance; get_object_or_404 will raise Http404 if not found.
             verification = get_object_or_404(ProfileVerification, user__email=email, token=token)
             
-            
             if verification.used:
-                return Response({"error": "Token has already been used."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    {"error": "Token has already been used."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
             
             if verification.is_expired():
-                return Response({"error": "Token has expired."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    {"error": "Token has expired."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
             
             verification.mark_as_used()
-            verification.user.activated_profile=True
+            verification.user.activated_profile = True
             verification.user.save()
-            return Response({"message": "Token verified successfully."}, status=status.HTTP_200_OK)
-        
-        except ObjectDoesNotExist:
-            return Response({"error": "Invalid email or token."}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"message": "Token verified successfully."},
+                status=status.HTTP_200_OK
+            )
+        except Http404:
+            return Response(
+                {"error": "Invalid email or token."},
+                status=status.HTTP_404_NOT_FOUND
+            )
         except Exception as e:
-         
-            return Response({"error": "An unexpected error occurred."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            logger.error("Error verifying token: %s", str(e), exc_info=True)
+            return Response(
+                {"error": "An unexpected error occurred.", "details": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     @swagger_auto_schema(
         operation_summary="Resend a new token",
@@ -453,30 +476,68 @@ class TokenVerificationView(APIView):
             404: openapi.Response("User not found", examples={"application/json": {"error": "User with the given email not found."}}),
         },
     )
-    def put(self, request: Request) -> Response:
-        """Resend a new token if expired or forced."""
+    def put(self, request: Any) -> Response:
+        """
+        Resend a new token if expired or forced.
+
+        Args:
+            request (Request): The HTTP request containing the email and optional force_resend flag.
+
+        Returns:
+            Response: JSON response indicating success or failure.
+        """
         try:
-            email: str | None = request.data.get("email")
-            force_resend: bool = request.data.get("force_resend", False)
-            
+            email = request.data.get("email")
+            force_resend = request.data.get("force_resend", False)
+
             if not email:
-                return Response({"error": "Email is required."}, status=status.HTTP_400_BAD_REQUEST)
-            
+                return Response(
+                    {"error": "Email is required."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Convert force_resend to boolean (handles "true"/"false" strings)
+            force_resend = str(force_resend).lower() in ["true", "1"]
+
+            # Validate email format
+            try:
+                validate_email(email)
+            except ValidationError:
+                return Response(
+                    {"error": "Invalid email format."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Fetch verification instance
             verification = get_object_or_404(ProfileVerification, user__email=email)
-            
+
+            # Resend token based on force_resend or expiration status
             if force_resend or (verification.is_expired() and not verification.used):
-                verification.resend_new_token()
-                return Response({"message": "New token sent successfully."}, status=status.HTTP_200_OK)
-            
-            return Response({"message": "Current token is still valid."}, status=status.HTTP_200_OK)
-        
-        except ObjectDoesNotExist:
-            return Response({"error": "User with the given email not found."}, status=status.HTTP_404_NOT_FOUND)
-        except ValidationError:
-            return Response({"error": "Invalid email format."}, status=status.HTTP_400_BAD_REQUEST)
+                verification.resend_new_token(force_resend=force_resend)  # ✅ Pass force_resend
+                return Response(
+                    {"message": "New token sent successfully."},
+                    status=status.HTTP_200_OK
+                )
+
+            return Response(
+                {"message": "Current token is still valid."},
+                status=status.HTTP_200_OK
+            )
+
+        except Http404:
+            return Response(
+                {"error": "User with the given email not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
         except Exception as e:
-            return Response({"error": "An unexpected error occurred."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            logger.error("Unexpected error in token resend: %s", str(e), exc_info=True)
+            return Response(
+                {"error": "An unexpected error occurred.", "details": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 
-#CustomUser.objects.get(email="fakay96@gmail.com").delete()
+
+
+

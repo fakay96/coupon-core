@@ -81,6 +81,11 @@ DATABASES = {
         "PASSWORD": os.getenv("DB_PASSWORD", "password"),
         "HOST": os.getenv("DB_HOST", "localhost"),
         "PORT": os.getenv("DB_PORT", "5432"),
+        "OPTIONS": {
+            "sslmode": "disable"
+        }
+     
+        
     },
     "authentication_shard": {
         "ENGINE": "django.contrib.gis.db.backends.postgis",
@@ -89,6 +94,10 @@ DATABASES = {
         "PASSWORD": os.getenv("DB_PASSWORD", "password"),
         "HOST": os.getenv("DB_HOST", "localhost"),
         "PORT": os.getenv("DB_PORT", "5432"),
+        "OPTIONS": {
+            "sslmode": "disable"
+        }
+     
     },
     "geodiscounts_db": {
         'ENGINE': 'django.contrib.gis.db.backends.postgis',
@@ -97,6 +106,9 @@ DATABASES = {
         "PASSWORD": os.getenv("DB_PASSWORD", "password"),
         "HOST": os.getenv("DB_HOST", "localhost"),
         "PORT": os.getenv("DB_PORT", "5432"),
+        "OPTIONS": {
+            "sslmode": "disable"
+        }
     },
     "vector_db": {
         'ENGINE': 'django.contrib.gis.db.backends.postgis',
@@ -105,9 +117,12 @@ DATABASES = {
         "PASSWORD": os.getenv("DB_PASSWORD", "password"),
         "HOST": os.getenv("DB_HOST", "localhost"),
         "PORT": os.getenv("DB_PORT", "5432"),
+        "OPTIONS": {
+            "sslmode": "disable"
+        }
+    
     },
 }
-
 # -----------------------------------------------
 # Redis Configuration
 # -----------------------------------------------
@@ -131,7 +146,7 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:6379/1"],
+            "hosts": [f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:6379/0"],
         },
     },
 }
@@ -139,15 +154,15 @@ CHANNEL_LAYERS = {
 # -----------------------------------------------
 # Celery Configuration (RabbitMQ)
 # -----------------------------------------------
+
 CELERY_BROKER_URL = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:6379/0"
+CELERY_RESULT_BACKEND = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:6379/0"
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
-# PostgreSQL as Celery Result Backend
-CELERY_RESULT_BACKEND = os.getenv("CELERY_DB","test_db")
 
-# Additional Celery Settings
-CELERY_ACCEPT_CONTENT = ["json"]
-CELERY_TASK_SERIALIZER = "json"
-CELERY_CACHE_BACKEND = "django-cache"
+
+
+
 
 # -----------------------------------------------
 # Email Backend (Console for Development)
@@ -174,3 +189,4 @@ SIMPLE_JWT = {
 # CORS Configuration
 # -----------------------------------------------
 CORS_ALLOW_ALL_ORIGINS = True
+
