@@ -21,7 +21,7 @@ import { Input } from "@/components/ui/input";
 import { axiosGoogleLogin } from "@/api/authApi";
 import { useGoogleLogin } from "@react-oauth/google";
 import { toast } from "sonner";
-import { loginUserQuery } from "@/queries/auth-queries";
+import { loginUserMutation } from "@/queries/auth-queries";
 import AuthHeader from "@/components/auth-component/header";
 import GoogleButton from "@/components/auth-component/google-button";
 
@@ -34,7 +34,7 @@ const SignInPage = () => {
   const [eyeToggle, setEyeToggle] = useState(true);
 
   // Mutation for logging in the user
-  const { isPending, mutateAsync: loginUser } = loginUserQuery();
+  const { isPending, mutateAsync: loginUser } = loginUserMutation();
   const form = useForm<z.infer<typeof signInSchema>>({
     resolver: zodResolver(signInSchema),
     defaultValues: {
@@ -72,9 +72,21 @@ const SignInPage = () => {
     const userInfo = { email, password, username: email?.split("@")[0] };
 
     toast.promise(
-      loginUser(userInfo).then(() => {
-        navigate("/dashboard", { replace: true });
-      }),
+      loginUser(userInfo)
+        .then(() => {
+          navigate("/dashboard", { replace: true });
+        })
+        .catch((error) => {
+          if (
+            error?.message
+              ?.toLowerCase()
+              ?.includes("your account is not verified.")
+          ) {
+            navigate(`/auth/resend-email`, { state: { email } });
+          }
+
+          throw error;
+        }),
       {
         loading: `${
           firstname || userInfo?.username
@@ -82,7 +94,7 @@ const SignInPage = () => {
         success: `${
           firstname || userInfo?.username
         }, Here is your dashboard! Explore!`,
-        error: (error) => error.message,
+        error: (error) => JSON.stringify(error.message),
       }
     );
   };

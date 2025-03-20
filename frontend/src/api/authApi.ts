@@ -55,7 +55,7 @@ export const registerUserService = async (
  */
 export const DeleteUserAccountService = async (): Promise<any> => {
   const response = await axiosInstance.delete(
-    "/api/authentication/v1/user-delete/",
+    "/api/authentication/v1/user-delete/"
   );
   return response.data;
 };
@@ -80,7 +80,7 @@ export const tokenRefresh = async (refresh: string) => {
  * @returns Promise containing guest access token
  * @throws {ApiError} If token generation fails
  */
-export const getGuestToken = async (email: { email: string }) => {
+export const getGuestToken = async (email: string) => {
   const response = await axiosInstance.post(
     "/api/authentication/v1/guest-token/",
     email
@@ -94,7 +94,9 @@ export const getGuestToken = async (email: { email: string }) => {
  * @throws {ApiError} If fetching fails or user is not authenticated
  */
 export const getUserInfo = async () => {
-  const response = await axiosInstance.get("/api/authentication/v1/user-profile/");
+  const response = await axiosInstance.get(
+    "/api/authentication/v1/user-profile/"
+  );
   return response.data;
 };
 
@@ -116,10 +118,38 @@ export const getUserProfile = async () => {
  * @returns Promise containing completed registration data
  * @throws {ApiError} If registration completion fails
  */
-export const userRegistration = async (data: any) => {
+export const userRegistration = async (data: {
+  email: string;
+  password: string;
+  confirm_password: string;
+}) => {
   const response = await axiosInstance.post(
     "/api/authentication/v1/user-registration/",
     data
+  );
+  return response.data;
+};
+
+export const resendVerificationToken = async (data: {
+  email: string;
+  force_resend: boolean; // default it to true.
+}) => {
+  const response = await axiosInstance.put(
+    "/api/authentication/v1/activate/",
+    data
+  );
+  return response.data;
+};
+
+export const verifyEmailToken = async ({
+  email,
+  token,
+}: {
+  email: string;
+  token: string; // default it to true.
+}) => {
+  const response = await axiosInstance.get(
+    `/api/authentication/v1/activate/?email=${email}&token=${token}`
   );
   return response.data;
 };

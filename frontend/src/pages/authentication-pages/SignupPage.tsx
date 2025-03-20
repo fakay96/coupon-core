@@ -22,7 +22,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { axiosGoogleLogin, loginUserService } from "@/api/authApi";
 import { loginCredentials } from "@/types";
 import { useGoogleLogin } from "@react-oauth/google";
-import { registerUserQuery } from "@/queries/auth-queries";
+import { registerUserMutation } from "@/queries/auth-queries";
 import { toast } from "sonner";
 import AuthHeader from "@/components/auth-component/header";
 import GoogleButton from "@/components/auth-component/google-button";
@@ -47,7 +47,7 @@ const SignUpPage = () => {
   });
 
   // Mutation for registering the user
-  const { isPending, mutateAsync: registerUser } = registerUserQuery();
+  const { isPending, mutateAsync: registerUser } = registerUserMutation();
   const form = useForm<z.infer<typeof signUpSchema>>({
     resolver: zodResolver(signUpSchema),
     defaultValues: {

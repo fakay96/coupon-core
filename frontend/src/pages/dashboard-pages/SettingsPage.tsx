@@ -6,9 +6,9 @@ import { FaCheckSquare } from "react-icons/fa";
 import { MdCheckBoxOutlineBlank } from "react-icons/md";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -27,11 +27,6 @@ const SettingsPage = () => {
   const [lastname, setLastname] = useState("");
   // const [preference, setPreference] = useState({});
   const [location, setLocation] = useState("");
-
-  console.log(user);
-
-  console.count("SETTINGS PAGE  ");
-
   const handleSummit = async () => {
     const user = {
       username,
@@ -166,7 +161,7 @@ const SettingsPage = () => {
                             />
                           </div>
                         </div>
-                        <DialogFooter>
+                        <DialogClose>
                           <Button
                             type="submit"
                             variant={"vivid"}
@@ -175,17 +170,17 @@ const SettingsPage = () => {
                           >
                             Update Profile
                           </Button>
-                        </DialogFooter>
+                        </DialogClose>
                       </DialogContent>
                     </Dialog>
                   </div>
                 </div>
               </div>
-              <div className="">
+              {/*  <div className="">
                 <h1 className="font-bold font-syne text-md pb-2 ">
                   Location And Preference
                 </h1>
-                {/* <CardComponent
+               <CardComponent
                   values={[
                     // { key: "Location", value: "Vienna Austria" },
                     {
@@ -194,8 +189,8 @@ const SettingsPage = () => {
                     },
                     // { key: "Spending Budget", value: "10€ - 90€" },
                   ]}
-                /> */}
-              </div>
+                /> 
+              </div>*/}
               <div className="">
                 <h1 className="font-bold font-syne text-md pb-2 ">
                   Basic Information

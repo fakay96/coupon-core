@@ -2,6 +2,8 @@ import {
   getUserInfo,
   loginUserService,
   registerUserService,
+  resendVerificationToken,
+  verifyEmailToken,
 } from "@/api/authApi";
 import { loginCredentials, RegisterUserData } from "@/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -19,7 +21,7 @@ export const getUserInfoQuery = () => {
     queryFn: async () => await getUserInfo(),
     refetchOnWindowFocus: false,
     retry: false,
-    gcTime: 1 * 60 * 60 * 1000, 
+    gcTime: 1 * 60 * 60 * 1000,
     staleTime: 1 * 60 * 60 * 1000,
   });
 };
@@ -29,11 +31,12 @@ export const getUserInfoQuery = () => {
  * @returns {UseMutationResult} Mutation result for login operation
  * @throws {Error} If login fails
  * @example
- * const { mutate: login, isLoading } = loginUserQuery();
+ * const { mutate: login, isLoading } = loginUserMutation();
  * login({ email: 'user@example.com', password: '123456' });
- */export const loginUserQuery = () => {
+ */ export const loginUserMutation = () => {
   const queryClient = useQueryClient();
   return useMutation<unknown, Error, loginCredentials>({
+    mutationKey: ["loginUserMutation"],
     mutationFn: async (value: loginCredentials) =>
       await loginUserService(value),
     onSuccess: () => {
@@ -47,13 +50,38 @@ export const getUserInfoQuery = () => {
  * @returns {UseMutationResult} Mutation result for registration operation
  * @throws {Error} If registration fails
  * @example
- * const { mutate: register, isLoading } = registerUserQuery();
+ * const { mutate: register, isLoading } = registerUserMutation();
  * register({ email: 'user@example.com', password: '123456', name: 'John Doe' });
  */
-export const registerUserQuery = () => {
+export const registerUserMutation = () => {
   const queryClient = useQueryClient();
   return useMutation<unknown, Error, RegisterUserData>({
+    mutationKey: ["registerUserMutation"],
     mutationFn: async (value) => await registerUserService(value),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["userInfo"] });
+    },
+  });
+};
+
+export const retryEmailTokenMutation = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: ["retryEmailTokenMutation"],
+    mutationFn: async (value: { email: string; force_resend: boolean }) =>
+      await resendVerificationToken(value),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["userInfo"] });
+    },
+  });
+};
+
+export const verifyEmailTokenMutation = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: ["verifyEmailTokenMutation"],
+    mutationFn: async (value: { email: string; token: string }) =>
+      await verifyEmailToken(value),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["userInfo"] });
     },

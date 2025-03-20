@@ -96,7 +96,8 @@ export const forgotPasswordSchema = z.object({
 
 
 export const verificationCodeSchema = z.object({
-  pin: z.string().min(4, {
-    message: "Your one-time password must be 4 characters.",
+  code: z.string().min(4, {
+    message: "Invalid verification code.",
   }),
+  userEmail: z.string().optional()
 })
