@@ -82,6 +82,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.15.0",
+    "esbuild": "^0.25.1",
     "@tanstack/eslint-plugin-query": "^5.66.0",
     "@types/js-cookie": "^3.0.6",
     "@types/lodash": "^4.17.15",
