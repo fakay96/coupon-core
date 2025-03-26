@@ -71,6 +71,7 @@
     "react-router-dom": "^6.22.0",
     "react-scroll": "^1.9.0",
     "react-simple-typewriter": "^5.0.1",
+    "react-spinners": "^0.15.0",
     "react-toastify": "^11.0.3",
     "recharts": "^2.15.0",
     "sonner": "^1.7.1",
@@ -82,7 +83,6 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.15.0",
-    "esbuild": "^0.25.1",
     "@tanstack/eslint-plugin-query": "^5.66.0",
     "@types/js-cookie": "^3.0.6",
     "@types/lodash": "^4.17.15",
@@ -92,6 +92,7 @@
     "@types/react-scroll": "^1.8.10",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
+    "esbuild": "^0.25.1",
     "eslint": "^9.15.0",
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.14",
