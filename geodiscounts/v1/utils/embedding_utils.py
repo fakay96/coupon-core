@@ -1,6 +1,7 @@
 from typing import List
 
 import torch
+import numpy as np
 from transformers import AutoModel, AutoTokenizer
 
 # Initialize model and tokenizer (use a pre-trained embedding model)
@@ -26,3 +27,25 @@ def generate_embedding(query: str) -> List[float]:
         return embedding
     except Exception as e:
         raise ValueError(f"Failed to generate embedding: {str(e)}")
+
+
+def normalize_embedding(vector: np.ndarray) -> np.ndarray:
+    """
+    Normalize a vector to unit length.
+
+    Args:
+        vector (np.ndarray): The input vector to normalize.
+
+    Returns:
+        np.ndarray: The normalized vector.
+    """
+    # Convert to numpy array if not already
+    vector = np.asarray(vector)
+    
+    # Handle zero vector case
+    norm = np.linalg.norm(vector)
+    if norm == 0:
+        return vector
+    
+    # Normalize the vector
+    return vector / norm

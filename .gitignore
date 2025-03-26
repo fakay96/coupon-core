@@ -25,3 +25,5 @@ env/*
 migrate.sh
 req.txt
 
+
+.coverage

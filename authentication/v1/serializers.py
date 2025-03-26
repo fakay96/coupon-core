@@ -16,6 +16,7 @@ from typing import Any, Dict, Optional
 from django.contrib.auth import authenticate
 from django.contrib.auth.hashers import make_password
 from django.utils.translation import gettext_lazy as _
+from django.contrib.gis.geos import Point
 from rest_framework import serializers
 
 from authentication.models import CustomUser, UserProfile
@@ -205,6 +206,13 @@ class UserProfileSerializer(serializers.ModelSerializer):
         required=False,
         help_text="The phone number of the user in international format (e.g., +1234567890)."
     )
+    location = serializers.ListField(
+        child=serializers.FloatField(),
+        required=False,
+        min_length=2,
+        max_length=2,
+        help_text="Location coordinates as [longitude, latitude]"
+    )
 
     class Meta:
         model = UserProfile
@@ -214,10 +222,61 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "phone_number",
             "preferences",
             "location",
+            "profile_image",
             "created_at",
             "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+    def to_representation(self, instance: UserProfile) -> Dict[str, Any]:
+        """
+        Convert the UserProfile instance to a dictionary representation.
+
+        Args:
+            instance (UserProfile): The user profile instance to serialize.
+
+        Returns:
+            Dict[str, Any]: The serialized user profile data.
+        """
+        data = super().to_representation(instance)
+        if instance.location:
+            data['location'] = [instance.location.x, instance.location.y]
+        return data
+
+    def validate_location(self, value: list) -> Point:
+        """
+        Validate and convert location coordinates to a Point object.
+
+        Args:
+            value (list): List containing [longitude, latitude] coordinates.
+
+        Returns:
+            Point: A Point object representing the location.
+
+        Raises:
+            serializers.ValidationError: If the coordinates are invalid.
+        """
+        try:
+            return Point(value[0], value[1])
+        except (IndexError, ValueError, TypeError):
+            raise serializers.ValidationError(_("Invalid location coordinates."))
+
+    def validate_preferences(self, value: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Validate user preferences.
+
+        Args:
+            value (Dict[str, Any]): Dictionary containing user preferences.
+
+        Returns:
+            Dict[str, Any]: The validated preferences.
+
+        Raises:
+            serializers.ValidationError: If the preferences format is invalid.
+        """
+        if not isinstance(value, dict):
+            raise serializers.ValidationError(_("Preferences must be a JSON object."))
+        return value
 
     def update(self, instance: UserProfile, validated_data: Dict[str, Any]) -> UserProfile:
         """
@@ -252,5 +311,9 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
         user.save()
 
-        # Update the rest of the profile fields.
-        return super().update(instance, validated_data)
+        # Update profile fields
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+
+        instance.save()
+        return instance

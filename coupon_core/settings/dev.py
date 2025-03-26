@@ -77,7 +77,7 @@ DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": os.getenv("DB_NAME", "default_db"),
-        "USER": os.getenv("DB_USER", "user"),
+        "USER": os.getenv("DB_USER", "coupon_admin"),
         "PASSWORD": os.getenv("DB_PASSWORD", "password"),
         "HOST": os.getenv("DB_HOST", "localhost"),
         "PORT": os.getenv("DB_PORT", "5432"),
@@ -90,7 +90,7 @@ DATABASES = {
     "authentication_shard": {
         "ENGINE": "django.contrib.gis.db.backends.postgis",
         "NAME": "authentication_shard",
-        "USER": os.getenv("DB_USER", "user"),
+        "USER": os.getenv("DB_USER", "coupon_admin"),
         "PASSWORD": os.getenv("DB_PASSWORD", "password"),
         "HOST": os.getenv("DB_HOST", "localhost"),
         "PORT": os.getenv("DB_PORT", "5432"),
@@ -102,7 +102,7 @@ DATABASES = {
     "geodiscounts_db": {
         'ENGINE': 'django.contrib.gis.db.backends.postgis',
         "NAME": os.getenv("GEODISCOUNTS_DB_NAME", "geodiscounts_db"),
-        "USER": os.getenv("DB_USER", "user"),
+        "USER": os.getenv("DB_USER", "coupon_admin"),
         "PASSWORD": os.getenv("DB_PASSWORD", "password"),
         "HOST": os.getenv("DB_HOST", "localhost"),
         "PORT": os.getenv("DB_PORT", "5432"),
@@ -113,7 +113,7 @@ DATABASES = {
     "vector_db": {
         'ENGINE': 'django.contrib.gis.db.backends.postgis',
         "NAME": os.getenv("VECTOR_DBNAME", "vector_db"),
-        "USER": os.getenv("DB_USER", "user"),
+        "USER": os.getenv("DB_USER", "coupon_admin"),
         "PASSWORD": os.getenv("DB_PASSWORD", "password"),
         "HOST": os.getenv("DB_HOST", "localhost"),
         "PORT": os.getenv("DB_PORT", "5432"),

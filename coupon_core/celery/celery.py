@@ -16,7 +16,8 @@ app = Celery("coupon_core")
 app.config_from_object("coupon_core.settings", namespace="CELERY")
 app.autodiscover_tasks(
     packages=[
-        "authentication.v1.tasks"
+        "authentication.v1.tasks",
+        "geodiscounts.v1.tasks"
     ]
 )
 app.conf.broker_connection_retry_on_startup = True

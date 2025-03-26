@@ -12,24 +12,41 @@ class GeoDiscountsRouter:
 
     APP_LABEL = "geodiscounts"
     DB_NAME = "geodiscounts_db"
+    AUTH_APP_LABEL = "authentication"
+    REQUIRED_APPS = {
+        "auth",
+        "contenttypes",
+        "authentication",
+        "geodiscounts",
+        "sessions",
+        "admin",
+    }
 
     def db_for_read(self, model, **hints):
-        """Route read operations for geodiscounts models."""
+        """Route read operations for geodiscounts models and related auth models."""
         if model._meta.app_label == self.APP_LABEL:
             return self.DB_NAME
+        elif model._meta.app_label == self.AUTH_APP_LABEL:
+            # Add a hint for the authentication router
+            hints['target_db'] = self.DB_NAME
+            return None
         return None
 
     def db_for_write(self, model, **hints):
-        """Route write operations for geodiscounts models."""
+        """Route write operations for geodiscounts models and related auth models."""
         if model._meta.app_label == self.APP_LABEL:
             return self.DB_NAME
+        elif model._meta.app_label == self.AUTH_APP_LABEL:
+            # Add a hint for the authentication router
+            hints['target_db'] = self.DB_NAME
+            return None
         return None
 
     def allow_relation(self, obj1, obj2, **hints):
-        """Allow relations if either object is in the geodiscounts app."""
+        """Allow relations if either object is in the geodiscounts app or authentication app."""
         if (
-            obj1._meta.app_label == self.APP_LABEL
-            or obj2._meta.app_label == self.APP_LABEL
+            obj1._meta.app_label in self.REQUIRED_APPS
+            or obj2._meta.app_label in self.REQUIRED_APPS
         ):
             return True
         return None
@@ -48,14 +65,13 @@ class GeoDiscountsRouter:
             bool | None: Whether to allow the migration
         """
         if app_label == self.APP_LABEL:
-            if db != self.DB_NAME:
-                return False
-                
-            # Check for GIS compatibility if we have access to the schema editor
-            schema_editor = hints.get('schema_editor')
-            if schema_editor:
-                return self._check_gis_compatibility(schema_editor)
-                
+            # Only allow geodiscounts app to migrate to geodiscounts_db
+            return db == self.DB_NAME
+        elif app_label == self.AUTH_APP_LABEL:
+            # Let the authentication router handle this
+            return None
+        elif app_label in self.REQUIRED_APPS:
+            # Allow other required apps to migrate to both databases
             return True
         return None
 
