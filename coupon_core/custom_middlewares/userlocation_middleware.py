@@ -17,7 +17,7 @@ from typing import Callable
 from django.http import HttpRequest, HttpResponse
 
 
-class ClientIPMiddleware:
+class UserLocationMiddleware:
     """
     Middleware to extract the client's IP address and attach it to the request object.
     This middleware ensures the IP is globally available for all views.

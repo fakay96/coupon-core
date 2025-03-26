@@ -72,6 +72,7 @@ class LoginView(APIView):
             serializer: LoginSerializer = LoginSerializer(data=request.data)
             serializer.is_valid(raise_exception=True)
             user = serializer.validated_data["user"]
+            
 
             if not user.activated_profile:
                 return Response(

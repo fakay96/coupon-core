@@ -14,6 +14,7 @@ class AuthenticationRouter:
 
     target_apps: Set[str] = {"authentication", "admin", "auth", "sessions", "contenttypes","authtoken","socialaccount","account"}
     db_name: str = "authentication_shard"
+    allowed_dbs: Set[str] = {"authentication_shard", "geodiscounts_db"}
 
     def db_for_read(self, model: Model, **hints: Any) -> Optional[str]:
         """
@@ -27,6 +28,9 @@ class AuthenticationRouter:
             Optional[str]: The database alias if the model belongs to a target app; otherwise, None.
         """
         if model._meta.app_label in self.target_apps:
+            # Check if there's a specific database hint
+            if 'target_db' in hints:
+                return hints['target_db']
             return self.db_name
         return None
 
@@ -42,6 +46,9 @@ class AuthenticationRouter:
             Optional[str]: The database alias if the model belongs to a target app; otherwise, None.
         """
         if model._meta.app_label in self.target_apps:
+            # Check if there's a specific database hint
+            if 'target_db' in hints:
+                return hints['target_db']
             return self.db_name
         return None
 
@@ -57,7 +64,7 @@ class AuthenticationRouter:
         Returns:
             Optional[bool]: True if the relation is allowed, False otherwise, or None to use the default.
         """
-        if obj1._state.db in {self.db_name, "default"} and obj2._state.db in {self.db_name, "default"}:
+        if obj1._state.db in self.allowed_dbs and obj2._state.db in self.allowed_dbs:
             return True
         return None
 
@@ -65,7 +72,7 @@ class AuthenticationRouter:
         self, db: str, app_label: str, model_name: Optional[str] = None, **hints: Any
     ) -> Optional[bool]:
         """
-        Allow migrations for target apps only on the authentication_shard database.
+        Allow migrations for target apps on both authentication_shard and geodiscounts_db databases.
 
         Args:
             db (str): The database alias where migration is being attempted.
@@ -78,5 +85,5 @@ class AuthenticationRouter:
                             or None to fallback to default behavior.
         """
         if app_label in self.target_apps:
-            return db == self.db_name
+            return db in self.allowed_dbs
         return None

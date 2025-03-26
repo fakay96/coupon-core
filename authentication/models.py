@@ -6,12 +6,6 @@ This module defines a custom user model and a role model to support RBAC in the 
 
 from django.contrib.auth.models import AbstractUser, Group, Permission
 from django.contrib.gis.db.models import PointField
-from django.core.validators import EmailValidator, MinLengthValidator
-from django.db import models
-
-
-from django.contrib.auth.models import AbstractUser, Group, Permission
-from django.contrib.gis.db.models import PointField
 from django.core.validators import EmailValidator, MinLengthValidator, RegexValidator
 from django.db import models
 
@@ -58,14 +52,14 @@ class CustomUser(AbstractUser):
 
     groups = models.ManyToManyField(
         Group,
-        related_name="customuser_groups",
+        related_name="custom_users",
         blank=True,
         help_text="The groups this user belongs to.",
         verbose_name="groups",
     )
     user_permissions = models.ManyToManyField(
         Permission,
-        related_name="customuser_permissions",
+        related_name="custom_users",
         blank=True,
         help_text="Specific permissions for this user.",
         verbose_name="user permissions",
@@ -76,7 +70,6 @@ class CustomUser(AbstractUser):
         default=None, 
         help_text="Indicates if the user has activated their profile."
         )
-
 
     def __str__(self) -> str:
         """
@@ -146,6 +139,12 @@ class UserProfile(models.Model):
         blank=True,
         null=True,
         help_text="Geographic location of the user (latitude and longitude).",
+    )
+    profile_image = models.ImageField(
+        upload_to='profile_images/',
+        blank=True,
+        null=True,
+        help_text="Profile image for the user.",
     )
     created_at = models.DateTimeField(
         auto_now_add=True, help_text="Timestamp when the profile was created."

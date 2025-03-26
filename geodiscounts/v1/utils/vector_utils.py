@@ -44,6 +44,7 @@ class PostgreSQLVectorClient:
 
     def __init__(self) -> None:
         self.conn: Optional[Connection] = None
+        self._initialized = False
 
     def _connect(self) -> None:
         """
@@ -61,14 +62,16 @@ class PostgreSQLVectorClient:
                 host=db_settings.get("HOST", "localhost"),
                 port=db_settings.get("PORT", 5432),
             )
-            self._initialize_database()
+            if not self._initialized:
+                self._initialize_database()
+                self._initialized = True
 
     def _initialize_database(self) -> None:
         """
         Initializes the database by enabling the pgvector extension and
         creating the 'vectors' table if it doesn't already exist.
         """
-        with self.get_cursor() as cur:
+        with self.conn.cursor() as cur:
             cur.execute("CREATE EXTENSION IF NOT EXISTS vector")
             cur.execute(f"""
                 CREATE TABLE IF NOT EXISTS vectors (
@@ -156,3 +159,78 @@ class PostgreSQLVectorClient:
             self.conn.rollback()
             logger.error(f"Failed to delete vector {vector_id}: {e}")
             raise ValueError(f"Failed to delete vector {vector_id}: {str(e)}") from e
+
+"""Utility functions for vector calculations and distance measurements."""
+
+from math import radians, sin, cos, sqrt, atan2
+
+def calculate_distance(lat1, lon1, lat2, lon2):
+    """
+    Calculate the great circle distance between two points 
+    on the earth (specified in decimal degrees).
+    
+    Args:
+        lat1 (float): Latitude of first point
+        lon1 (float): Longitude of first point
+        lat2 (float): Latitude of second point
+        lon2 (float): Longitude of second point
+        
+    Returns:
+        float: Distance between points in kilometers
+    """
+    # Convert decimal degrees to radians
+    lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
+    
+    # Haversine formula
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+    c = 2 * atan2(sqrt(a), sqrt(1-a))
+    
+    # Radius of earth in kilometers
+    r = 6371
+    
+    # Calculate distance
+    distance = r * c
+    
+    return distance
+
+def calculate_bounding_box(lat, lon, radius_km):
+    """
+    Calculate a bounding box given a center point and radius.
+    
+    Args:
+        lat (float): Center latitude
+        lon (float): Center longitude
+        radius_km (float): Radius in kilometers
+        
+    Returns:
+        tuple: (min_lat, max_lat, min_lon, max_lon)
+    """
+    # Rough approximation: 1 degree = 111km
+    lat_change = radius_km / 111.0
+    lon_change = radius_km / (111.0 * cos(radians(lat)))
+    
+    return (
+        lat - lat_change,  # min lat
+        lat + lat_change,  # max lat
+        lon - lon_change,  # min lon
+        lon + lon_change   # max lon
+    )
+
+def is_point_in_radius(center_lat, center_lon, point_lat, point_lon, radius_km):
+    """
+    Check if a point is within a given radius of a center point.
+    
+    Args:
+        center_lat (float): Center point latitude
+        center_lon (float): Center point longitude
+        point_lat (float): Point to check latitude
+        point_lon (float): Point to check longitude
+        radius_km (float): Radius in kilometers
+        
+    Returns:
+        bool: True if point is within radius, False otherwise
+    """
+    distance = calculate_distance(center_lat, center_lon, point_lat, point_lon)
+    return distance <= radius_km

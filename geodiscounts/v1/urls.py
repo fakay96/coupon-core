@@ -9,6 +9,8 @@ Endpoints:
     - v1/discounts/nearby/   : Fetch discounts near the user's location (based on IP).
     - v1/retailers/          : List all retailers.
     - v1/retailers/<id>/     : Fetch details of a specific retailer by ID.
+    - v1/shared-discounts/   : List all shared discounts.
+    - v1/shared-discounts/<id>/ : Fetch details of a specific shared discount by ID.
 
 Author: Your Name
 Date: YYYY-MM-DD
@@ -16,33 +18,41 @@ Date: YYYY-MM-DD
 
 from django.urls import path
 
-from geodiscounts.v1.views.geodiscount_views import (
-    DiscountListView,
+from geodiscounts.v1.views.discount_views import (
+    DiscountListCreateView,
+    DiscountDetailView,
     NearbyDiscountsView,
+    SearchDiscountsView,
     CategoryView,
 )
-from geodiscounts.v1.views.retailer_views import RetailerDetailView, RetailerListView
+from geodiscounts.v1.views.retailer_views import (
+    RetailerListCreateView,
+    RetailerDetailView,
+    NearbyRetailersView,
+    RetailerAnalyticsView,
+)
+from geodiscounts.v1.views.shared_discount_views import (
+    SharedDiscountListCreateView,
+    SharedDiscountDetailView,
+)
 
-app_name = "geodiscounts_v1"
+app_name = "geodiscounts"
 
 urlpatterns = [
-    # Discount-related endpoints
-    path("v1/discounts/", DiscountListView.as_view(), name="discount_list"),
-    path(
-        "v1/discounts/nearby/",
-        NearbyDiscountsView.as_view(),
-        name="nearby_discounts",
-    ),
-    path(
-        "v1/discounts/categories/",
-        CategoryView.as_view(),
-        name="discount_categories",
-    ),
-    # Retailer-related endpoints
-    path("v1/retailers/", RetailerListView.as_view(), name="retailer_list"),
-    path(
-        "v1/retailers/<int:retailer_id>/",
-        RetailerDetailView.as_view(),
-        name="retailer_detail",
-    ),
+    # # Discount URLs
+    path('discounts/', DiscountListCreateView.as_view(), name='discount-list'),
+    path('discounts/<int:pk>/', DiscountDetailView.as_view(), name='discount-detail'),
+    path('discounts/nearby/', NearbyDiscountsView.as_view(), name='discount-nearby'),
+    path('discounts/search/', SearchDiscountsView.as_view(), name='discount-search'),
+    path('discounts/categories/', CategoryView.as_view(), name='discount-categories'),
+    
+    # Retailer URLs
+    path('retailers/', RetailerListCreateView.as_view(), name='retailer-list'),
+    path('retailers/<int:pk>/', RetailerDetailView.as_view(), name='retailer-detail'),
+    path('retailers/nearby/', NearbyRetailersView.as_view(), name='retailer-nearby'),
+    path('retailers/<int:pk>/analytics/', RetailerAnalyticsView.as_view(), name='merchant-analytics'),
+    
+    # Shared Discount URLs
+    path('shared-discounts/', SharedDiscountListCreateView.as_view(), name='shared-discount-list'),
+    path('shared-discounts/<int:pk>/', SharedDiscountDetailView.as_view(), name='shared-discount-detail'),
 ]
