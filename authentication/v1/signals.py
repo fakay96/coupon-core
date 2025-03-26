@@ -18,6 +18,7 @@ import logging
 from django.db.models.signals import post_save,pre_save
 from django.dispatch import receiver
 from allauth.account.signals import user_signed_up
+from django.conf import settings
 
 from authentication.models import CustomUser, UserProfile, ProfileVerification
 from django.db.models import Model
@@ -128,7 +129,12 @@ def create_profile_verification(sender: Type[Model], instance: CustomUser, creat
         )
 
         # Send verification email after creating the token
-        send_verification_email_task.delay(instance.email, verification.token)
+        if settings.CELERY_ALWAYS_EAGER:
+            # If in test mode, execute task synchronously
+            send_verification_email_task(instance.email, verification.token)
+        else:
+            # In production, use Celery
+            send_verification_email_task.delay(instance.email, verification.token)
         
 @receiver(pre_save, sender=ProfileVerification)
 def handle_token_resend(sender: Type[ProfileVerification], instance: ProfileVerification, **kwargs) -> None:
@@ -196,3 +202,5 @@ def handle_token_resend(sender: Type[ProfileVerification], instance: ProfileVeri
     
     except ProfileVerification.DoesNotExist:
         logger.warning(f"ProfileVerification instance not found for pk={instance.pk}. Skipping signal.")
+        
+        

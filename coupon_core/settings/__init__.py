@@ -3,33 +3,31 @@ from dotenv import load_dotenv
 import sentry_sdk
 from sentry_sdk.integrations.django import DjangoIntegration
 
-# Load environment variables from a .env file
-load_dotenv()
-
-# Determine the current environment (defaults to 'development')
-ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
-# Import base settings
-
-
-from .base import *
-
-# Import environment-specific settings
-if ENVIRONMENT == "production":
-    from .prod import *
-elif ENVIRONMENT == "staging":
-    from .staging import *
-elif ENVIRONMENT== "development":
-    from .dev import *
+# Only load environment variables if not in test mode
+if os.getenv("DJANGO_SETTINGS_MODULE") != "coupon_core.settings.test":
+    load_dotenv()
+    # Determine environment
+    ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
+    # Import environment-specific settings
+    from .base import *
+    if ENVIRONMENT == "production":
+        from .prod import *
+    elif ENVIRONMENT == "staging":
+        from .staging import *
+    else:
+        from .dev import *
+    
+    # Configure Sentry (applies to all environments except test)
+    SENTRY_DSN = os.getenv("SENTRY_DSN", "")
+    if SENTRY_DSN:
+        sentry_sdk.init(
+            dsn=SENTRY_DSN,
+            integrations=[DjangoIntegration()],
+            traces_sample_rate=1.0 if ENVIRONMENT == "production" else 0.5,  # Adjust sampling
+            send_default_pii=True,  # Capture user context in production
+            environment=ENVIRONMENT,  # Assign correct environment in Sentry logs
+        )
 else:
-    raise("environment not defined")
-# Configure Sentry (applies to all environments)
-SENTRY_DSN = os.getenv("SENTRY_DSN", "")
-
-if SENTRY_DSN:
-    sentry_sdk.init(
-        dsn=SENTRY_DSN,
-        integrations=[DjangoIntegration()],
-        traces_sample_rate=1.0 if ENVIRONMENT == "production" else 0.5,  # Adjust sampling
-        send_default_pii=True,  # Capture user context in production
-        environment=ENVIRONMENT,  # Assign correct environment in Sentry logs
-    )
+    # In test mode, only import base settings
+    # Test settings will be loaded directly by manage.py
+    from .base import *

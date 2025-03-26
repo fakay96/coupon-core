@@ -42,19 +42,18 @@ from geodiscounts.v1.utils.vector_utils import PostgreSQLVectorClient
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from rest_framework.permissions import AllowAny
+
 client = PostgreSQLVectorClient()
-
-
 
 
 class CategoryView(APIView):
     """
     API endpoint to retrieve all available discount categories.
 
-    - Categories are **cached for 30 minutes** to optimize performance and reduce database load.
-    - Uses `cache.get_or_set()` for atomic caching.
+    - Categories are cached for 30 minutes to optimize performance and reduce database load.
+    - Uses atomic caching to reduce redundant queries.
     """
-    
+    # Removed serializer_class to prevent automatic inclusion in the Swagger spec.
     permission_classes = [AllowAny]  # Public access
 
     @swagger_auto_schema(
@@ -62,56 +61,54 @@ class CategoryView(APIView):
         responses={
             HTTP_200_OK: openapi.Response(
                 description="Success.",
-                schema=CategorySerializer(many=True)
+                schema=openapi.Schema(
+                    type=openapi.TYPE_ARRAY,
+                    items=openapi.Schema(
+                        type=openapi.TYPE_OBJECT,
+                        properties={
+                            "id": openapi.Schema(type=openapi.TYPE_INTEGER),
+                            "name": openapi.Schema(type=openapi.TYPE_STRING),
+                            "image": openapi.Schema(type=openapi.TYPE_STRING, nullable=True),
+                        },
+                    ),
+                ),
             ),
             HTTP_404_NOT_FOUND: openapi.Response(
                 description="No categories found.",
-                examples={"application/json": {"message": "No categories available."}}
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "message": openapi.Schema(type=openapi.TYPE_STRING),
+                    },
+                ),
             ),
             HTTP_500_INTERNAL_SERVER_ERROR: openapi.Response(
                 description="Internal server error.",
-                examples={"application/json": {"error": "An unexpected error occurred."}}
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "error": openapi.Schema(type=openapi.TYPE_STRING),
+                        "details": openapi.Schema(type=openapi.TYPE_STRING),
+                    },
+                ),
             ),
         },
     )
     def get(self, request) -> Response:
-        """
-        Handles GET requests to retrieve all available discount categories.
-
-        - **Caching**: Categories are **cached for 30 minutes** (`cache_key="categories_list"`).
-        - **Efficient DB Querying**: Uses `.only()` to retrieve minimal necessary fields.
-        - **Logging**: Errors are logged for debugging.
-
-        Returns:
-            Response: JSON response containing the list of categories.
-
-        Status Codes:
-            - 200: Success.
-            - 404: No categories found.
-            - 500: Internal server error.
-        """
         cache_key = "categories_list"
-
         try:
             categories = cache.get(cache_key)
-
             if categories is None:
-                category_queryset = Category.objects.only("id", "name", "image")  # Fetch minimal fields
-
+                category_queryset = Category.objects.only("id", "name", "image")
                 if not category_queryset.exists():
                     return Response(
                         {"message": "No categories available."},
                         status=HTTP_404_NOT_FOUND,
                     )
-
                 serializer = CategorySerializer(category_queryset, many=True)
                 categories = serializer.data
-
-                # Use atomic `cache.get_or_set`
-                cache.set(cache_key, categories, timeout=1800)  # 30 min cache
-
+                cache.set(cache_key, categories, timeout=1800)  # Cache for 30 minutes
             return Response(categories, status=HTTP_200_OK)
-
         except Exception as e:
             return Response(
                 {"error": "An unexpected error occurred.", "details": str(e)},
@@ -123,43 +120,53 @@ class DiscountListView(APIView):
     """
     API endpoint to fetch all available discounts.
     """
-
     @swagger_auto_schema(
         operation_description="Returns a list of all discounts in the system.",
         responses={
             HTTP_200_OK: openapi.Response(
                 description="Success.",
-                schema=DiscountSerializer(many=True)
+                schema=openapi.Schema(
+                    type=openapi.TYPE_ARRAY,
+                    items=openapi.Schema(
+                        type=openapi.TYPE_OBJECT,
+                        properties={
+                            "id": openapi.Schema(type=openapi.TYPE_INTEGER),
+                            "retailer": openapi.Schema(
+                                type=openapi.TYPE_OBJECT,
+                                properties={
+                                    "id": openapi.Schema(type=openapi.TYPE_INTEGER),
+                                    "name": openapi.Schema(type=openapi.TYPE_STRING),
+                                    # Add additional retailer fields if needed.
+                                },
+                            ),
+                            "description": openapi.Schema(type=openapi.TYPE_STRING),
+                            "discount_code": openapi.Schema(type=openapi.TYPE_STRING),
+                            "discount_value": openapi.Schema(type=openapi.TYPE_NUMBER),
+                            "is_active": openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                            "expiration_date": openapi.Schema(type=openapi.TYPE_STRING, format="date-time"),
+                            "location": openapi.Schema(type=openapi.TYPE_STRING),
+                            "created_at": openapi.Schema(type=openapi.TYPE_STRING, format="date-time"),
+                            "updated_at": openapi.Schema(type=openapi.TYPE_STRING, format="date-time"),
+                        },
+                    ),
+                ),
             ),
             HTTP_404_NOT_FOUND: openapi.Response(
                 description="No discounts found.",
-                examples={
-                    "application/json": {"message": "No discounts available."}
-                }
+                examples={"application/json": {"message": "No discounts available."}},
             ),
             HTTP_500_INTERNAL_SERVER_ERROR: openapi.Response(
                 description="Internal server error.",
                 examples={
                     "application/json": {
                         "error": "An unexpected error occurred.",
-                        "details": "Detailed error message..."
+                        "details": "Detailed error message...",
                     }
-                }
+                },
             ),
         },
     )
     def get(self, request) -> Response:
-        """
-        Returns a list of all discounts in the system.
-
-        Returns:
-            Response: JSON response containing the list of discounts.
-
-        Status Codes:
-            - 200: Success.
-            - 404: No discounts found.
-            - 500: Internal server error.
-        """
         try:
             discounts = Discount.objects.all()
             if not discounts.exists():
@@ -182,8 +189,6 @@ class NearbyDiscountsView(APIView):
 
     Allows optional filtering by a maximum distance (in kilometers).
     """
-
-    # Define a query parameter for max_distance (optional)
     max_distance_param = openapi.Parameter(
         "max_distance",
         openapi.IN_QUERY,
@@ -198,54 +203,57 @@ class NearbyDiscountsView(APIView):
         responses={
             HTTP_200_OK: openapi.Response(
                 description="Success.",
-                schema=DiscountSerializer(many=True)
+                schema=openapi.Schema(
+                    type=openapi.TYPE_ARRAY,
+                    items=openapi.Schema(
+                        type=openapi.TYPE_OBJECT,
+                        properties={
+                            "id": openapi.Schema(type=openapi.TYPE_INTEGER),
+                            "retailer": openapi.Schema(
+                                type=openapi.TYPE_OBJECT,
+                                properties={
+                                    "id": openapi.Schema(type=openapi.TYPE_INTEGER),
+                                    "name": openapi.Schema(type=openapi.TYPE_STRING),
+                                },
+                            ),
+                            "description": openapi.Schema(type=openapi.TYPE_STRING),
+                            "discount_code": openapi.Schema(type=openapi.TYPE_STRING),
+                            "discount_value": openapi.Schema(type=openapi.TYPE_NUMBER),
+                            "is_active": openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                            "expiration_date": openapi.Schema(type=openapi.TYPE_STRING, format="date-time"),
+                            "location": openapi.Schema(type=openapi.TYPE_STRING),
+                            "created_at": openapi.Schema(type=openapi.TYPE_STRING, format="date-time"),
+                            "updated_at": openapi.Schema(type=openapi.TYPE_STRING, format="date-time"),
+                            "distance": openapi.Schema(type=openapi.TYPE_NUMBER, description="Distance in meters"),
+                        },
+                    ),
+                ),
             ),
             HTTP_400_BAD_REQUEST: openapi.Response(
                 description="Validation error.",
-                examples={
-                    "application/json": {"error": "Detailed validation error message."}
-                }
+                examples={"application/json": {"error": "Detailed validation error message."}},
             ),
             HTTP_404_NOT_FOUND: openapi.Response(
                 description="No discounts found.",
-                examples={
-                    "application/json": {"message": "No discounts found near your location."}
-                }
+                examples={"application/json": {"message": "No discounts found near your location."}},
             ),
             HTTP_500_INTERNAL_SERVER_ERROR: openapi.Response(
                 description="Internal server error.",
                 examples={
                     "application/json": {
                         "error": "An unexpected error occurred.",
-                        "details": "Detailed error message..."
+                        "details": "Detailed error message...",
                     }
-                }
+                },
             ),
         },
     )
     def get(self, request) -> Response:
-        """
-        Handles GET requests to retrieve nearby discounts.
-
-        Query Parameters:
-            - max_distance (optional): Maximum distance (in kilometers) for filtering discounts.
-
-        Returns:
-            Response: JSON response containing nearby discounts.
-
-        Status Codes:
-            - 200: Success.
-            - 400: Validation error.
-            - 404: No discounts found.
-            - 500: Internal server error.
-        """
         try:
-            # Ensure the IP address is provided by the middleware
             ip = getattr(request, "client_ip", None)
             if not ip:
                 raise ValidationError("Client IP address is not available.")
 
-            # Fetch geolocation from IP
             location = get_location_from_ip(ip)
             if not location:
                 raise ValidationError("Unable to determine location from IP address.")
@@ -253,7 +261,6 @@ class NearbyDiscountsView(APIView):
             lat, lon = location["latitude"], location["longitude"]
             user_location = Point(lon, lat, srid=4326)
 
-            # Optional distance filtering
             max_distance = request.GET.get("max_distance")
             if max_distance:
                 try:
@@ -261,26 +268,20 @@ class NearbyDiscountsView(APIView):
                 except ValueError as e:
                     raise ValidationError(str(e))
 
-            # Query discounts and annotate with distance
             discounts = Discount.objects.annotate(
                 distance=Distance("location", user_location)
             )
             if max_distance:
-                discounts = discounts.filter(
-                    distance__lte=max_distance * 1000
-                )  # Convert km to meters
-
-            discounts = discounts.order_by("distance")[:10]  # Limit results to top 10
+                discounts = discounts.filter(distance__lte=max_distance * 1000)
+            discounts = discounts.order_by("distance")[:10]
             if not discounts.exists():
                 return Response(
                     {"message": "No discounts found near your location."},
                     status=HTTP_404_NOT_FOUND,
                 )
 
-            # Serialize and return results
             serializer = DiscountSerializer(discounts, many=True)
             return Response(serializer.data, status=HTTP_200_OK)
-
         except ValidationError as ve:
             return Response({"error": str(ve)}, status=HTTP_400_BAD_REQUEST)
         except Exception as e:
@@ -296,8 +297,6 @@ class SearchDiscountsView(APIView):
 
     The query is embedded into a vector, which is then used to search the vector database.
     """
-
-    # Define the request body schema for the search endpoint.
     search_request_body = openapi.Schema(
         type=openapi.TYPE_OBJECT,
         properties={
@@ -321,58 +320,52 @@ class SearchDiscountsView(APIView):
         responses={
             HTTP_200_OK: openapi.Response(
                 description="Success.",
-                schema=DiscountSerializer(many=True)
+                schema=openapi.Schema(
+                    type=openapi.TYPE_ARRAY,
+                    items=openapi.Schema(
+                        type=openapi.TYPE_OBJECT,
+                        properties={
+                            "id": openapi.Schema(type=openapi.TYPE_INTEGER),
+                            "retailer": openapi.Schema(
+                                type=openapi.TYPE_OBJECT,
+                                properties={
+                                    "id": openapi.Schema(type=openapi.TYPE_INTEGER),
+                                    "name": openapi.Schema(type=openapi.TYPE_STRING),
+                                },
+                            ),
+                            "description": openapi.Schema(type=openapi.TYPE_STRING),
+                            "discount_code": openapi.Schema(type=openapi.TYPE_STRING),
+                            "discount_value": openapi.Schema(type=openapi.TYPE_NUMBER),
+                            "is_active": openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                            "expiration_date": openapi.Schema(type=openapi.TYPE_STRING, format="date-time"),
+                            "location": openapi.Schema(type=openapi.TYPE_STRING),
+                            "created_at": openapi.Schema(type=openapi.TYPE_STRING, format="date-time"),
+                            "updated_at": openapi.Schema(type=openapi.TYPE_STRING, format="date-time"),
+                        },
+                    ),
+                ),
             ),
             HTTP_400_BAD_REQUEST: openapi.Response(
                 description="Validation error.",
-                examples={
-                    "application/json": {"error": "A valid search query must be provided as a string."}
-                }
+                examples={"application/json": {"error": "A valid search query must be provided as a string."}},
             ),
             HTTP_500_INTERNAL_SERVER_ERROR: openapi.Response(
                 description="Internal server error.",
-                examples={
-                    "application/json": {
-                        "error": "An unexpected error occurred.",
-                        "details": "Detailed error message..."
-                    }
-                }
+                examples={"application/json": {"error": "An unexpected error occurred.", "details": "Detailed error message..."}},
             ),
         },
     )
     def post(self, request) -> Response:
-        """
-        Handles POST requests to search for similar discounts.
-
-        Request Body:
-            - query (str): A user-provided search query (e.g., a string description or keywords).
-            - top_k (int, optional): The number of top results to retrieve (default: 10).
-
-        Returns:
-            Response: JSON response containing the top matching discounts.
-
-        Status Codes:
-            - 200: Success.
-            - 400: Validation error.
-            - 500: Internal server error.
-        """
         try:
-            # Extract and validate the query
             query: str = request.data.get("query")
             if not query or not isinstance(query, str):
-                raise ValidationError(
-                    "A valid search query must be provided as a string."
-                )
+                raise ValidationError("A valid search query must be provided as a string.")
 
-            # Generate embedding for the query
             try:
                 query_vector: List[float] = generate_embedding(query)
             except Exception as e:
-                raise ValidationError(
-                    f"Failed to generate embedding for the query: {str(e)}"
-                )
+                raise ValidationError(f"Failed to generate embedding for the query: {str(e)}")
 
-            # Validate the top_k parameter
             top_k = request.data.get("top_k", 10)
             try:
                 top_k = int(top_k)
@@ -381,24 +374,14 @@ class SearchDiscountsView(APIView):
             except ValueError:
                 raise ValidationError("top_k must be a positive integer.")
 
-            # Search vector database
             search_results = client.search_vectors(query_vector, top_k=top_k)
-
-            # Extract matching vector IDs
             matching_ids = [result["id"] for result in search_results]
-
-            # Query matching discounts from the database
             discounts = Discount.objects.filter(vector_id__in=matching_ids)
             if not discounts.exists():
-                return Response(
-                    {"message": "No matching discounts found."},
-                    status=HTTP_200_OK,
-                )
+                return Response({"message": "No matching discounts found."}, status=HTTP_200_OK)
 
-            # Serialize and return results
             serializer = DiscountSerializer(discounts, many=True)
             return Response(serializer.data, status=HTTP_200_OK)
-
         except ValidationError as ve:
             return Response({"error": str(ve)}, status=HTTP_400_BAD_REQUEST)
         except Exception as e:

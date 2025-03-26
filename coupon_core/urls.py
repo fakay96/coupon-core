@@ -41,12 +41,10 @@ schema_view = get_schema_view(
     permission_classes=(permissions.AllowAny,),
 )
 
-
-
 # Base URL patterns
 urlpatterns = [
     path("admin/", admin.site.urls),  # Admin panel
- 
+    # path("healthz/", health_check, name="health-check"),  # Health check endpoint
 ]
 
 # Mapping of applications to their URL configurations
@@ -57,9 +55,14 @@ app_urls = {
 
 # Dynamically include all app-specific URLs under the `api/` prefix
 for app_name, app_url in app_urls.items():
-    urlpatterns += [
-        path(f"api/{app_name}/", include(app_url)),  # Add `api/` prefix
-    ]
+    if app_name == "geodiscounts":
+        urlpatterns += [
+            path(f"api/{app_name}/v1/", include(app_url)),  # Use v1 prefix for geodiscounts
+        ]
+    else:
+        urlpatterns += [
+            path(f"api/{app_name}/", include(app_url)),  # Keep original prefix for other apps
+        ]
 
 # Add Swagger and Redoc endpoints (typically for development)
 urlpatterns += [

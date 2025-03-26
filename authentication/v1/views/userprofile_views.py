@@ -5,6 +5,8 @@ This module provides the following endpoints:
 1. User Profile Management:
     - GET /api/v1/user-profile/: Retrieve the authenticated user's profile details.
     - PUT /api/v1/user-profile/: Update the authenticated user's profile details.
+    - PATCH /api/v1/user-profile/: Partially update the authenticated user's profile details.
+    - DELETE /api/v1/user-profile/image/: Delete the authenticated user's profile image.
 
 2. User Registration:
     - POST /api/v1/register/: Register a new user or upgrade a guest user to a regular user.
@@ -28,7 +30,7 @@ from django.shortcuts import get_object_or_404
 from django.core.validators import validate_email
 
 from rest_framework import status
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -69,6 +71,8 @@ class UserProfileView(APIView):
     Endpoints:
         - GET /api/v1/user-profile/: Retrieve the authenticated user's profile details.
         - PUT /api/v1/user-profile/: Update the authenticated user's profile details.
+        - PATCH /api/v1/user-profile/: Partially update the authenticated user's profile details.
+        - DELETE /api/v1/user-profile/image/: Delete the authenticated user's profile image.
     """
 
     permission_classes = [IsAuthenticated]
@@ -151,11 +155,20 @@ class UserProfileView(APIView):
             - 500: Internal server error.
         """
         try:
-            profile = request.user.profile  # Fetch the authenticated user's profile.
-            serializer = UserProfileSerializer(profile, data=request.data, partial=True)
-            
+            profile = request.user.profile
+            # Handle nested user data by including it in the request data
+            data = request.data.copy()
+            if 'first_name' in request.data or 'last_name' in request.data:
+                user_data = {}
+                if 'first_name' in request.data:
+                    user_data['first_name'] = request.data['first_name']
+                if 'last_name' in request.data:
+                    user_data['last_name'] = request.data['last_name']
+                data['user'] = user_data
+
+            serializer = UserProfileSerializer(profile, data=data)
             if serializer.is_valid():
-                serializer.save()  # Save the updated profile data.
+                serializer.save()
                 return Response(serializer.data, status=status.HTTP_200_OK)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except UserProfile.DoesNotExist:
@@ -165,6 +178,124 @@ class UserProfileView(APIView):
             )
         except Exception as e:
             logger.error("Error updating user profile: %s", str(e), exc_info=True)
+            return Response(
+                {"error": "An unexpected error occurred.", "details": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @swagger_auto_schema(
+        operation_description="Partially update the profile of the authenticated user.",
+        request_body=UserProfileSerializer,
+        responses={
+            200: openapi.Response(
+                description="Successfully updated profile details.",
+                schema=UserProfileSerializer()
+            ),
+            400: openapi.Response(
+                description="Validation errors.",
+                schema=error_response_schema
+            ),
+            404: openapi.Response(
+                description="Profile not found.",
+                schema=error_response_schema
+            ),
+            500: openapi.Response(
+                description="Internal server error.",
+                schema=error_response_schema
+            ),
+        },
+    )
+    def patch(self, request: Any) -> Response:
+        """
+        Partially update the profile of the authenticated user.
+
+        Args:
+            request (Any): The HTTP request containing the partial profile data.
+
+        Returns:
+            - 200: Successfully updated profile details.
+            - 400: Validation errors.
+            - 404: Profile not found.
+            - 500: Internal server error.
+        """
+        try:
+            profile = request.user.profile
+            # Handle nested user data by including it in the request data
+            data = request.data.copy()
+            if 'first_name' in request.data or 'last_name' in request.data:
+                user_data = {}
+                if 'first_name' in request.data:
+                    user_data['first_name'] = request.data['first_name']
+                if 'last_name' in request.data:
+                    user_data['last_name'] = request.data['last_name']
+                data['user'] = user_data
+
+            # Handle preferences update
+            if 'preferences' in data:
+                if not isinstance(data['preferences'], dict):
+                    return Response(
+                        {"error": "Preferences must be a JSON object."},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                current_preferences = profile.preferences or {}
+                current_preferences.update(data['preferences'])
+                data['preferences'] = current_preferences
+
+            serializer = UserProfileSerializer(profile, data=data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except UserProfile.DoesNotExist:
+            return Response(
+                {"error": "Profile not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error("Error updating user profile: %s", str(e), exc_info=True)
+            return Response(
+                {"error": "An unexpected error occurred.", "details": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @swagger_auto_schema(
+        operation_description="Delete the profile image of the authenticated user.",
+        responses={
+            204: openapi.Response(
+                description="Successfully deleted profile image.",
+            ),
+            404: openapi.Response(
+                description="Profile not found.",
+                schema=error_response_schema
+            ),
+            500: openapi.Response(
+                description="Internal server error.",
+                schema=error_response_schema
+            ),
+        },
+    )
+    def delete(self, request: Any) -> Response:
+        """
+        Delete the profile image of the authenticated user.
+
+        Returns:
+            - 204: Successfully deleted profile image.
+            - 404: Profile not found.
+            - 500: Internal server error.
+        """
+        try:
+            profile = request.user.profile
+            if profile.profile_image:
+                profile.profile_image.delete()
+                profile.save()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except UserProfile.DoesNotExist:
+            return Response(
+                {"error": "Profile not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error("Error deleting profile image: %s", str(e), exc_info=True)
             return Response(
                 {"error": "An unexpected error occurred.", "details": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -236,7 +367,7 @@ class UserRegistrationView(APIView):
         Register a new user or upgrade a guest user to a regular user.
 
         Args:
-            request (Any): The HTTP request object containing user data.
+            request (Any): The HTTP request containing registration data.
 
         Returns:
             - 201: User successfully registered or upgraded.
@@ -244,58 +375,18 @@ class UserRegistrationView(APIView):
             - 500: Internal server error.
         """
         try:
-            # Check if the user is authenticated.
-            if request.user.is_authenticated:
-                # Check if the user is a guest user.
-                if getattr(request.user, "is_guest", False):
-                    password = request.data.get("password")
-                    confirm_password = request.data.get("confirm_password")
-
-                    if not password or not confirm_password:
-                        return Response(
-                            {"error": "Password and confirm password are required."},
-                            status=status.HTTP_400_BAD_REQUEST,
-                        )
-                    if password != confirm_password:
-                        return Response(
-                            {"error": "Password and confirm password do not match."},
-                            status=status.HTTP_400_BAD_REQUEST,
-                        )
-
-                    # Upgrade the guest user to a regular user.
-                    request.user.is_guest = False
-                    request.user.role = "user"
-                    request.user.password = make_password(password)
-                    request.user.save()
-
-                    return Response(
-                        {"message": "Guest user upgraded to a regular user."},
-                        status=status.HTTP_201_CREATED,
-                    )
-                else:
-                    return Response(
-                        {"error": "You are already registered."},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-
-            # For new user registration.
+            # Validate required fields
             email = request.data.get("email")
             password = request.data.get("password")
             confirm_password = request.data.get("confirm_password")
 
-            if not email or not password or not confirm_password:
+            if not all([email, password, confirm_password]):
                 return Response(
-                    {"error": "Email, password, and confirm password are required."},
+                    {"error": "All fields are required."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            if password != confirm_password:
-                return Response(
-                    {"error": "Password and confirm password do not match."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            # Validate email format before proceeding.
+            # Validate email format
             try:
                 validate_email(email)
             except ValidationError:
@@ -304,30 +395,47 @@ class UserRegistrationView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # Use the serializer to validate and create the user.
-            serializer = RegisterSerializer(
-                data={
-                    "email": email,
-                    "password": password,
-                    "username": email.split("@")[0],
-                }
-            )
-            if serializer.is_valid():
-                user = serializer.save()
-                user.role = "user"
-                user.save()
+            # Check if passwords match
+            if password != confirm_password:
                 return Response(
-                    {
-                        "message": "User registered successfully.",
-                        "user": serializer.data,
-                    },
-                    status=status.HTTP_201_CREATED,
+                    {"error": "Passwords do not match."},
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            # Check if email is already registered
+            if CustomUser.objects.filter(email=email).exists():
+                return Response(
+                    {"error": "Email is already registered."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Create user and profile
+            user = CustomUser.objects.create(
+                email=email,
+                password=make_password(password),
+                is_active=True,
+            )
+
+            profile = UserProfile.objects.create(user=user)
+
+            # Create verification token
+            verification = ProfileVerification.objects.create(
+                user=user,
+                email=email,
+            )
+            verification.send_verification_email()
+
+            serializer = RegisterSerializer(user)
+            return Response(
+                {
+                    "message": "User registered successfully.",
+                    "user": serializer.data,
+                },
+                status=status.HTTP_201_CREATED,
+            )
 
         except Exception as e:
-            logger.error("Error in user registration: %s", str(e), exc_info=True)
+            logger.error("Error during user registration: %s", str(e), exc_info=True)
             return Response(
                 {"error": "An unexpected error occurred.", "details": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -534,6 +642,260 @@ class TokenVerificationView(APIView):
             return Response(
                 {"error": "An unexpected error occurred.", "details": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class UserProfileBulkView(APIView):
+    """
+    API endpoint for bulk operations on user profiles.
+
+    Permissions:
+        - Requires the user to be an admin.
+
+    Endpoints:
+        - GET /api/v1/user-profiles/bulk/: Retrieve multiple user profiles.
+        - PUT /api/v1/user-profiles/bulk/: Update multiple user profiles.
+        - DELETE /api/v1/user-profiles/bulk/: Delete multiple user profiles.
+    """
+
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    @swagger_auto_schema(
+        operation_description="Retrieve multiple user profiles.",
+        manual_parameters=[
+            openapi.Parameter(
+                'user_ids',
+                openapi.IN_QUERY,
+                description="Comma-separated list of user IDs",
+                type=openapi.TYPE_STRING,
+                required=True,
+            ),
+        ],
+        responses={
+            200: openapi.Response(
+                description="Successfully retrieved profiles.",
+                schema=UserProfileSerializer(many=True)
+            ),
+            400: openapi.Response(
+                description="Invalid request parameters.",
+                schema=error_response_schema
+            ),
+            404: openapi.Response(
+                description="One or more profiles not found.",
+                schema=error_response_schema
+            ),
+            500: openapi.Response(
+                description="Internal server error.",
+                schema=error_response_schema
+            ),
+        },
+    )
+    def get(self, request: Any) -> Response:
+        """
+        Retrieve multiple user profiles.
+
+        Args:
+            request (Any): The HTTP request containing user IDs.
+
+        Returns:
+            - 200: Successfully retrieved profiles.
+            - 400: Invalid request parameters.
+            - 404: One or more profiles not found.
+            - 500: Internal server error.
+        """
+        try:
+            user_ids = request.query_params.get('user_ids', '').split(',')
+            if not user_ids or not all(user_ids):
+                return Response(
+                    {"error": "user_ids parameter is required."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            profiles = UserProfile.objects.filter(user_id__in=user_ids)
+            if not profiles.exists():
+                return Response(
+                    {"error": "No profiles found for the provided user IDs."},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            serializer = UserProfileSerializer(profiles, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.error("Error retrieving user profiles: %s", str(e), exc_info=True)
+            return Response(
+                {"error": "An unexpected error occurred.", "details": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @swagger_auto_schema(
+        operation_description="Update multiple user profiles.",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'profiles': openapi.Schema(
+                    type=openapi.TYPE_ARRAY,
+                    items=openapi.Schema(
+                        type=openapi.TYPE_OBJECT,
+                        properties={
+                            'user_id': openapi.Schema(type=openapi.TYPE_INTEGER),
+                            'data': UserProfileSerializer,
+                        },
+                    ),
+                ),
+            },
+            required=['profiles'],
+        ),
+        responses={
+            200: openapi.Response(
+                description="Successfully updated profiles.",
+                schema=UserProfileSerializer(many=True)
+            ),
+            400: openapi.Response(
+                description="Invalid request data.",
+                schema=error_response_schema
+            ),
+            404: openapi.Response(
+                description="One or more profiles not found.",
+                schema=error_response_schema
+            ),
+            500: openapi.Response(
+                description="Internal server error.",
+                schema=error_response_schema
+            ),
+        },
+    )
+    def put(self, request: Any) -> Response:
+        """
+        Update multiple user profiles.
+
+        Args:
+            request (Any): The HTTP request containing profile updates.
+
+        Returns:
+            - 200: Successfully updated profiles.
+            - 400: Invalid request data.
+            - 404: One or more profiles not found.
+            - 500: Internal server error.
+        """
+        try:
+            profiles_data = request.data.get('profiles', [])
+            if not profiles_data:
+                return Response(
+                    {"error": "No profile updates provided."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            updated_profiles = []
+            errors = []
+
+            for profile_update in profiles_data:
+                try:
+                    user_id = profile_update.get('user_id')
+                    data = profile_update.get('data', {})
+
+                    if not user_id:
+                        errors.append({"error": "user_id is required.", "data": profile_update})
+                        continue
+
+                    try:
+                        profile = UserProfile.objects.get(user_id=user_id)
+                    except UserProfile.DoesNotExist:
+                        errors.append({"error": f"Profile not found for user_id {user_id}."})
+                        continue
+
+                    serializer = UserProfileSerializer(profile, data=data, partial=True)
+                    if serializer.is_valid():
+                        serializer.save()
+                        updated_profiles.append(serializer.data)
+                    else:
+                        errors.append({
+                            "user_id": user_id,
+                            "errors": serializer.errors
+                        })
+                except Exception as e:
+                    errors.append({
+                        "user_id": profile_update.get('user_id'),
+                        "error": str(e)
+                    })
+
+            response_data = {
+                "updated_profiles": updated_profiles,
+            }
+            if errors:
+                response_data["errors"] = errors
+
+            return Response(response_data, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.error("Error updating user profiles: %s", str(e), exc_info=True)
+            return Response(
+                {"error": "An unexpected error occurred.", "details": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @swagger_auto_schema(
+        operation_description="Delete multiple user profiles.",
+        manual_parameters=[
+            openapi.Parameter(
+                'user_ids',
+                openapi.IN_QUERY,
+                description="Comma-separated list of user IDs",
+                type=openapi.TYPE_STRING,
+                required=True,
+            ),
+        ],
+        responses={
+            204: openapi.Response(
+                description="Successfully deleted profiles.",
+            ),
+            400: openapi.Response(
+                description="Invalid request parameters.",
+                schema=error_response_schema
+            ),
+            404: openapi.Response(
+                description="One or more profiles not found.",
+                schema=error_response_schema
+            ),
+            500: openapi.Response(
+                description="Internal server error.",
+                schema=error_response_schema
+            ),
+        },
+    )
+    def delete(self, request: Any) -> Response:
+        """
+        Delete multiple user profiles.
+
+        Args:
+            request (Any): The HTTP request containing user IDs.
+
+        Returns:
+            - 204: Successfully deleted profiles.
+            - 400: Invalid request parameters.
+            - 404: One or more profiles not found.
+            - 500: Internal server error.
+        """
+        try:
+            user_ids = request.query_params.get('user_ids', '').split(',')
+            if not user_ids or not all(user_ids):
+                return Response(
+                    {"error": "user_ids parameter is required."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            profiles = UserProfile.objects.filter(user_id__in=user_ids)
+            if not profiles.exists():
+                return Response(
+                    {"error": "No profiles found for the provided user IDs."},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            profiles.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except Exception as e:
+            logger.error("Error deleting user profiles: %s", str(e), exc_info=True)
+            return Response(
+                {"error": "An unexpected error occurred.", "details": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
 
