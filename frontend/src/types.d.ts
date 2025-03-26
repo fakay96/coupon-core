@@ -21,13 +21,43 @@ interface RegisterUserData {
 }
 
 export type userT = {
-  date_joined: string;
-  email: string;
+  created_at: string;
   id: number;
-  is_active: boolean;
-  is_staff: boolean;
-  last_login: null;
-  role: string;
-  username: string;
+  location: string;
+  phone_number: string;
+  preferences: string;
+  updated_at: string;
+  user: {
+    email: string;
+    first_name: string;
+    id: number;
+    last_name: string;
+    phone_number: null;
+    username: string;
+  };
 };
 
+export interface Product {
+  title: string;
+  img: string;
+  category: string;
+}
+
+export interface SearchInputBoxProps {
+  categoryItems: Product[];
+  setCategoryItems: React.Dispatch<React.SetStateAction<Product[]>>;
+  category: string | null;
+  search: string | null;
+}
+
+export interface categoriesT {
+  id: number;
+  image: string;
+  name: string;
+}
+
+export interface DiscountItemT {
+  title: string;
+  img: string;
+  category: string;
+}

@@ -18,36 +18,37 @@ import NotFoundPage from "@/pages/NotFoundPage";
 import Homepage from "@/pages/HomePage";
 import ContinuePage from "@/pages/dashboard-pages/ContinuePage";
 import CategorySearchPage from "@/pages/dashboard-pages/CategorySearchPage";
+import EmailResendPage from "@/pages/authentication-pages/EmailResendPage";
 
 const AppRoutes = () => {
   return (
     <>
-    <ScrollToTop />
-    <Routes>
-      <Route path="/" element={<Homepage />} />
+      <ScrollToTop />
+      <Routes>
+        <Route path="/" element={<Homepage />} />
 
-      <Route path="/auth/login" element={<SignInPage />} />
-      <Route path="/auth/register" element={<SignUpPage />} />
-      <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
-      <Route path="/auth/verification" element={<CodeVerificationPage />} />
-      
-      <Route path="/dashboard" element={<DashboardLayout />}>
-        <Route index element={<DashboardPage />} />
-        <Route path="discount" element={<DiscountPage />} />
-        <Route path="price" element={<PricePage />} />
-        <Route path="category-search" element={<CategorySearchPage />} />
-        <Route path="category" element={<CategoryPage />} />
-        <Route path="reservation" element={<ReservationPage />} />
-        <Route path="together" element={<TogetherPage />} />
-        <Route path="plans" element={<PlanPage />} />
-        <Route path="continue" element={<ContinuePage />} />
-        <Route path="history" element={<HistoryPage />} />
-        <Route path="settings" element={<SettingsPage />} />
-      </Route>
+        <Route path="/auth/login" element={<SignInPage />} />
+        <Route path="/auth/register" element={<SignUpPage />} />
+        <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/auth/verification" element={<CodeVerificationPage />} />
+        <Route path="/auth/resend-email" element={<EmailResendPage />} />
 
+        <Route path="/dashboard" element={<DashboardLayout />}>
+          <Route index element={<DashboardPage />} />
+          <Route path="discount" element={<DiscountPage />} />
+          <Route path="price" element={<PricePage />} />
+          <Route path="category-search" element={<CategorySearchPage />} />
+          <Route path="category" element={<CategoryPage />} />
+          <Route path="reservation" element={<ReservationPage />} />
+          <Route path="together" element={<TogetherPage />} />
+          <Route path="plans" element={<PlanPage />} />
+          <Route path="continue" element={<ContinuePage />} />
+          <Route path="history" element={<HistoryPage />} />
+          <Route path="settings" element={<SettingsPage />} />
+        </Route>
 
         <Route path="*" element={<NotFoundPage />} />
-    </Routes>
+      </Routes>
     </>
   );
 };

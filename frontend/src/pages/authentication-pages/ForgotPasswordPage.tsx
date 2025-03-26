@@ -14,7 +14,7 @@ import { useNavigate } from "react-router-dom";
 import { forgotPasswordSchema } from "@/validation-schemas";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { loginUserQuery } from "@/queries/auth-queries";
+import { loginUserMutation } from "@/queries/auth-queries";
 import AuthHeader from "@/components/auth-component/header";
 
 const ForgotPasswordPage = () => {
@@ -23,7 +23,7 @@ const ForgotPasswordPage = () => {
   // Mutation for logging in the user
   const { isPending, 
     // mutateAsync: loginUser
-   } = loginUserQuery();
+   } = loginUserMutation();
   const form = useForm<z.infer<typeof forgotPasswordSchema>>({
     resolver: zodResolver(forgotPasswordSchema),
     defaultValues: {

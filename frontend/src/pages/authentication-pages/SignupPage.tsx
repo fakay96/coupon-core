@@ -22,7 +22,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { axiosGoogleLogin, loginUserService } from "@/api/authApi";
 import { loginCredentials } from "@/types";
 import { useGoogleLogin } from "@react-oauth/google";
-import { registerUserQuery } from "@/queries/auth-queries";
+import { registerUserMutation } from "@/queries/auth-queries";
 import { toast } from "sonner";
 import AuthHeader from "@/components/auth-component/header";
 import GoogleButton from "@/components/auth-component/google-button";
@@ -47,7 +47,7 @@ const SignUpPage = () => {
   });
 
   // Mutation for registering the user
-  const { isPending, mutateAsync: registerUser } = registerUserQuery();
+  const { isPending, mutateAsync: registerUser } = registerUserMutation();
   const form = useForm<z.infer<typeof signUpSchema>>({
     resolver: zodResolver(signUpSchema),
     defaultValues: {
@@ -79,7 +79,7 @@ const SignUpPage = () => {
         {
           loading: `${name}, Dishpal AI is creating your account.`,
           success: `${name}, Here is your dashboard! Explore!`,
-          error: `${name}, Your email is already registered.`,
+          error: (error) => error.message,
         }
       );
     },
@@ -107,7 +107,7 @@ const SignUpPage = () => {
       {
         loading: `${firstname}, Dishpal AI is creating your account.`,
         success: `${firstname}, Dishpal AI created your account successfully! Please login to continue.`,
-        error: `${firstname}, Your email is already registered.`,
+        error: (error) => error.message,
       }
     );
   };
@@ -119,9 +119,9 @@ const SignUpPage = () => {
         width={500}
         height={600}
         alt=""
-        className="hidden md:block 2xl:hidden place-self-center "
+        className="hidden md:block place-self-center "
       />
-      <div className="relative hidden 2xl:grid">
+      {/* <div className="relative hidden 2xl:grid">
         <img
           src="/images/logo.svg"
           alt=""
@@ -132,7 +132,7 @@ const SignUpPage = () => {
           alt=""
           className="2xl:absolute 2xl:h-full 2xl:w-full place-self-center justify-self-end "
         />
-      </div>
+      </div> */}
       <div className="flex items-center justify-center md:justify-start 2xl:mx-auto w-full max-w-lg mb-16 ">
         <div className="space-y-4 sm:space-y-6 w-full">
           <div className="space-y-3 mb-12 hidden md:block">

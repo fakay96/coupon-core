@@ -1,5 +1,8 @@
 import SearchInputNavbar from "@/components/globals/searchInputNavbar";
-import { categoryList, groceryProducts, imgs } from "@/constants";
+import {
+  categoryList,
+  categoryImages,
+} from "@/constants";
 import { FaHeart } from "react-icons/fa6";
 import { FaRegHeart } from "react-icons/fa";
 import { IoLocationSharp } from "react-icons/io5";
@@ -21,40 +24,43 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Dispatch, SetStateAction, useEffect, useState } from "react";
+import { FC, memo, useEffect, useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { useDebounce } from "@/hooks/searchDebounce";
 import { X } from "lucide-react";
 import CategorySwiper from "@/components/category-page-components/CategorySwiper";
 import { isEmpty } from "lodash";
+import { discountApiQuery } from "@/queries/geo-discount-queries";
+import { DiscountItemT } from "@/types";
 
-const CategoryPage = () => {
+
+
+const CategoryPage: FC = () => {
   const [searchParams] = useSearchParams();
   const category = searchParams.get("category");
   const search = searchParams.get("search");
 
-  console.count("CategoryPage");
+  const { data: allDiscount } = discountApiQuery();
 
-  const [categoryItems, setCategoryItems] = useState(groceryProducts);
-  useEffect(() => {
-    if (category) {
-      const filtered = groceryProducts.filter((item) => {
-        return item.category.toLowerCase() === category.toLowerCase();
-      });
-      setCategoryItems(filtered);
-    } else if (search) {
-      console.log(search);
-      const filtered = groceryProducts.filter((item) => {
-        return item?.title?.toLowerCase().includes(search.toLowerCase());
-      });
-      setCategoryItems(filtered);
-    } else {
-      setCategoryItems(groceryProducts);
+  const filteredItems = useMemo(() => {
+    if (!allDiscount) return [];
+
+    if (category && category !== "All") {
+      return allDiscount.filter(
+        (item: DiscountItemT) =>
+          item.category.toLowerCase() === category.toLowerCase()
+      );
     }
-    if (category === "All") {
-      setCategoryItems(groceryProducts);
+
+    if (search) {
+      return allDiscount.filter((item: DiscountItemT) =>
+        item.title.toLowerCase().includes(search.toLowerCase())
+      );
     }
-  }, [category]);
+
+    return allDiscount;
+  }, [category, search, allDiscount]);
+
   const navigate = useNavigate();
   return (
     <div className="">
@@ -122,7 +128,7 @@ const CategoryPage = () => {
             </div>
           </div>
           <div className="hidden lg:grid grid-cols-2 gap-4 sxx:grid-cols-4 sm:grid-cols-5 md:ml-auto">
-            {imgs.map((item, index) => (
+            {categoryImages.map((item, index) => (
               <div
                 onClick={() => {
                   navigate(`/dashboard/category?category=${item.href}`);
@@ -138,7 +144,7 @@ const CategoryPage = () => {
             ))}
           </div>
           <div className="lg:hidden">
-            <CategorySwiper imgs={imgs} />
+            <CategorySwiper imgs={categoryImages} />
           </div>
           <div className="">
             <h1 className="font-syne font-bold text-3xl">
@@ -148,11 +154,11 @@ const CategoryPage = () => {
                 ? "All Categories"
                 : category}
             </h1>
-            <p className="font-syne">{categoryItems.length} Results</p>
+            <p className="font-syne">{filteredItems?.length} Results</p>
           </div>
           <div className="flex mx-auto w-full">
-            <div className="grid grid-cols-1 ss:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 justify-center w-full">
-              {categoryItems.map(({ title, img }, index) => (
+            <div className="grid grid-cols-2 ss:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-4 justify-center w-full">
+              {filteredItems?.map((item: DiscountItemT, index: number) => (
                 <div key={index} className="bg-white shadow-xl relative w-full">
                   <div className="p-4 pb-20 flex flex-col h-full space-y-4">
                     <div
@@ -166,11 +172,13 @@ const CategoryPage = () => {
                       )}
                     </div>
                     <div className="flex-1 justify-center items-center flex">
-                      <img src={img} alt="" />
+                      <img src={item.img} alt="" />
                     </div>
                     <div className="space-y-2.5 capitalize font-syne">
-                      <h1 className="text-10 text-center font-bold">{title}</h1>
-                      <p className="text-cartGreen text-center">
+                      <h1 className="text-[10px] sm:text-sm text-center font-bold">
+                        {item.title}
+                      </h1>
+                      <p className="text-cartGreen text-center text-[10px] sm:text-sm">
                         2 hours left on deal
                       </p>
                       <div className="flex items-center justify-center gap-2">
@@ -179,7 +187,7 @@ const CategoryPage = () => {
                           shopping store name (2 miles away)
                         </p>
                       </div>
-                      <div className="flex items-center justify-center gap-4">
+                      <div className="flex items-center justify-center sm:gap-4">
                         {[1, 2, 3, 4].map((_, key) => (
                           <div key={key} className="flex">
                             <MdOutlineStar className="text-buttonGreen" />
@@ -187,9 +195,12 @@ const CategoryPage = () => {
                         ))}
                         <MdOutlineStar className="text-gray-200" />
                       </div>
+
                       <div className="flex gap-2 justify-center font-monst pt-4">
-                        <p className="font-semibold">80.29 </p>
-                        <div className="relative">
+                        <p className="font-semibold text-[10px] sm:text-sm">
+                          80.29{" "}
+                        </p>
+                        <div className="relative text-[10px] sm:text-sm">
                           {formatCurrency(18.29)}
                           <div className="absolute -translate-y-1/2 top-1/2 h-[1px] w-8 bg-vividOrange" />
                         </div>
@@ -205,8 +216,7 @@ const CategoryPage = () => {
           </div>
           <div className="">
             <SearchInputBox
-              setCategoryItems={setCategoryItems}
-              categoryItems={categoryItems}
+              categoryItems={filteredItems}
               search={search}
               category={category}
             />
@@ -219,39 +229,21 @@ const CategoryPage = () => {
 
 export default CategoryPage;
 
-const SearchInputBox = ({
-  categoryItems,
-  setCategoryItems,
-  category,
-  search
-}: {
+const SearchInputBox: FC<{
   categoryItems: {
     title: string;
     img: string;
     category: string;
   }[];
-  setCategoryItems: Dispatch<
-  SetStateAction<
-  {
-    title: string;
-    img: string;
-    category: string;
-  }[]
-  >
-  >;
   category: string | null;
   search: string | null;
-}) => {
+}> = memo(({ categoryItems, category, search }) => {
   const [value, setValue] = useState("");
   const debouncedSearch = useDebounce(value);
   const navigate = useNavigate();
-
+  console.count("Search Component");
   useEffect(() => {
-    const filtered = categoryItems.filter((item) => {
-      return item?.title?.toLowerCase().includes(debouncedSearch.toLowerCase());
-    });
-
-    setCategoryItems(filtered);
+    navigate(`/dashboard/category?search=${value}`);
   }, [debouncedSearch]);
 
   return (
@@ -280,4 +272,4 @@ const SearchInputBox = ({
       )}
     </div>
   );
-};
+});

@@ -3,9 +3,13 @@ import { loginCredentials, RegisterUserData } from "@/types";
 import { TokenResponse } from "@react-oauth/google";
 import axios from "axios";
 
-// POST: Login the registered user.
+/**
+ * Authenticates user with provided credentials
+ * @param credentials User login credentials containing email and password
+ * @returns Promise containing authentication tokens and user data
+ * @throws {ApiError} If authentication fails
+ */
 export const loginUserService = async (credentials: loginCredentials) => {
-  // Sends login credentials to the server and returns the response data.
   const response = await axiosInstance.post(
     "/api/authentication/v1/login/",
     credentials
@@ -13,11 +17,30 @@ export const loginUserService = async (credentials: loginCredentials) => {
   return response.data;
 };
 
-// POST: Register a new user.
+/**
+ * Updates the authenticated user's profile information
+ * @param userProfile Object containing user profile data to update
+ * @returns Promise containing updated user profile data
+ * @throws {ApiError} If update fails or user is not authenticated
+ */
+export const updateUserProfile = async (userProfile: any) => {
+  console.log(userProfile);
+  const response = await axiosInstance.put(
+    "/api/authentication/v1/user-profile/",
+    userProfile
+  );
+  return response.data;
+};
+
+/**
+ * Registers a new user in the system
+ * @param data User registration data including email, password and profile info
+ * @returns Promise containing new user data
+ * @throws {ApiError} If registration fails or validation errors occur
+ */
 export const registerUserService = async (
   data: RegisterUserData
 ): Promise<any> => {
-  // Sends registration data to the server and returns the response data.
   const response = await axiosInstance.post(
     "/api/authentication/v1/register/",
     data
@@ -25,9 +48,25 @@ export const registerUserService = async (
   return response.data;
 };
 
-// Auth token refresh route.
+/**
+ * Permanently deletes the authenticated user's account
+ * @returns Promise indicating successful deletion
+ * @throws {ApiError} If deletion fails or user is not authenticated
+ */
+export const DeleteUserAccountService = async (): Promise<any> => {
+  const response = await axiosInstance.delete(
+    "/api/authentication/v1/user-delete/"
+  );
+  return response.data;
+};
+
+/**
+ * Refreshes the authentication token using a refresh token
+ * @param refresh Valid refresh token
+ * @returns Promise containing new access token
+ * @throws {ApiError} If refresh fails or token is invalid
+ */
 export const tokenRefresh = async (refresh: string) => {
-  // Sends a request to refresh the authentication token using the refresh token.
   const response = await axiosInstance.post(
     "/api/authentication/v1/token/refresh/",
     { refresh }
@@ -35,9 +74,13 @@ export const tokenRefresh = async (refresh: string) => {
   return response;
 };
 
-// GET: Obtain a guest token. TODO: This will be implemented in the future after I get updates from Ayodeji regarding the app design on figma.
-export const getGuestToken = async (email: { email: string }) => {
-  // Sends a request to obtain a guest token using the provided email.
+/**
+ * Generates a guest access token for limited system access
+ * @param email Guest user email address
+ * @returns Promise containing guest access token
+ * @throws {ApiError} If token generation fails
+ */
+export const getGuestToken = async (email: string) => {
   const response = await axiosInstance.post(
     "/api/authentication/v1/guest-token/",
     email
@@ -45,25 +88,41 @@ export const getGuestToken = async (email: { email: string }) => {
   return response.data;
 };
 
-// GET: Fetch user information.
+/**
+ * Retrieves basic information about the authenticated user
+ * @returns Promise containing user information
+ * @throws {ApiError} If fetching fails or user is not authenticated
+ */
 export const getUserInfo = async () => {
-  // Sends a request to fetch the authenticated user's information.
-  const response = await axiosInstance.get("/api/authentication/v1/user-info/");
-  return response.data;
-};
-
-// GET: Fetch user profile.
-export const getUserProfile = async () => {
-  // Sends a request to fetch the authenticated user's profile.
   const response = await axiosInstance.get(
     "/api/authentication/v1/user-profile/"
   );
   return response.data;
 };
 
-// POST: Additional user registration endpoint.
-export const userRegistration = async (data: any) => {
-  // Sends additional user registration data to the server and returns the response data.
+/**
+ * Retrieves detailed profile information of the authenticated user
+ * @returns Promise containing user profile data
+ * @throws {ApiError} If fetching fails or user is not authenticated
+ */
+export const getUserProfile = async () => {
+  const response = await axiosInstance.get(
+    "/api/authentication/v1/user-profile/"
+  );
+  return response.data;
+};
+
+/**
+ * Completes user registration process with additional data
+ * @param data Additional user registration information
+ * @returns Promise containing completed registration data
+ * @throws {ApiError} If registration completion fails
+ */
+export const userRegistration = async (data: {
+  email: string;
+  password: string;
+  confirm_password: string;
+}) => {
   const response = await axiosInstance.post(
     "/api/authentication/v1/user-registration/",
     data
@@ -71,9 +130,37 @@ export const userRegistration = async (data: any) => {
   return response.data;
 };
 
-// GET: Fetch Google user information.
+export const resendVerificationToken = async (data: {
+  email: string;
+  force_resend: boolean; // default it to true.
+}) => {
+  const response = await axiosInstance.put(
+    "/api/authentication/v1/activate/",
+    data
+  );
+  return response.data;
+};
+
+export const verifyEmailToken = async ({
+  email,
+  token,
+}: {
+  email: string;
+  token: string; // default it to true.
+}) => {
+  const response = await axiosInstance.get(
+    `/api/authentication/v1/activate/?email=${email}&token=${token}`
+  );
+  return response.data;
+};
+
+/**
+ * Retrieves user information from Google OAuth API
+ * @param tokenResponse Google OAuth token response containing access token
+ * @returns Promise containing Google user information
+ * @throws {ApiError} If Google API request fails or token is invalid
+ */
 export const axiosGoogleLogin = async (tokenResponse: TokenResponse) => {
-  // Sends a request to fetch Google user information using the provided token.
   const { data } = await axios.get(
     "https://www.googleapis.com/oauth2/v3/userinfo",
     {
@@ -81,18 +168,4 @@ export const axiosGoogleLogin = async (tokenResponse: TokenResponse) => {
     }
   );
   return data;
-};
-
-// Returns a list of all discounts in the system.
-export const getDiscounts = async () => {
-  try {
-    console.log(import.meta.env.VITE_API_URL+"/api/geodiscounts/v1/discounts/");
-    console.log(axiosInstance.defaults.headers.common);
-
-    const response = await axiosInstance.get("/api/geodiscounts/v1/discounts/");
-    console.log(response);
-    
-  } catch (error) {
-    console.error(error);
-  }
 };
