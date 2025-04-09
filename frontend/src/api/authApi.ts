@@ -132,7 +132,7 @@ export const userRegistration = async (data: {
 
 export const resendVerificationToken = async (data: {
   email: string;
-  force_resend: boolean; // default it to true.
+  force_resend: boolean;
 }) => {
   const response = await axiosInstance.put(
     "/api/authentication/v1/activate/",
