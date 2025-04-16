@@ -22,6 +22,8 @@ class CustomUser(AbstractUser):
 
     This model adds support for guest users and includes timestamps for creation and updates.
     """
+    USERNAME_FIELD = "email"
+    REQUIRED_FIELDS = []
 
     email = models.EmailField(
         unique=True,
