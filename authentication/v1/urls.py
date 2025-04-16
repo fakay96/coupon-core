@@ -19,8 +19,8 @@ Endpoints:
 from django.urls import path, include
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from authentication.v1.views.admin_views import LoginView, RegisterView, UserInfoView
-from authentication.v1.views.guest_views import GuestTokenView
+from authentication.v1.views.authentication_views import LoginView, RegisterView, UserInfoView
+from authentication.v1.views.guest_authentication_views import GuestTokenView
 from authentication.v1.views.userprofile_views import (
     UserProfileView,
     UserRegistrationView,
