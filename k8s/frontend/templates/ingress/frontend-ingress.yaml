@@ -4,7 +4,7 @@ metadata:
   name: frontend
   namespace: {{ .Values.namespace }}
   labels:
-    app: backend
+    app: {{ .Values.frontend.name | default "frontend" }}
     release: coupon-service
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /
@@ -12,17 +12,17 @@ metadata:
 spec:
   ingressClassName: nginx
   tls:
-  - hosts:
-    - {{ .Values.frontend.ingress.host }}
-    secretName: {{ .Values.ingress.host | replace "." "-" }}-tls
+    - hosts:
+        - {{ .Values.frontend.ingress.host }}
+      secretName: {{ .Values.frontend.ingress.host | replace "." "-" }}-tls
   rules:
-  - host: {{ .Values.frontend.ingress.host }}
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: frontend
-            port:
-              number: {{ .Values.frontend.service.port }}
+    - host: {{ .Values.frontend.ingress.host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: {{ .Values.frontend.service.port }}
