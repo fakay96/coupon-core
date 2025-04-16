@@ -7,7 +7,7 @@ as well as searching for nearby discounts and filtering discounts by various cri
 
 from rest_framework import generics, status
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated,AllowAny
 from django.contrib.gis.geos import Point
 from django.contrib.gis.measure import D
 from django.conf import settings
@@ -54,24 +54,30 @@ class DiscountDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 class NearbyDiscountsView(generics.ListAPIView):
     """
-    View for listing discounts near a specified location.
+    View for listing discounts near the client's location.
 
     GET: List nearby discounts
-    Query Parameters:
-        - latitude: float (required)
-        - longitude: float (required)
-        - radius: float (optional, default=5.0, in kilometers)
+
+    Location is inferred from request.client_latitude and request.client_longitude
+    (set via middleware). If not available, returns an empty list.
+
+    Optional Query Parameters:
+        - radius: float (default=5.0, in kilometers)
     """
     serializer_class = DiscountSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        """Filter discounts by location."""
-        latitude = float(self.request.query_params.get('latitude', 0))
-        longitude = float(self.request.query_params.get('longitude', 0))
-        radius = float(self.request.query_params.get('radius', 5.0))
+        """Filter discounts by the user's current location (via middleware)."""
+        lat = getattr(self.request, "client_latitude", None)
+        lon = getattr(self.request, "client_longitude", None)
+        radius = float(self.request.query_params.get("radius", 5.0))
 
-        return GeoService.get_nearby_discounts(latitude, longitude, radius)
+        # If location is unavailable, return no results
+        if lat is None or lon is None:
+            return []  # Empty queryset
+
+        return GeoService.get_nearby_discounts(lat, lon, radius)
 
 
 class SearchDiscountsView(generics.ListAPIView):
@@ -116,7 +122,7 @@ class CategoryView(generics.ListAPIView):
     """
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny] 
 
     @swagger_auto_schema(
         operation_description="List all available discount categories",

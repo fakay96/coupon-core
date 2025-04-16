@@ -156,32 +156,29 @@ class UserProfileView(APIView):
         """
         try:
             profile = request.user.profile
-            # Handle nested user data by including it in the request data
             data = request.data.copy()
-            if 'first_name' in request.data or 'last_name' in request.data:
-                user_data = {}
-                if 'first_name' in request.data:
-                    user_data['first_name'] = request.data['first_name']
-                if 'last_name' in request.data:
-                    user_data['last_name'] = request.data['last_name']
-                data['user'] = user_data
-
-            serializer = UserProfileSerializer(profile, data=data)
+            # Safely add location from middleware
+            print(request.client_latitude)
+            if hasattr(request, "client_latitude") and hasattr(request, "client_longitude"):
+                if request.client_latitude is not None and request.client_longitude is not None:
+                    data["location"] = [request.client_longitude, request.client_latitude]
+            print(data)
+            serializer = UserProfileSerializer(profile, data=data, partial=True)
             if serializer.is_valid():
                 serializer.save()
                 return Response(serializer.data, status=status.HTTP_200_OK)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
         except UserProfile.DoesNotExist:
-            return Response(
-                {"error": "Profile not found."},
-                status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"error": "Profile not found."}, status=status.HTTP_404_NOT_FOUND)
+
         except Exception as e:
             logger.error("Error updating user profile: %s", str(e), exc_info=True)
             return Response(
                 {"error": "An unexpected error occurred.", "details": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
 
     @swagger_auto_schema(
         operation_description="Partially update the profile of the authenticated user.",

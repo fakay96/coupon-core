@@ -9,27 +9,36 @@ The middleware prioritizes the `X-Forwarded-For` header to fetch the original cl
 request passes through a proxy. If the header is unavailable, it falls back to the `REMOTE_ADDR`
 field.
 
+Additionally, this middleware performs IP-based geolocation to determine the user's
+longitude and latitude using a public geolocation API (ip-api.com). It caches the result
+for 2 hours to reduce redundant external API calls and improve performance.
 
+Attributes attached to request:
+    - request.client_ip: The resolved IP address of the client.
+    - request.client_latitude: Latitude of the client’s location (if resolved).
+    - request.client_longitude: Longitude of the client’s location (if resolved).
 """
 
+import requests
 from typing import Callable
-
+from django.core.cache import cache
 from django.http import HttpRequest, HttpResponse
 
 
 class UserLocationMiddleware:
     """
     Middleware to extract the client's IP address and attach it to the request object.
-    This middleware ensures the IP is globally available for all views.
+    Also attempts to geolocate the user by IP and cache the result.
 
     Attributes:
         get_response (Callable): The next middleware or view in the request chain.
 
     Methods:
         __call__(request: HttpRequest) -> HttpResponse:
-            Processes the incoming request, extracts the client's IP address, and
-            attaches it to the request object.
+            Processes the request and attaches client_ip, client_latitude, and client_longitude.
     """
+
+    CACHE_TIMEOUT_SECONDS = 2 * 60 * 60  # 2 hours
 
     def __init__(self, get_response: Callable) -> None:
         """
@@ -43,11 +52,7 @@ class UserLocationMiddleware:
     def __call__(self, request: HttpRequest) -> HttpResponse:
         """
         Processes the incoming request, extracts the client's IP address, and
-        attaches it to the request object.
-
-        The middleware prioritizes the `X-Forwarded-For` header to fetch the original
-        client IP if the request passes through a proxy. If the header is unavailable,
-        it falls back to the `REMOTE_ADDR` field.
+        attaches it to the request object. Also attaches geolocated lat/lon values.
 
         Args:
             request (HttpRequest): The incoming HTTP request.
@@ -57,14 +62,41 @@ class UserLocationMiddleware:
         """
         # Extract the IP address
         x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
-        if x_forwarded_for:
-            ip = x_forwarded_for.split(",")[0]  # First IP in the chain
-        else:
-            ip = request.META.get("REMOTE_ADDR")  # Direct IP address
-
-        # Attach the IP to the request object
+        ip = x_forwarded_for.split(",")[0] if x_forwarded_for else request.META.get("REMOTE_ADDR")
         request.client_ip = ip
 
-        # Pass the request to the next middleware or view
-        response = self.get_response(request)
-        return response
+        # Get geolocation from cache or API
+        lat, lon = self.get_geo_location(ip)
+        request.client_latitude = lat
+        request.client_longitude = lon
+
+        # Continue processing
+        return self.get_response(request)
+
+    def get_geo_location(self, ip: str) -> tuple[float | None, float | None]:
+        """
+        Query geolocation for the given IP and cache the result for 2 hours.
+
+        Args:
+            ip (str): IP address to look up.
+
+        Returns:
+            tuple: (latitude, longitude), or (None, None) if not available.
+        """
+        cache_key = f"geoip:{ip}"
+        cached = cache.get(cache_key)
+
+        if cached:
+            return cached.get("lat"), cached.get("lon")
+
+        try:
+            response = requests.get(f"http://ip-api.com/json/{ip}", timeout=2)
+            data = response.json()
+            if data.get("status") == "success":
+                lat, lon = data.get("lat"), data.get("lon")
+                cache.set(cache_key, {"lat": lat, "lon": lon}, timeout=self.CACHE_TIMEOUT_SECONDS)
+                return lat, lon
+        except Exception:
+            pass
+
+        return None, None

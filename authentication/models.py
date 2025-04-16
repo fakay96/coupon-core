@@ -153,6 +153,7 @@ class UserProfile(models.Model):
         auto_now=True, help_text="Timestamp when the profile was last updated."
     )
 
+
     def __str__(self) -> str:
         """
         Return a string representation of the UserProfile instance.

@@ -21,43 +21,58 @@ from rest_framework import serializers
 
 from authentication.models import CustomUser, UserProfile
 
-
 class LoginSerializer(serializers.Serializer):
     """
     Serializer for user login validation.
 
-    Validates username and password, ensuring the user is not a guest.
+    This serializer handles user authentication using email and password.
+    It ensures that:
+        - The provided email is in a valid format.
+        - The password matches the user account.
+        - Guest accounts are not allowed to log in.
+
+    Attributes:
+        email (EmailField): The user's email address.
+        password (CharField): The user's password (write-only).
     """
-    username = serializers.CharField(max_length=150, required=True)
-    password = serializers.CharField(write_only=True, required=True)
+
+    email = serializers.EmailField(
+        max_length=150,
+        required=True,
+        help_text="A valid email address used to identify the user."
+    )
+    password = serializers.CharField(
+        write_only=True,
+        required=True,
+        help_text="The user's password (not returned in the response)."
+    )
 
     def validate(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Validate the provided username and password.
+        Validates the provided email and password against registered users.
 
         Args:
-            data (Dict[str, Any]): Input containing 'username' and 'password'.
+            data (Dict[str, Any]): A dictionary containing 'email' and 'password'.
 
         Returns:
             Dict[str, Any]: The validated data with the authenticated user instance.
 
         Raises:
-            serializers.ValidationError: If the credentials are invalid or the user is a guest.
+            serializers.ValidationError: If authentication fails or the user is a guest.
         """
-        username: str = data.get("username")
+        email: str = data.get("email")
         password: str = data.get("password")
 
-        user: Optional[CustomUser] = authenticate(username=username, password=password)
+        user: Optional[CustomUser] = authenticate(email=email, password=password)
 
         if user is None:
-            raise serializers.ValidationError(_("Invalid username or password."))
+            raise serializers.ValidationError(_("Invalid email or password."))
 
         if getattr(user, "is_guest", False):
             raise serializers.ValidationError(_("Guest accounts are not allowed to log in."))
 
         data["user"] = user
         return data
-
 
 class RegisterSerializer(serializers.ModelSerializer):
     """
@@ -168,79 +183,74 @@ class GuestTokenSerializer(serializers.Serializer):
             return CustomUser.objects.get(email=email)
         except CustomUser.DoesNotExist:
             raise serializers.ValidationError(_("No user found with the provided email."))
-
-
-class UserSerializer(serializers.ModelSerializer):
-    """
-    Serializer for the Django CustomUser model.
-
-    Provides basic user details such as username and email.
-    """
-    class Meta:
-        model = CustomUser
-        fields = ["id", "username", "email", "first_name", "last_name", "phone_number"]
-        read_only_fields = ["id"]
-
-
 class UserProfileSerializer(serializers.ModelSerializer):
     """
-    Serializer for managing user profiles.
+    Serializer for managing user profile updates in a flat structure.
 
-    This serializer is responsible for serializing and deserializing user profile data.
+    This serializer flattens the user-related fields (first_name, last_name, phone_number)
+    into the top level of the payload rather than nesting them inside a 'user' object.
+
     It supports:
-        - Retrieving profile information, including user details.
-        - Updating user preferences and location.
-        - Allowing updates to the user's phone number.
+        - Updating basic user details: first_name, last_name, phone_number.
+        - Updating profile-specific fields: preferences, location (write-only), profile_image.
+        - Accepting user preferences as a dictionary (e.g., {"dark_mode": true}).
+        - Validating and converting the location field into a geographic Point.
+        - Serializing data into a flat JSON format for ease of use in front-end clients,
+          excluding sensitive fields like location from responses.
 
-    Attributes:
-        - user (UserSerializer, read-only): Nested serializer for user details.
-        - phone_number (str, optional): Allows updating the phone number of the user.
-        - preferences (dict, optional): JSON object storing user preferences.
-        - location (PointField, optional): Geographical location of the user.
-        - created_at (datetime, read-only): Timestamp when the profile was created.
-        - updated_at (datetime, read-only): Timestamp when the profile was last updated.
+    Expected input format:
+    {
+        "first_name": "Jane",
+        "last_name": "Doe",
+        "phone_number": "+1234567890",
+        "preferences": {
+            "dark_mode": true,
+            "notifications": false
+        },
+        "location": [-3.93, 50.74],  # accepted but not serialized
+        "profile_image": null
+    }
+
+    Notes:
+        - The location must be a list with exactly two float values: [longitude, latitude].
+        - Fields are optional and only provided fields will be updated.
+        - The location is only writeable and not returned in serialized output for privacy.
     """
-    user = UserSerializer(read_only=True)
-    phone_number = serializers.CharField(
-        source="user.phone_number",
-        required=False,
-        help_text="The phone number of the user in international format (e.g., +1234567890)."
-    )
+
+    first_name = serializers.CharField(source='user.first_name', required=False)
+    last_name = serializers.CharField(source='user.last_name', required=False)
+    phone_number = serializers.CharField(source='user.phone_number', required=False)
+
+    preferences = serializers.JSONField(required=False)
     location = serializers.ListField(
         child=serializers.FloatField(),
         required=False,
         min_length=2,
         max_length=2,
-        help_text="Location coordinates as [longitude, latitude]"
+        write_only=True,
+        help_text="Location coordinates as [longitude, latitude] (write-only)"
     )
+    profile_image = serializers.ImageField(required=False, allow_null=True)
 
     class Meta:
         model = UserProfile
         fields = [
-            "id",
-            "user",
+            "first_name",
+            "last_name",
             "phone_number",
             "preferences",
-            "location",
-            "profile_image",
-            "created_at",
-            "updated_at",
+            "location",  # write-only
+            "profile_image"
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
     def to_representation(self, instance: UserProfile) -> Dict[str, Any]:
         """
-        Convert the UserProfile instance to a dictionary representation.
-
-        Args:
-            instance (UserProfile): The user profile instance to serialize.
-
-        Returns:
-            Dict[str, Any]: The serialized user profile data.
+        Convert the UserProfile instance to a dictionary representation,
+        excluding location from the serialized output.
         """
         data = super().to_representation(instance)
-        if instance.location:
-            data['location'] = [instance.location.x, instance.location.y]
+        # Do not include location in the output
         return data
 
     def validate_location(self, value: list) -> Point:
@@ -248,13 +258,13 @@ class UserProfileSerializer(serializers.ModelSerializer):
         Validate and convert location coordinates to a Point object.
 
         Args:
-            value (list): List containing [longitude, latitude] coordinates.
+            value (list): [longitude, latitude]
 
         Returns:
-            Point: A Point object representing the location.
+            Point: A valid geographic point.
 
         Raises:
-            serializers.ValidationError: If the coordinates are invalid.
+            serializers.ValidationError: If the input format is invalid.
         """
         try:
             return Point(value[0], value[1])
@@ -265,14 +275,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         """
         Validate user preferences.
 
-        Args:
-            value (Dict[str, Any]): Dictionary containing user preferences.
-
-        Returns:
-            Dict[str, Any]: The validated preferences.
-
-        Raises:
-            serializers.ValidationError: If the preferences format is invalid.
+        Must be a dictionary (e.g., {"dark_mode": true}).
         """
         if not isinstance(value, dict):
             raise serializers.ValidationError(_("Preferences must be a JSON object."))
@@ -280,38 +283,21 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     def update(self, instance: UserProfile, validated_data: Dict[str, Any]) -> UserProfile:
         """
-        Update the UserProfile and the associated User model.
+        Update the UserProfile and related User fields using flat input.
 
-        This method ensures that:
-        - `phone_number`, `first_name`, and `last_name` updates are applied to the `CustomUser` model.
-        - Other profile-related fields (`preferences`, `location`) are updated normally.
-
-        Args:
-            instance (UserProfile): The current user profile instance.
-            validated_data (dict): The validated data from the request.
-
-        Returns:
-            UserProfile: The updated user profile instance.
+        Handles:
+        - Updating fields on the associated CustomUser instance.
+        - Updating profile-specific fields directly.
         """
-        # Extract user data from validated data; if not provided, an empty dict is used.
         user_data = validated_data.pop("user", {})
-
         user = instance.user
-        # Update user fields if provided.
-        phone_number = user_data.get("phone_number")
-        first_name = user_data.get("first_name")
-        last_name = user_data.get("last_name")
 
-        if phone_number is not None:
-            user.phone_number = phone_number
-        if first_name is not None:
-            user.first_name = first_name
-        if last_name is not None:
-            user.last_name = last_name
-
+        for attr in ["first_name", "last_name", "phone_number"]:
+            if attr in user_data:
+                setattr(user, attr, user_data[attr])
         user.save()
 
-        # Update profile fields
+        # Update remaining profile fields
         for field, value in validated_data.items():
             setattr(instance, field, value)
 

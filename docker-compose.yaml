@@ -66,14 +66,14 @@ services:
     networks:
       - internal-network
 
+  
   redis:
     image: redis:7
-    restart: unless-stopped
+    container_name: redis
     ports:
       - "6379:6379"
-    command: redis-server --requirepass {REDIS_PASSWORD}
-    networks:
-      - internal-network
+    command: ["redis-server", "--requirepass", "redis_password"]
+
 
 
   milvus:
