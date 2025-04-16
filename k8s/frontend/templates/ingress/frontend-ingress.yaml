@@ -7,14 +7,13 @@ metadata:
     app: {{ .Values.frontend.name | default "frontend" }}
     release: coupon-service
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
-    cert-manager.io/cluster-issuer: letsencrypt-prod
+    {{- toYaml .Values.ingress.annotations | nindent 4 }}
 spec:
-  ingressClassName: nginx
+  ingressClassName: {{ .Values.ingress.className }}
   tls:
     - hosts:
         - {{ .Values.frontend.ingress.host }}
-      secretName: {{ .Values.frontend.ingress.host | replace "." "-" }}-tls
+      secretName: {{ .Values.ingress.tls.secretName | default (.Values.frontend.ingress.host | replace "." "-" | printf "%s-tls") }}
   rules:
     - host: {{ .Values.frontend.ingress.host }}
       http:
