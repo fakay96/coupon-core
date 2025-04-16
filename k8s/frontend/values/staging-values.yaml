@@ -28,11 +28,11 @@ ingress:
   className: "nginx"
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /$1
-    cert-manager.io/cluster-issuer: letsencrypt-staging
+    cert-manager.io/cluster-issuer: letsencrypt-prod
   tls:
-    - hosts:
+    hosts:
         - app-staging.dishpal.ai
-      secretName: app-staging-dishpal-ai-tls
+    secretName: app-staging-dishpal-ai-tls
 
 autoscaling:
   enabled: false
