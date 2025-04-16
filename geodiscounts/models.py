@@ -88,14 +88,14 @@ class Retailer(models.Model):
     location: models.PointField = models.PointField(
         help_text="Geographic location of the retailer (latitude/longitude)."
     )
-    owner = models.ForeignKey(
-        CustomUser,
-        on_delete=models.CASCADE,
-        related_name='retailers',
-        help_text="User who owns/manages this retailer.",
-        null=True,
-        blank=True
-    )
+    # owner = models.ForeignKey(
+    #     CustomUser,
+    #     on_delete=models.CASCADE,
+    #     related_name='+',
+    #     help_text="User who owns/manages this retailer.",
+    #     null=True,
+    #     blank=True
+    # )
     analytics_data: Dict[str, Any] = models.JSONField(
         default=dict,
         blank=True,

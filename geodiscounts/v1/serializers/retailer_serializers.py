@@ -18,12 +18,11 @@ class RetailerSerializer(serializers.ModelSerializer):
             'name', 
             'contact_info', 
             'location', 
-            'owner', 
             'analytics_data',
             'created_at',
             'updated_at'
         ]
-        read_only_fields = ['owner', 'id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
 
 
 class NearbyRetailersSerializer(serializers.ModelSerializer):

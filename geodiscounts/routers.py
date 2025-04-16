@@ -1,112 +1,94 @@
 """
-Database Router for the geodiscounts app.
+Database Router for the geodiscounts and authentication apps.
 
 This router directs all database operations for models in the `geodiscounts`
-app to a specific relational database (`geodiscounts_db`).
+app to a specific relational database (`geodiscounts_db`), and all operations
+for the `authentication` app to `authentication_shard`. It enforces strict
+database isolation and prevents cross-database relationships.
 """
+
 class GeoDiscountsRouter:
     """
-    A database router to control all database operations on models in the `geodiscounts` app.
-    Includes proper handling of GIS operations and database compatibility checks.
+    A database router to control all database operations on models in the
+    `geodiscounts` and `authentication` apps, ensuring each app only interacts
+    with its designated database shard.
+
+    - Routes all geodiscounts models to `geodiscounts_db`.
+    - Routes all authentication models to `authentication_shard`.
+    - Routes shared Django apps (auth, admin, contenttypes, sessions) to `default`.
+    - Prevents cross-database relations and migrations.
     """
 
-    APP_LABEL = "geodiscounts"
-    DB_NAME = "geodiscounts_db"
-    AUTH_APP_LABEL = "authentication"
-    REQUIRED_APPS = {
-        "auth",
-        "contenttypes",
-        "authentication",
-        "geodiscounts",
-        "sessions",
-        "admin",
-    }
+    GEODISCOUNTS_APPS = {'geodiscounts'}
+    AUTH_APP = {'authentication'}
+    SHARED_APPS = {'admin', 'auth', 'contenttypes', 'sessions'}
 
     def db_for_read(self, model, **hints):
-        """Route read operations for geodiscounts models and related auth models."""
-        if model._meta.app_label == self.APP_LABEL:
-            return self.DB_NAME
-        elif model._meta.app_label == self.AUTH_APP_LABEL:
-            # Add a hint for the authentication router
-            hints['target_db'] = self.DB_NAME
-            return None
-        return None
+        """
+        Directs read operations for models to the correct database.
+
+        Args:
+            model: The model class being queried.
+            **hints: Additional hints.
+
+        Returns:
+            str | None: The database alias or None to fall back to default.
+        """
+        if model._meta.app_label in self.GEODISCOUNTS_APPS:
+            return 'geodiscounts_db'
+        if model._meta.app_label in self.AUTH_APP:
+            return 'authentication_shard'
+        return 'default'
 
     def db_for_write(self, model, **hints):
-        """Route write operations for geodiscounts models and related auth models."""
-        if model._meta.app_label == self.APP_LABEL:
-            return self.DB_NAME
-        elif model._meta.app_label == self.AUTH_APP_LABEL:
-            # Add a hint for the authentication router
-            hints['target_db'] = self.DB_NAME
-            return None
-        return None
+        """
+        Directs write operations for models to the correct database.
+
+        Args:
+            model: The model class being written to.
+            **hints: Additional hints.
+
+        Returns:
+            str | None: The database alias or None to fall back to default.
+        """
+        if model._meta.app_label in self.GEODISCOUNTS_APPS:
+            return 'geodiscounts_db'
+        if model._meta.app_label in self.AUTH_APP:
+            return 'authentication_shard'
+        return 'default'
 
     def allow_relation(self, obj1, obj2, **hints):
-        """Allow relations if either object is in the geodiscounts app or authentication app."""
-        if (
-            obj1._meta.app_label in self.REQUIRED_APPS
-            or obj2._meta.app_label in self.REQUIRED_APPS
-        ):
-            return True
-        return None
+        """
+        Only allow relations within the same database.
 
-    def allow_migrate(self, db, app_label, model_name=None, **hints):
-        """
-        Control migrations based on app label and GIS compatibility.
-        
         Args:
-            db: The database alias
-            app_label: The app label being migrated
-            model_name: The name of the model being migrated
-            **hints: Additional hints including the SchemaEditor
-        
-        Returns:
-            bool | None: Whether to allow the migration
-        """
-        if app_label == self.APP_LABEL:
-            # Only allow geodiscounts app to migrate to geodiscounts_db
-            return db == self.DB_NAME
-        elif app_label == self.AUTH_APP_LABEL:
-            # Let the authentication router handle this
-            return None
-        elif app_label in self.REQUIRED_APPS:
-            # Allow other required apps to migrate to both databases
-            return True
-        return None
+            obj1: The first model instance.
+            obj2: The second model instance.
+            **hints: Additional hints.
 
-    def _check_gis_compatibility(self, schema_editor):
-        """
-        Check if the database backend supports GIS operations.
-        
-        Args:
-            schema_editor: The schema editor being used
-            
         Returns:
-            bool: Whether the backend supports GIS operations
+            bool | None: True if allowed, False if not, None to fall back to default.
         """
-        try:
-            # Check for GIS support through multiple methods
-            connection = schema_editor.connection
-            
-            # Method 1: Check for geo_db_type
-            if hasattr(connection.ops, 'geo_db_type'):
-                return True
-                
-            # Method 2: Check if using a known GIS backend
-            backend_name = connection.vendor
-            gis_backends = {'postgresql', 'postgis', 'mysql', 'sqlite'}
-            if backend_name.lower() in gis_backends:
-                return True
-                
-            # Method 3: Check for spatial backend features
-            if hasattr(connection.features, 'gis_enabled'):
-                return connection.features.gis_enabled
-                
-            return False
-            
-        except Exception as e:
-            # Log the error if you have logging configured
-            import logging
-            logging.error(f"GIS compatibility check failed: {str(e)}")
-            return False
+        db1 = self.db_for_read(obj1._meta.model)
+        db2 = self.db_for_read(obj2._meta.model)
+        return db1 == db2
+
+    def allow_migrate(self, db, app_label, **hints):
+        """
+        Ensure each app only migrates to its designated database.
+
+        Args:
+            db: The database alias.
+            app_label: The app label being migrated.
+            **hints: Additional hints.
+
+        Returns:
+            bool | None: True if migration is allowed, False if not, None to fall back to default.
+        """
+        if app_label in self.GEODISCOUNTS_APPS:
+            return db == 'geodiscounts_db'
+        if app_label in self.AUTH_APP:
+            return db == 'authentication_shard'
+        if app_label in self.SHARED_APPS:
+            return db == 'default'
+        return None

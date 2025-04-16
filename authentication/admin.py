@@ -1,27 +1,42 @@
-"""
-Admin configuration for the authentication app.
-
-This module customizes the Django admin interface for managing:
-- Custom users (`CustomUser`)
-- Role-based access control (`Role`)
-- User profiles (`UserProfile`)
-- Groups and permissions
-
-It provides an enhanced user management experience, including:
-- Search and filtering capabilities
-- Custom user and permission management
-"""
-
-from typing import Optional, Tuple, Type
-
+from typing import Optional, Tuple
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from django.contrib.auth.models import Group, Permission
-from django.db.models import QuerySet
 from django.http import HttpRequest
+from django.db.models import QuerySet
 
-from .models import CustomUser, Role, UserProfile
+from .models import (
+    CustomUser,
+    UserProfile,
+    ProfileVerification,
+    Role
+)
 
+
+class UserProfileInline(admin.StackedInline):
+    """
+    Inline admin for displaying and editing user profile details
+    within the CustomUser admin panel.
+    """
+    model = UserProfile
+    can_delete = False
+    verbose_name_plural = "Profile"
+    fk_name = "user"
+
+
+class ProfileVerificationInline(admin.StackedInline):
+    """
+    Inline admin for managing profile verification tokens associated
+    with the user in the CustomUser admin panel.
+    """
+    model = ProfileVerification
+    can_delete = False
+    verbose_name_plural = "Verification"
+    fk_name = "user"
+    def get_queryset(self, request: HttpRequest) -> QuerySet[ProfileVerification]:
+        """
+        Force ProfileVerificationInline to use the authentication shard.
+        """
+        return super().get_queryset(request).using("authentication_shard")
 
 @admin.register(CustomUser)
 class CustomUserAdmin(UserAdmin):
@@ -29,164 +44,129 @@ class CustomUserAdmin(UserAdmin):
     Admin panel customization for CustomUser.
 
     Enhancements include:
-    - Search by username and email
-    - Filters for active, staff, and guest users
+    - Search by username, email, and phone number
+    - Filters for active, staff, superuser, guest, and profile activation
     - Read-only timestamps for auditing
     - Group and permission management for access control
+    - Inline display of UserProfile and ProfileVerification models
     """
 
     model = CustomUser
-    list_display = ("username", "email", "is_active", "is_staff", "is_superuser", "is_guest", "created_at")
-    list_filter = ("is_active", "is_staff", "is_superuser", "is_guest", "created_at")
-    search_fields = ("username", "email")
-    ordering = ("-created_at",)
-    readonly_fields = ("created_at", "updated_at")
 
-    fieldsets: Tuple[Tuple[Optional[str], dict], ...] = (
-        ("Basic Information", {"fields": ("username", "email", "password")}),
-        ("Permissions", {"fields": ("is_active", "is_staff", "is_superuser", "is_guest")}),
-        ("Groups & Permissions", {"fields": ("groups", "user_permissions")}),
-        ("Timestamps", {"fields": ("created_at", "updated_at")}),
+    # Fields to display in the admin list view
+    list_display: Tuple[str, ...] = (
+        "username",
+        "email",
+        "phone_number",
+        "is_active",
+        "is_staff",
+        "is_superuser",
+        "is_guest",
+        "activated_profile",
+        "created_at"
     )
 
-    add_fieldsets: Tuple[Tuple[Optional[str], dict], ...] = (
-        ("Create User", {
-            "classes": ("wide",),
-            "fields": ("username", "email", "password1", "password2", "is_guest", "is_active", "is_staff", "is_superuser"),
+    # Filters available in the right sidebar
+    list_filter: Tuple[str, ...] = (
+        "is_active",
+        "is_staff",
+        "is_superuser",
+        "is_guest",
+        "activated_profile",
+        "created_at"
+    )
+
+    # Fields searchable from the search bar
+    search_fields: Tuple[str, ...] = ("username", "email", "phone_number")
+
+    # Default ordering of the admin list view
+    ordering: Tuple[str] = ("-created_at",)
+
+    # Fields marked as read-only
+    readonly_fields: Tuple[str, ...] = ("created_at", "updated_at")
+
+    # Inline panels for linked models
+    inlines = (UserProfileInline, ProfileVerificationInline)
+
+    # Field layout in the detail view for existing users
+    fieldsets: Tuple[Tuple[Optional[str], dict], ...] = (
+        ("Basic Information", {
+            "fields": ("username", "email", "phone_number", "password")
+        }),
+        ("Permissions", {
+            "fields": (
+                "is_active",
+                "is_staff",
+                "is_superuser",
+                "is_guest",
+                "activated_profile"
+            )
+        }),
+        ("Groups & Permissions", {
+            "fields": ("groups", "user_permissions")
+        }),
+        ("Timestamps", {
+            "fields": ("created_at", "updated_at")
         }),
     )
 
-    filter_horizontal = ("groups", "user_permissions")
+    # Field layout when adding a new user
+    add_fieldsets: Tuple[Tuple[Optional[str], dict], ...] = (
+        ("Create User", {
+            "classes": ("wide",),
+            "fields": (
+                "username",
+                "email",
+                "phone_number",
+                "password1",
+                "password2",
+                "is_guest",
+                "is_active",
+                "is_staff",
+                "is_superuser",
+                "activated_profile"
+            )
+        }),
+    )
+
+    # Horizontal filter box for group and permissions
+    filter_horizontal: Tuple[str, ...] = ("groups", "user_permissions")
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[CustomUser]:
         """
-        Return a queryset for all CustomUser objects.
+        Return a queryset for all CustomUser objects, explicitly using the 'authentication_shard'
+        database to avoid cross-database relation issues in the admin panel.
 
         Args:
             request (HttpRequest): The incoming admin request.
 
         Returns:
-            QuerySet[CustomUser]: Queryset of all CustomUser instances.
+            QuerySet[CustomUser]: Queryset of all CustomUser instances from authentication_shard.
         """
-        return super().get_queryset(request)
+        return super().get_queryset(request).using("authentication_shard")
+    def delete_queryset(self, request: HttpRequest, queryset: QuerySet[CustomUser]) -> None:
+        """
+        Ensure that deletions of CustomUser and related objects use the authentication shard.
+        """
+        for obj in queryset:
+            # Delete related profiles and verifications explicitly if needed
+            UserProfile.objects.using("authentication_shard").filter(user=obj).delete()
+            ProfileVerification.objects.using("authentication_shard").filter(user=obj).delete()
+            obj.delete(using="authentication_shard")
+
+
 
 
 @admin.register(Role)
 class RoleAdmin(admin.ModelAdmin):
     """
-    Admin panel customization for Role model.
+    Admin panel configuration for the Role model.
 
-    - Provides filtering and search options
-    - Ensures timestamps are read-only
-    - Allows administrators to manage role-based access control
+    Supports:
+    - Search by role name
+    - Sorting by creation timestamp
+    - Listing name and description
     """
-
-    list_display = ("name", "description", "created_at", "updated_at")
-    search_fields = ("name",)
-    ordering = ("-created_at",)
-    readonly_fields = ("created_at", "updated_at")
-    list_filter = ("created_at",)
-
-    def get_queryset(self, request: HttpRequest) -> QuerySet[Role]:
-        """
-        Return a queryset for all Role objects.
-
-        Args:
-            request (HttpRequest): The incoming admin request.
-
-        Returns:
-            QuerySet[Role]: Queryset of all Role instances.
-        """
-        return super().get_queryset(request)
-
-
-@admin.register(UserProfile)
-class UserProfileAdmin(admin.ModelAdmin):
-    """
-    Admin panel customization for UserProfile model.
-
-    - Allows administrators to view and edit user preferences
-    - Provides search and filtering for efficient user management
-    """
-
-    list_display = ("user", "preferences", "location", "created_at")
-    search_fields = ("user__username", "user__email")
-    ordering = ("-created_at",)
-    readonly_fields = ("created_at", "updated_at")
-    list_filter = ("created_at",)
-
-    def get_queryset(self, request: HttpRequest) -> QuerySet[UserProfile]:
-        """
-        Return a queryset for all UserProfile objects.
-
-        Args:
-            request (HttpRequest): The incoming admin request.
-
-        Returns:
-            QuerySet[UserProfile]: Queryset of all UserProfile instances.
-        """
-        return super().get_queryset(request)
-
-
-# Ensure groups and permissions are manageable in Django admin
-admin.site.unregister(Group)  # Unregister default Group
-
-
-@admin.register(Group)
-class GroupAdmin(admin.ModelAdmin):
-    """
-    Custom admin panel for managing Django groups.
-
-    - Enables search by group name
-    - Allows management of permissions within groups
-    - Improves default Django admin experience for role-based access
-    """
-
-    search_fields = ("name",)
-    ordering = ("name",)
-    filter_horizontal = ("permissions",)
-
-    def get_queryset(self, request: HttpRequest) -> QuerySet[Group]:
-        """
-        Return a queryset for all Group objects.
-
-        Args:
-            request (HttpRequest): The incoming admin request.
-
-        Returns:
-            QuerySet[Group]: Queryset of all Group instances.
-        """
-        return super().get_queryset(request)
-
-
-@admin.register(Permission)
-class PermissionAdmin(admin.ModelAdmin):
-    """
-    Admin panel for managing individual permissions.
-
-    - Enables search by permission name and codename
-    - Provides an ordered list of permissions
-    - Allows efficient management of user access controls
-    """
-
-    search_fields = ("name", "codename")
-    ordering = ("name",)
-    list_display = ("name", "codename", "content_type")
-
-    def get_queryset(self, request: HttpRequest) -> QuerySet[Permission]:
-        """
-        Return a queryset for all Permission objects.
-
-        Args:
-            request (HttpRequest): The incoming admin request.
-
-        Returns:
-            QuerySet[Permission]: Queryset of all Permission instances.
-        """
-        return super().get_queryset(request)
-
-
-# Customizing the Django admin interface
-admin.site.site_header = "Coupon Core Admin"
-admin.site.site_title = "Coupon Core Admin Panel"
-admin.site.index_title = "Welcome to Coupon Core Admin"
+    list_display: Tuple[str, ...] = ("name", "description", "created_at")
+    search_fields: Tuple[str, ...] = ("name",)
+    ordering: Tuple[str, ...] = ("-created_at",)

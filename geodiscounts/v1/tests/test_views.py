@@ -54,13 +54,13 @@ class RetailerViewTestCase(APITestCase):
             'name': 'Test Retailer',
             'contact_info': 'test@retailer.com',
             'location': {'latitude': 40.7128, 'longitude': -74.0060},  # New York coordinates
-            'owner': self.user.id
+           
         }
         self.retailer = Retailer.objects.create(
             name=self.retailer_data['name'],
             contact_info=self.retailer_data['contact_info'],
             location=Point(self.retailer_data['location']['longitude'], self.retailer_data['location']['latitude']),
-            owner=self.user
+           
         )
 
     def test_retailer_list(self):
@@ -82,7 +82,6 @@ class RetailerViewTestCase(APITestCase):
             'name': 'New Retailer',
             'contact_info': 'new@retailer.com',
             'location': {'latitude': 40.7128, 'longitude': -74.0060},
-            'owner': self.user.id
         }
         response = self.client.post(url, new_retailer_data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -94,7 +93,6 @@ class RetailerViewTestCase(APITestCase):
             'name': 'Updated Retailer',
             'contact_info': 'updated@retailer.com',
             'location': {'latitude': 40.7128, 'longitude': -74.0060},
-            'owner': self.user.id
         }
         response = self.client.put(url, updated_data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -136,7 +134,6 @@ class DiscountViewTestCase(APITestCase):
             name='Test Retailer',
             contact_info='test@retailer.com',
             location=Point(-74.0060, 40.7128),
-            owner=self.user
         )
         self.discount_data = {
             'retailer': self.retailer.id,
@@ -236,7 +233,6 @@ class SharedDiscountViewTestCase(APITestCase):
             name='Test Retailer',
             contact_info='test@retailer.com',
             location=Point(-74.0060, 40.7128),
-            owner=self.user
         )
         self.discount = Discount.objects.create(
             retailer=self.retailer,
