@@ -23,6 +23,7 @@ Date: YYYY-MM-DD
 from django.contrib import admin
 from django.utils.html import format_html
 import os
+
 from .models import Category, Retailer, Discount, SharedDiscount
 
 
@@ -35,17 +36,11 @@ class CategoryAdmin(admin.ModelAdmin):
     - Viewing and filtering categories.
     - Uploading category images (supports SVG, PNG, JPEG).
     - Displaying an image preview in the admin panel.
-
-    Fields Displayed:
-        - name: Name of the category.
-        - image_preview: Shows a preview of the category image.
-        - created_at: Timestamp when the category was created.
-        - updated_at: Timestamp when the category was last updated.
     """
 
-    list_display: tuple[str, str, str, str] = ("name", "image_preview", "created_at", "updated_at")
-    search_fields: tuple[str] = ("name",)
-    ordering: tuple[str] = ("created_at",)
+    list_display: tuple[str, ...] = ("name", "image_preview", "created_at", "updated_at")
+    search_fields: tuple[str, ...] = ("name",)
+    ordering: tuple[str, ...] = ("created_at",)
 
     def image_preview(self, obj: Category) -> str:
         """
@@ -63,8 +58,14 @@ class CategoryAdmin(admin.ModelAdmin):
         if obj.image:
             file_extension = os.path.splitext(obj.image.url)[-1].lower()
             if file_extension == ".svg":
-                return format_html('<object data="{}" type="image/svg+xml" width="50" height="50"></object>', obj.image.url)
-            return format_html('<img src="{}" width="50" height="50" style="border-radius:5px;" />', obj.image.url)
+                return format_html(
+                    '<object data="{}" type="image/svg+xml" width="50" height="50"></object>',
+                    obj.image.url
+                )
+            return format_html(
+                '<img src="{}" width="50" height="50" style="border-radius:5px;" />',
+                obj.image.url
+            )
         return "No Image"
 
     image_preview.short_description = "Preview"
@@ -80,17 +81,24 @@ class RetailerAdmin(admin.ModelAdmin):
     - Viewing retailer locations on a map (if enabled).
     - Sorting by creation date.
 
-    Fields Displayed:
-        - name: Name of the retailer.
-        - contact_info: Contact details.
-        - location: Geographic location.
-        - created_at: Timestamp when the retailer was created.
-        - updated_at: Timestamp when the retailer was last updated.
+    Prevents reverse relation lookups to avoid cross-shard joins.
     """
 
-    list_display: tuple[str, str, str, str, str] = ("name", "contact_info", "location", "created_at", "updated_at")
-    search_fields: tuple[str] = ("name", "contact_info")
-    ordering: tuple[str] = ("created_at",)
+    list_display: tuple[str, ...] = ("name", "contact_info", "location", "created_at", "updated_at")
+    search_fields: tuple[str, ...] = ("name", "contact_info")
+    ordering: tuple[str, ...] = ("created_at",)
+
+    def get_queryset(self, request):
+        """
+        Prevent automatic JOINs that could span multiple databases.
+
+        Args:
+            request: Admin request object.
+
+        Returns:
+            QuerySet: Unoptimized queryset without select_related().
+        """
+        return super().get_queryset(request).select_related(None)
 
 
 @admin.register(Discount)
@@ -102,24 +110,15 @@ class DiscountAdmin(admin.ModelAdmin):
     - Filtering discounts by category or expiration date.
     - Searching for discounts by retailer, description, or discount code.
     - Displaying an image preview of discount images (supports SVG).
-
-    Fields Displayed:
-        - retailer: The retailer offering the discount.
-        - category: The category of the discount.
-        - description_preview: Shortened preview of the discount description.
-        - discount_code: Unique code to redeem the discount.
-        - expiration_date: Expiration date of the discount.
-        - image_preview: Displays an image preview (supports SVG).
-        - created_at: Timestamp when the discount was created.
-        - updated_at: Timestamp when the discount was last updated.
     """
 
-    list_display: tuple[str, str, str, str, str, str, str, str] = (
-        "retailer", "category", "description_preview", "discount_code", "expiration_date", "image_preview", "created_at", "updated_at"
+    list_display: tuple[str, ...] = (
+        "retailer", "category", "description_preview", "discount_code",
+        "expiration_date", "image_preview", "created_at", "updated_at"
     )
-    list_filter: tuple[str] = ("category", "expiration_date")
-    search_fields: tuple[str] = ("retailer__name", "description", "discount_code")
-    ordering: tuple[str] = ("-created_at",)
+    list_filter: tuple[str, ...] = ("category", "expiration_date")
+    search_fields: tuple[str, ...] = ("retailer__name", "description", "discount_code")
+    ordering: tuple[str, ...] = ("-created_at",)
 
     def description_preview(self, obj: Discount) -> str:
         """
@@ -151,8 +150,14 @@ class DiscountAdmin(admin.ModelAdmin):
         if obj.image:
             file_extension = os.path.splitext(obj.image.url)[-1].lower()
             if file_extension == ".svg":
-                return format_html('<object data="{}" type="image/svg+xml" width="50" height="50"></object>', obj.image.url)
-            return format_html('<img src="{}" width="50" height="50" style="border-radius:5px;" />', obj.image.url)
+                return format_html(
+                    '<object data="{}" type="image/svg+xml" width="50" height="50"></object>',
+                    obj.image.url
+                )
+            return format_html(
+                '<img src="{}" width="50" height="50" style="border-radius:5px;" />',
+                obj.image.url
+            )
         return "No Image"
 
     image_preview.short_description = "Preview"
@@ -167,16 +172,9 @@ class SharedDiscountAdmin(admin.ModelAdmin):
     - Filtering by discount status (active, completed, expired).
     - Searching for shared discounts by group name or discount code.
     - Sorting by creation date.
-
-    Fields Displayed:
-        - discount: The related discount.
-        - group_name: The name of the sharing group.
-        - status: Status of the shared discount (active, completed, expired).
-        - created_at: Timestamp when the shared discount was created.
-        - updated_at: Timestamp when the shared discount was last updated.
     """
 
-    list_display: tuple[str, str, str, str, str] = ("discount", "group_name", "status", "created_at", "updated_at")
-    list_filter: tuple[str] = ("status",)
-    search_fields: tuple[str] = ("group_name", "discount__discount_code")
-    ordering: tuple[str] = ("-created_at",)
+    list_display: tuple[str, ...] = ("discount", "group_name", "status", "created_at", "updated_at")
+    list_filter: tuple[str, ...] = ("status",)
+    search_fields: tuple[str, ...] = ("group_name", "discount__discount_code")
+    ordering: tuple[str, ...] = ("-created_at",)

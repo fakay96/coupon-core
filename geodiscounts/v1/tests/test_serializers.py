@@ -75,7 +75,6 @@ class RetailerSerializerTest(TestCase):
             'name',
             'contact_info',
             'location',
-            'owner',
             'created_at',
             'updated_at',
         })

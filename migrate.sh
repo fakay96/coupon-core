@@ -100,4 +100,3 @@ for DB in "${DATABASES[@]}"; do
 done
 
 log_and_print "✅ All migrations completed successfully!"
-
