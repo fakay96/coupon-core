@@ -1,0 +1,11 @@
+# Core libraries
+scrapy>=2.11
+itemadapter>=0.8
+
+# JavaScript rendering back‑ends
+scrapy-splash>=0.9
+scrapy-playwright>=0.0.30
+
+# Pin Twisted for Scrapy 2.11+
+
+twisted>=22.10.0

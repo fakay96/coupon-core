@@ -1,124 +1,190 @@
-"""discountscraper.spiders.discount_spider
-=================================================
-Refactored **FromAustria** discount spider with:
+"""
+crawlers.spiders.discountspider
 
-* Separation of concerns – most utilities live in :pymod:`discountscraper.utils`.
-* Proper static typing throughout.
-* Google‑style docstrings.
-* Minimal business logic in the spider itself.
-* A *thin* SplashRequest builder provided by :pyfunc:`discountscraper.utils.splash.build_splash_request`.
+Defines DiscountSpider, a Scrapy spider that uses Splash to fully scroll
+through the "Angebote" (offers) catalogue on fromaustria.com, then extracts
+every product deal as a DiscountItem. Now supports pagination using the correct URL format.
 """
 
 from __future__ import annotations
-
-import logging
-from typing import Generator, Iterable, Optional
+from datetime import datetime
+from typing import Set
+import re
 
 import scrapy
-from scrapy.selector import Selector
-from scrapy.http import Response
+from scrapy_splash import SplashRequest
 
-# Local imports
-from discountscraper.items import DiscountItem, DiscountData
-from discountscraper.utils.price import (
-    parse_discount_percentage,
-    parse_euro_price,
-)
-from discountscraper.utils.splash import build_splash_request
-
-_LOGGER = logging.getLogger(__name__)
+from crawlers.items import DiscountItem
 
 
 class DiscountSpider(scrapy.Spider):
-    """Spider scraping discounted products from *fromaustria.com*.
+    """
+    A Splash‑powered Scrapy spider named "discountspider".
 
-    The spider renders each page through **Splash** to deal with JavaScript
-    and infinite scrolling. Pagination is followed until no ``Next`` button
-    is found or a hard limit of ``MAX_PAGES`` is reached (to prevent
-    accidental infinite crawls during testing).
+    Workflow:
+      1. Start with the first page of Angebote.
+      2. For each page (1-10):
+         a. Load the page via Splash.
+         b. Repeatedly scroll to the bottom until no new product cards appear
+            (three consecutive identical counts) or MAX_SCROLLS is reached.
+         c. Parse every <li class="productCard"> in the final HTML.
+         d. Yield a DiscountItem for each unique product URL, with all fields
+            populated and a UTC timestamp.
+         e. Move to the next page if available.
     """
 
-    name: str = "discountspider"
-    allowed_domains: list[str] = ["fromaustria.com"]
-    start_urls: list[str] = ["https://www.fromaustria.com/de-AT/angebote"]
-    custom_settings: dict[str, object] = {
-        # Avoid hitting the site too hard while still having decent speed
-        "DOWNLOAD_DELAY": 0.25,
-        "CONCURRENT_REQUESTS_PER_DOMAIN": 2,
-    }
+    name = "discountspider"
+    allowed_domains = ["fromaustria.com"]
+    start_urls = ["https://www.fromaustria.com/de-AT/angebote"]
+    MAX_SCROLLS = 40  # Max scroll attempts before assuming page is fully loaded
+    MAX_PAGES = 10    # Maximum number of pagination pages to crawl
 
-    #: Safety valve – stop after this many pages even if *Next* is present.
-    MAX_PAGES: int = 10
-
-    # ------------------------------------------------------------------ #
-    # Scrapy API methods                                                 #
-    # ------------------------------------------------------------------ #
-
-    def start_requests(self) -> Iterable[scrapy.Request]:
-        """Kick‑off the crawl using :pyfunc:`build_splash_request`."""
-        for url in self.start_urls:
-            yield build_splash_request(url, callback=self.parse, meta={"page": 1})
-
-    def parse(self, response: Response) -> Generator[DiscountItem, None, None]:
-        """Parse a single result page.
-
-        Parameters
-        ----------
-        response:
-            Rendered HTML page coming from Splash.
+    def __init__(self, *args, **kwargs) -> None:
         """
-        page_no = response.meta.get("page", 1)
-        _LOGGER.info("Parsing page %s (%s)", page_no, response.url)
+        Initialize the spider.
 
-        # ----- Extract products ----------------------------------------
-        products_sel = response.css("li.productCard")
-        for sel in products_sel:
-            item = self._extract_product(sel, response)
-            if item:
-                yield item
+        Creates a set to track which product URLs have already been seen,
+        ensuring that each deal is only yielded once.
+        """
+        super().__init__(*args, **kwargs)
+        self.seen_urls: Set[str] = set()
+        self.current_page = 1
 
-        # ----- Pagination ---------------------------------------------
-        has_next = bool(response.data.get("has_next")) if hasattr(response, "data") else False
-        if has_next and page_no < self.MAX_PAGES:
-            _LOGGER.debug("Following pagination to page %s", page_no + 1)
-            yield build_splash_request(
-                response.url,
-                callback=self.parse,
-                meta={"page": page_no + 1},
-                splash_args={"click_next": True},
-                dont_filter=True,
+    def get_lua_script(self) -> str:
+        """
+        Return the Lua script used for scrolling, with MAX_SCROLLS properly inserted.
+        """
+        return f"""
+        function main(splash, args)
+          splash:set_viewport_size(1920,1080)
+          splash.private_mode_enabled = false
+          splash:set_user_agent(
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+            .. '(KHTML, like Gecko) Chrome/124.0 Safari/537.36')
+          assert(splash:go(args.url))
+          splash:wait(2)
+
+          -- Accept cookie banner if present
+          local consent = splash:select('button[data-testid="uc-accept-all-button"]')
+          if consent then
+            consent:mouse_click()
+            splash:wait(1)
+          end
+
+          -- Scroll until no new products load or MAX_SCROLLS reached
+          local unchanged, last_count = 0, 0
+          for i = 1, {self.MAX_SCROLLS} do
+            splash:evaljs("window.scrollTo(0, document.body.scrollHeight)")
+            splash:wait(1.5)
+            local count = splash:evaljs(
+              "document.querySelectorAll('ul#productList li.productCard').length"
             )
+            if count == last_count then
+              unchanged = unchanged + 1
+            else
+              unchanged, last_count = 0, count
+            end
+            if unchanged >= 3 then
+              break
+            end
+          end
 
-    # ------------------------------------------------------------------ #
-    # Helpers                                                            #
-    # ------------------------------------------------------------------ #
-
-    def _extract_product(self, sel: Selector, response: Response) -> Optional[DiscountItem]:
-        """Return a :class:`DiscountItem` from a *productCard* ``<li>`` element.
-
-        The heavy lifting (price parsing, percentage parsing) is delegated
-        to utility functions so that this method stays *quasi‑declarative*.
+          return {{ html = splash:html() }}
+        end
         """
-        data = DiscountData(
-            url=response.urljoin(sel.css(".productCard__title a.productCard__link::attr(href)").get()),
-            brand=sel.css(".productCard__title strong.productCard__brand::text").get(),
-            name=sel.css(".productCard__title a.productCard__link::text").get(),
-            sale_price=parse_euro_price(
-                sel.css(".productCard__price .price--reduced::text").get()
-            ),
-            original_price=parse_euro_price(
-                sel.css(".productCard__price .instead-price::text").get()
-            ),
-            price_per_unit=sel.css(".productCard__price .price--perUnit::text").get(),
-            discount_percentage=parse_discount_percentage(
-                sel.css(".productCard__tags .flag.sale-tag.small.percent::text").get()
-            ),
-            stock_info=sel.css(".productCard__stock::text").get(),
-            category=response.css("h1.page-title::text").get(),
+
+    def start_requests(self):
+        """
+        Kick off the crawl with a single SplashRequest for the first page.
+        
+        The Lua script will do all the scrolling; when it finishes, parse()
+        will be called with the fully‑loaded HTML.
+        """
+        # Start with the first page of Angebote section
+        first_page_url = self.start_urls[0]
+        yield SplashRequest(
+            url=first_page_url,
+            callback=self.parse,
+            endpoint="execute",
+            args={"lua_source": self.get_lua_script(), "timeout": 90.0},
+            dont_filter=True,
+            meta={"page": 1}
         )
 
-        if data.sale_price is None or data.original_price is None:
-            # Incomplete entry – skip silently.
-            return None
+    def get_next_page_url(self, current_page):
+        """
+        Construct the URL for the next page based on the provided format.
+        For fromaustria.com, pagination follows the format:
+        https://www.fromaustria.com/de-AT/suche?keyword=angebote&page=X#catalog-navbar
+        """
+        next_page = current_page + 1
+        # Use the search URL format with 'angebote' keyword for pagination
+        return f"https://www.fromaustria.com/de-AT/suche?keyword=angebote&page={next_page}#catalog-navbar"
 
-        return data.to_item()
+    def parse(self, response: scrapy.http.HtmlResponse):
+        """
+        Extract every product deal from the final HTML snapshot.
+        After processing the current page, request the next page if available.
+
+        For each <li.productCard>:
+          - Build absolute URL and skip if already seen.
+          - Extract brand, name, sale_price, original_price, price_per_unit,
+            discount_percentage, stock_info.
+          - Stamp with current UTC time.
+          - Yield as DiscountItem.
+
+        Logs a warning if the page contains no product cards (possible layout change).
+        """
+        current_page = response.meta.get("page", 1)
+        self.logger.info(f"Processing page {current_page}")
+
+        cards = response.css("ul#productList > li.productCard")
+        if not cards:
+            self.logger.warning(f"No product cards found on page {current_page}; check page layout.")
+            # Even if no cards are found, we might try to move to the next page
+        else:
+            new_count = 0
+            for card in cards:
+                url = response.urljoin(card.css(".productCard__title a::attr(href)").get())
+                if url in self.seen_urls:
+                    continue
+                self.seen_urls.add(url)
+                new_count += 1
+
+                yield DiscountItem(
+                    url=url,
+                    brand=card.css(".productCard__brand::text").get(),
+                    name=card.css(".productCard__title a::text").get(),
+                    sale_price=card.css(
+                        ".price--reduced::text, .price--default::text, "
+                        ".productCard__price > span:not(.price--perUnit)::text"
+                    ).get(),
+                    original_price=card.css(
+                        ".price--lineThrough::text, .instead-price::text"
+                    ).get(),
+                    price_per_unit=card.css(".price--perUnit::text").get(),
+                    discount_percentage=card.css(".productCard__tags .percent::text").get(),
+                    stock_info=card.css(".productCard__stock::text").get(),
+                    timestamp=datetime.utcnow().isoformat(timespec="seconds"),
+                )
+
+            self.logger.info(
+                f"Page {current_page}: {new_count} new items, {len(self.seen_urls)} total unique."
+            )
+
+        # Move to next page if we haven't reached MAX_PAGES
+        if current_page < self.MAX_PAGES:
+            next_page_url = self.get_next_page_url(current_page)
+            
+            self.logger.info(f"Moving to page {current_page + 1}: {next_page_url}")
+            
+            yield SplashRequest(
+                url=next_page_url,
+                callback=self.parse,
+                endpoint="execute",
+                args={"lua_source": self.get_lua_script(), "timeout": 90.0},
+                dont_filter=True,
+                meta={"page": current_page + 1}
+            )
+        else:
+            self.logger.info(f"Reached maximum page limit ({self.MAX_PAGES}). Crawling complete.")
