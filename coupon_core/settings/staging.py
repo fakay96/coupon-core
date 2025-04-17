@@ -146,10 +146,7 @@ CELERY_BROKER_URL = REDIS_URL
 CELERY_RESULT_BACKEND = REDIS_URL
 
 
-# -----------------------------------------------
-# Email Backend (Console for Staging)
-# -----------------------------------------------
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+
 
 # -----------------------------------------------
 # SimpleJWT Authentication Configuration
