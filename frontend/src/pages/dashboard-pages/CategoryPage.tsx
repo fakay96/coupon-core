@@ -241,7 +241,6 @@ const SearchInputBox: FC<{
   const [value, setValue] = useState("");
   const debouncedSearch = useDebounce(value);
   const navigate = useNavigate();
-  console.count("Search Component");
   useEffect(() => {
     navigate(`/dashboard/category?search=${value}`);
   }, [debouncedSearch]);

@@ -10,6 +10,7 @@ import axios from "axios";
  * @throws {ApiError} If authentication fails
  */
 export const loginUserService = async (credentials: loginCredentials) => {
+  console.log(credentials)
   const response = await axiosInstance.post(
     "/api/authentication/v1/login/",
     credentials
@@ -24,7 +25,6 @@ export const loginUserService = async (credentials: loginCredentials) => {
  * @throws {ApiError} If update fails or user is not authenticated
  */
 export const updateUserProfile = async (userProfile: any) => {
-  console.log(userProfile);
   const response = await axiosInstance.put(
     "/api/authentication/v1/user-profile/",
     userProfile

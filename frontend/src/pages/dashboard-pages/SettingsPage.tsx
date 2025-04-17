@@ -21,30 +21,29 @@ import { DeleteUserAccountService, updateUserProfile } from "@/api/authApi";
 
 const SettingsPage = () => {
   const { user, logout } = useAuth();
-  const [username, setUsername] = useState(user?.user?.username);
-  const [email, setEmail] = useState(user?.user?.email);
+  const [preferences, setPreferences] = useState("");
   const [firstname, setFirstname] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [lastname, setLastname] = useState("");
   // const [preference, setPreference] = useState({});
-  const [location, setLocation] = useState("");
   const handleSummit = async () => {
+    console.log(preferences)
     const user = {
-      username,
-      email,
       first_name: firstname,
       last_name: lastname,
-      location,
+      phone_number: phoneNumber,
+      preferences: {},
     };
     toast.promise(updateUserProfile(user), {
-      loading: `${username}, Dishpal AI is updating your account details.`,
-      success: `${username}, Your profile info have been successfully updated!`,
+      loading: `${firstname}, Dishpal AI is updating your account details.`,
+      success: `${firstname}, Your profile info have been successfully updated!`,
       error: (error) => error.message,
     });
   };
 
   useEffect(() => {
-    setUsername(user?.user?.username);
-    setEmail(user?.user?.email);
+    setFirstname(user?.first_name || "");
+    setLastname(user?.last_name || "");
   }, [user]);
 
   return (
@@ -53,13 +52,6 @@ const SettingsPage = () => {
         <div className="flex flex-col h-full min-h-screen max-w-screen-xl px-4 sm:px-8 mx-auto">
           <SearchInputNavbar />
           <section className="flex flex-col sm:flex-row my-16 gap-8 w-full">
-            {/* {user?.user?.image && (
-              <aside className="space-y-8 w-full sm:max-w-64 md:shrink-0 flex flex-col items-center">
-                <div className="rounded-xl overflow-hidden size-60">
-                  <img src={user?.user?.image} alt="notification" className="" />
-                </div>
-              </aside>
-            )} */}
             <main className="w-full space-y-8">
               <div className="">
                 <h1 className="font-bold font-syne text-md pb-2 -mt-2">
@@ -67,23 +59,24 @@ const SettingsPage = () => {
                 </h1>
                 <div className="relative flex flex-col bg-white p-4 md:p-8 rounded-xl w-full">
                   <div className="flex gap-2 flex-wrap items-center">
-                    <span className="font-bold text-sm font-syne">Name:</span>
+                    <span className="font-bold text-sm font-syne">FirstName:</span>
                     <span className="font-syne ">
-                      {capitalize(user?.user?.username)} {capitalize(user?.user?.last_name)}
+                      {capitalize(user?.first_name)}{" "}
+                      
                     </span>
                   </div>
                   <div className="flex gap-2 flex-wrap items-center">
                     <span className="font-bold text-sm font-syne">
-                      Email Address:
+                      LastName:
                     </span>
                     <span className="font-syne ">
-                      {capitalize(user?.user?.email)}
+                      {capitalize(user?.last_name)}
                     </span>
                   </div>
                   <div className="flex gap-2 flex-wrap items-center">
                     <span className="font-bold text-sm font-syne">Phone:</span>
                     <span className="font-syne ">
-                      {user?.user?.phone_number}
+                      {user?.phone_number}
                     </span>
                   </div>
                   <div className="absolute right-4 bottom-2 flex gap-2 font-syne font-bold">
@@ -91,7 +84,7 @@ const SettingsPage = () => {
                       <DialogTrigger asChild>
                         <div className="hover:cursor-pointer">Edit</div>
                       </DialogTrigger>
-                      <DialogContent className="sm:max-w-[425px] w-[95svw] rounded-xl">
+                      <DialogContent className="sm:max-w-[445px] w-[95svw] rounded-xl">
                         <DialogHeader>
                           <DialogTitle className="text-start">
                             Edit profile
@@ -99,23 +92,12 @@ const SettingsPage = () => {
                           <DialogDescription className="text-start">
                             Hi{" "}
                             <span className="text-vividOrange capitalize">
-                              {user?.user?.username}
+                              {user?.first_name}
                             </span>
                             , Make changes to your profile here.
                           </DialogDescription>
                         </DialogHeader>
                         <div className="grid gap-4 py-4">
-                          <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="username" className="">
-                              Username
-                            </Label>
-                            <Input
-                              id="username"
-                              onChange={(e) => setUsername(e.target.value)}
-                              value={username}
-                              className="col-span-3"
-                            />
-                          </div>
                           <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="firstname" className="">
                               Firstname
@@ -123,6 +105,7 @@ const SettingsPage = () => {
                             <Input
                               id="firstname"
                               onChange={(e) => setFirstname(e.target.value)}
+                              placeholder="Matthew"
                               value={firstname}
                               className="col-span-3"
                             />
@@ -134,34 +117,37 @@ const SettingsPage = () => {
                             <Input
                               id="lastname"
                               onChange={(e) => setLastname(e.target.value)}
+                              placeholder="Fred"
                               value={lastname}
                               className="col-span-3"
                             />
                           </div>
                           <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="email" className="">
-                              Email
+                            <Label htmlFor="preferences" className="">
+                              Preferences
                             </Label>
                             <Input
-                              id="email"
-                              onChange={(e) => setEmail(e.target.value)}
-                              value={email}
+                              id="preferences"
+                              onChange={(e) => setPreferences(e.target.value)}
+                              placeholder="flight, travel, tourism"
+                              value={preferences}
                               className="col-span-3"
                             />
                           </div>
                           <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="location" className="">
-                              Location
+                            <Label htmlFor="phone" className="text-nowrap">
+                              Phone Number
                             </Label>
                             <Input
-                              id="location"
-                              onChange={(e) => setLocation(e.target.value)}
-                              value={location}
+                              id="phone"
+                              onChange={(e) => setPhoneNumber(e.target.value)}
+                              placeholder="+1 (583) 928-8372"
+                              value={phoneNumber}
                               className="col-span-3"
                             />
                           </div>
                         </div>
-                        <DialogClose>
+                        <DialogClose asChild>
                           <Button
                             type="submit"
                             variant={"vivid"}
@@ -176,21 +162,7 @@ const SettingsPage = () => {
                   </div>
                 </div>
               </div>
-              {/*  <div className="">
-                <h1 className="font-bold font-syne text-md pb-2 ">
-                  Location And Preference
-                </h1>
-               <CardComponent
-                  values={[
-                    // { key: "Location", value: "Vienna Austria" },
-                    {
-                      key: "Preferred Shopping Category",
-                      value: "Fashion, Groceries, Electronic",
-                    },
-                    // { key: "Spending Budget", value: "10€ - 90€" },
-                  ]}
-                /> 
-              </div>*/}
+
               <div className="">
                 <h1 className="font-bold font-syne text-md pb-2 ">
                   Basic Information

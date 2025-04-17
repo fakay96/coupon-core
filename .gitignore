@@ -11,6 +11,7 @@ pvcs/
 
 
 node_modules/
+node_modules
 **.csv
 
 node_modules

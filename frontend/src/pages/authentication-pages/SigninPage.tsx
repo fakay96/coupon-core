@@ -50,9 +50,8 @@ const SignInPage = () => {
       const { email, name } = await axiosGoogleLogin(tokenResponse);
       googleInfo.current = { email, name };
       const googleCredentials = {
-        email,
         password: import.meta.env.VITE_GOOGLE_PASS,
-        username: email?.split("@")[0],
+        email,
       };
       toast.promise(
         loginUser(googleCredentials).then(() => {
@@ -69,7 +68,8 @@ const SignInPage = () => {
 
   // Form submit handler
   const onSubmit = ({ email, password }: z.infer<typeof signInSchema>) => {
-    const userInfo = { email, password, username: email?.split("@")[0] };
+    const username = email?.split("@")[0]
+    const userInfo = { password, email };
 
     toast.promise(
       loginUser(userInfo)
@@ -77,53 +77,45 @@ const SignInPage = () => {
           navigate("/dashboard", { replace: true });
         })
         .catch((error) => {
+          const errorMessage =
+            error?.response?.data?.message ||
+            error?.message ||
+            "An error occurred";
+
+          if (typeof errorMessage === "object") {
+            throw new Error("Invalid username or password.");
+          }
           if (
-            error?.message
-              ?.toLowerCase()
-              ?.includes("your account is not verified.")
+            errorMessage &&
+            errorMessage?.toLowerCase().includes("your account is not verified")
           ) {
             navigate(`/auth/resend-email`, { state: { email } });
           }
-
-          throw error;
+          throw new Error(errorMessage);
         }),
       {
         loading: `${
-          firstname || userInfo?.username
+          firstname || username
         }, Dishpal AI is logging you into your account now.`,
         success: `${
-          firstname || userInfo?.username
+          firstname || username
         }, Here is your dashboard! Explore!`,
-        error: (error) => JSON.stringify(error.message),
+        error: (error) => error.message,
       }
     );
   };
 
   return (
-    <div className="h-full min-h-screen bg-bg3xl bg-cover grid md:grid-cols-2 max-2xl:py-8 max-sm:p-4  gap-4 max-2xl:p-8">
+    <div className="h-full min-h-screen bg-bg3xl bg-cover grid md:grid-cols-2 max-2xl:py-8 max-sm:p-4  gap-4 max-2xl:p-8 2xl:gap-16">
       <img
         src="/images/loginImg.png"
         width={500}
         height={600}
         alt=""
-        className="hidden md:block 2xl:hidden place-self-center "
+        className="hidden md:block 2xl:ml-auto place-self-center "
       />
-      <div className="relative hidden 2xl:grid">
-        <img
-          src="/images/coverSigninImg.png"
-          alt=""
-          className="2xl:absolute 2xl:h-full 2xl:w-full place-self-center justify-self-end "
-        />
-        <img
-          src="/images/logo.svg"
-          alt=""
-          className="2xl:absolute 2xl:w-[150px] h-auto left-4 top-4"
-        />
-        <h1 className="font-syne z-30 absolute top-1/2 left-1/2 text-5xl font-bold -translate-x-1/2 -translate-y-1/2 leading- text-white">
-          Welcome <br /> Back
-        </h1>
-      </div>
-      <div className="flex items-center justify-center md:justify-start w-full max-w-lg mx-auto">
+
+      <div className="flex items-center justify-center md:justify-start w-full max-w-lg max-2xl:mx-auto 2xl:mr-auto">
         <div className="space-y-6 w-full mb-16">
           <div className="hidden md:block space-y-3 mb-3">
             <h1 className="font-bold text-xl xxx:text-3xl  xl:text-5xl max-xx:text-center  font-syne">
@@ -271,18 +263,31 @@ const SignInPage = () => {
                 </div>
               </Button>
             </div>
-            <div className="flex gap-6 items-center justify-center overflow-hidden md:hidden ">
-              <Separator className="bg-black w-full" />
-              <div className="font-syne text-nowrap md:hidden">
-                Or Continue With
+            <div className="space-y-6 hidden md:flex mdflex-col ">
+              <div className="flex gap-6 items-center justify-center overflow-hidden md:hidden ">
+                <Separator className="bg-black w-full" />
+                <div className="font-syne text-nowrap md:hidden">
+                  Or Continue With
+                </div>
+                <Separator className="bg-black w-full" />
               </div>
-              <Separator className="bg-black w-full" />
+              <GoogleButton
+                onClick={() => {
+                  googleLogin();
+                }}
+              />
             </div>
-            <GoogleButton
-              onClick={() => {
-                googleLogin();
-              }}
-            />
+            <div className="space-y-6 md:hidden flex justify-center">
+              <div className="flex gap-2">
+                <div className="font-syne">Don't Have An Account ?</div>
+                <Link
+                  to="/auth/register"
+                  className="font-syne text-vividOrange font-bold hover:underline hover:cursor-pointer"
+                >
+                  Sign Up
+                </Link>
+              </div>
+            </div>
           </div>
         </div>
       </div>

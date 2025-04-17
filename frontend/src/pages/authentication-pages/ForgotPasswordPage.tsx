@@ -10,20 +10,20 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Loader } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { forgotPasswordSchema } from "@/validation-schemas";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { loginUserMutation } from "@/queries/auth-queries";
-import AuthHeader from "@/components/auth-component/header";
 
 const ForgotPasswordPage = () => {
   const navigate = useNavigate();
 
   // Mutation for logging in the user
-  const { isPending, 
+  const {
+    isPending,
     // mutateAsync: loginUser
-   } = loginUserMutation();
+  } = loginUserMutation();
   const form = useForm<z.infer<typeof forgotPasswordSchema>>({
     resolver: zodResolver(forgotPasswordSchema),
     defaultValues: {
@@ -54,45 +54,25 @@ const ForgotPasswordPage = () => {
   };
 
   return (
-    <div className="h-full min-h-screen bg-bg3xl bg-cover grid md:grid-cols-2 max-2xl:py-8 max-sm:p-4  gap-4 max-2xl:p-8">
-      <img
-        src="/images/loginImg.png"
-        width={500}
-        height={600}
-        alt=""
-        className="hidden md:block 2xl:hidden place-self-center "
-      />
-      <div className="relative hidden 2xl:grid">
-        <img
-          src="/images/coverSigninImg.png"
-          alt=""
-          className="2xl:absolute 2xl:h-full 2xl:w-full place-self-center justify-self-end "
-        />
-        <img
-          src="/images/logo.svg"
-          alt=""
-          className="2xl:absolute 2xl:w-[150px] h-auto left-4 top-4"
-        />
-        <h1 className="font-syne z-30 absolute top-1/2 left-1/2 text-5xl font-bold -translate-x-1/2 -translate-y-1/2 leading- text-white">
-          Welcome <br /> Back
-        </h1>
-      </div>
+    <div className="h-full min-h-screen bg-bg3xl bg-cover grid  max-2xl:py-8 max-sm:p-4  gap-4 max-2xl:p-8">
       <div className="flex items-center justify-center md:justify-start w-full max-w-lg mx-auto">
         <div className="space-y-6 w-full mb-16">
-          <div className="hidden md:block space-y-3 mb-3">
-            <h1 className="font-bold text-xl xxx:text-3xl  xl:text-5xl max-xx:text-center  font-syne">
-              Sign In
-            </h1>
-            <p className="space-x-6 flex flex-wrap justify-center xx:justify-start">
-              <span className="font-syne max-xx:text-center ">
-                Welcome Back, Please Enter Your Details
-              </span>
-            </p>
-          </div>
-          <AuthHeader
-            title="Forgot Password"
-            description="Please Enter Your Email Address To send The Verification Link To Reset Your Password."
-          />
+          <Link to="/" className="flex flex-col items-center">
+            <div className="">
+              <img src="/images/logo.svg" alt="log" />
+            </div>
+            <div className="my-6 flex flex-col gap-2">
+              <h1 className="font-medium text-xl text-center">
+                Forgot Password
+              </h1>
+              <div className="">
+                <p className="text-md text-center text-gray-400">
+                  Please Enter Your Email Address To send The Verification Link
+                  To Reset Your Password.
+                </p>
+              </div>
+            </div>
+          </Link>
           <div className="space-y-6">
             <Form {...form}>
               <form
