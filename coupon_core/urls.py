@@ -22,6 +22,10 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+from django.http import HttpResponse
+
+def trigger_error(request):
+    division_by_zero = 1 / 0
 # Import drf-yasg components
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
@@ -45,6 +49,8 @@ schema_view = get_schema_view(
 urlpatterns = [
     path("admin/", admin.site.urls),  # Admin panel
     # path("healthz/", health_check, name="health-check"),  # Health check endpoint
+    path('sentry-debug/', trigger_error),
+
 ]
 
 # Mapping of applications to their URL configurations
