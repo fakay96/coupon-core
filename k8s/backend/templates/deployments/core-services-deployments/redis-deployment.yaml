@@ -25,7 +25,7 @@ spec:
             secretKeyRef:
               name: app-secrets
               key: REDIS_PASSWORD
-        
+        args: ["--requirepass", "$(REDIS_PASSWORD)"]
         resources:
           {{- toYaml .Values.redis.resources | nindent 12 }}
         {{- if .Values.redis.persistence.enabled }}
