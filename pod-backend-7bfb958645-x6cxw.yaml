@@ -1,0 +1,223 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    checksum/image: fakay96/coupon-core:261f24b8a2efdf26f585477dfc7ea994f4a098f1c9aae84debd8eaf6a94964a3
+  creationTimestamp: "2025-04-16T12:53:21Z"
+  generateName: backend-7bfb958645-
+  labels:
+    app: backend
+    pod-template-hash: 7bfb958645
+    release: coupon-service
+  name: backend-7bfb958645-x6cxw
+  namespace: staging
+  ownerReferences:
+  - apiVersion: apps/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: ReplicaSet
+    name: backend-7bfb958645
+    uid: a720f364-8171-40c4-a7be-f4044c9dca4d
+  resourceVersion: "21012121"
+  uid: 856531e6-07f3-49fc-a92e-6bf6cbe1ea2e
+spec:
+  containers:
+  - env:
+    - name: DB_PORT
+      valueFrom:
+        secretKeyRef:
+          key: DB_PORT
+          name: app-secrets
+    - name: DB_USER
+      valueFrom:
+        secretKeyRef:
+          key: DB_USER
+          name: app-secrets
+    - name: DB_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          key: DB_PASSWORD
+          name: app-secrets
+    - name: DB_HOST
+      valueFrom:
+        secretKeyRef:
+          key: DB_HOST
+          name: app-secrets
+    - name: ENVIRONMENT
+      valueFrom:
+        secretKeyRef:
+          key: ENVIRONMENT
+          name: app-secrets
+    - name: REDIS_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          key: REDIS_PASSWORD
+          name: app-secrets
+    - name: REDIS_HOST
+      valueFrom:
+        secretKeyRef:
+          key: REDIS_HOST
+          name: app-secrets
+    - name: AUTHENTICATION_SHARD_DB_NAME
+      valueFrom:
+        secretKeyRef:
+          key: AUTHENTICATION_SHARD_DB_NAME
+          name: app-secrets
+    - name: GEODISCOUNTS_DB_NAME
+      valueFrom:
+        secretKeyRef:
+          key: GEODISCOUNTS_DB_NAME
+          name: app-secrets
+    - name: VECTOR_DB_NAME
+      valueFrom:
+        secretKeyRef:
+          key: VECTOR_DB_NAME
+          name: app-secrets
+    - name: DB_NAME
+      valueFrom:
+        secretKeyRef:
+          key: DB_NAME
+          name: app-secrets
+    - name: DO_SPACES_ACCESS_KEY_ID
+      valueFrom:
+        secretKeyRef:
+          key: DO_SPACES_ACCESS_KEY_ID
+          name: app-secrets
+    - name: DO_SPACES_SECRET_ACCESS_KEY
+      valueFrom:
+        secretKeyRef:
+          key: DO_SPACES_SECRET_ACCESS_KEY
+          name: app-secrets
+    - name: BASE_DOMAIN
+      valueFrom:
+        secretKeyRef:
+          key: BASE_DOMAIN
+          name: app-secrets
+    - name: CELERY_BROKER_URL
+      valueFrom:
+        secretKeyRef:
+          key: CELERY_BROKER_URL
+          name: app-secrets
+    - name: DISHPAL_EMAIL_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          key: DISHPAL_EMAIL_PASSWORD
+          name: app-secrets
+    - name: DISHPAL_EMAIL
+      valueFrom:
+        secretKeyRef:
+          key: DISHPAL_EMAIL
+          name: app-secrets
+    - name: CELERY_DB
+      valueFrom:
+        secretKeyRef:
+          key: CELERY_DB
+          name: app-secrets
+    - name: SERVICE_TYPE
+      value: backend
+    image: fakay96/coupon-core:20250416-0367cd1
+    imagePullPolicy: Always
+    name: backend
+    ports:
+    - containerPort: 8000
+      protocol: TCP
+    resources:
+      limits:
+        cpu: 1800m
+        memory: 768Mi
+      requests:
+        cpu: 500m
+        memory: 512Mi
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-9fbsz
+      readOnly: true
+  dnsPolicy: ClusterFirst
+  enableServiceLinks: true
+  nodeName: pool-i9xrs30l1-agyp1
+  preemptionPolicy: PreemptLowerPriority
+  priority: 0
+  restartPolicy: Always
+  schedulerName: default-scheduler
+  securityContext: {}
+  serviceAccount: default
+  serviceAccountName: default
+  terminationGracePeriodSeconds: 30
+  tolerations:
+  - effect: NoExecute
+    key: node.kubernetes.io/not-ready
+    operator: Exists
+    tolerationSeconds: 300
+  - effect: NoExecute
+    key: node.kubernetes.io/unreachable
+    operator: Exists
+    tolerationSeconds: 300
+  volumes:
+  - name: kube-api-access-9fbsz
+    projected:
+      defaultMode: 420
+      sources:
+      - serviceAccountToken:
+          expirationSeconds: 3607
+          path: token
+      - configMap:
+          items:
+          - key: ca.crt
+            path: ca.crt
+          name: kube-root-ca.crt
+      - downwardAPI:
+          items:
+          - fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+            path: namespace
+status:
+  conditions:
+  - lastProbeTime: null
+    lastTransitionTime: "2025-04-16T12:54:10Z"
+    status: "True"
+    type: PodReadyToStartContainers
+  - lastProbeTime: null
+    lastTransitionTime: "2025-04-16T12:53:22Z"
+    status: "True"
+    type: Initialized
+  - lastProbeTime: null
+    lastTransitionTime: "2025-04-16T12:54:10Z"
+    status: "True"
+    type: Ready
+  - lastProbeTime: null
+    lastTransitionTime: "2025-04-16T12:54:10Z"
+    status: "True"
+    type: ContainersReady
+  - lastProbeTime: null
+    lastTransitionTime: "2025-04-16T12:53:22Z"
+    status: "True"
+    type: PodScheduled
+  containerStatuses:
+  - containerID: containerd://84bc23f155c3b405e3f76a305a74b2916ba83ed7cb362edfc7f8034f724d59f7
+    image: docker.io/fakay96/coupon-celery:20250416-0367cd1
+    imageID: docker.io/fakay96/coupon-celery@sha256:dc6abdb07d998633bc15869a6d99f3aebe01aa690d49b412e9da9b3610906842
+    lastState: {}
+    name: backend
+    ready: true
+    restartCount: 0
+    started: true
+    state:
+      running:
+        startedAt: "2025-04-16T12:54:09Z"
+    volumeMounts:
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-9fbsz
+      readOnly: true
+      recursiveReadOnly: Disabled
+  hostIP: 10.114.0.3
+  hostIPs:
+  - ip: 10.114.0.3
+  phase: Running
+  podIP: 10.150.0.41
+  podIPs:
+  - ip: 10.150.0.41
+  qosClass: Burstable
+  startTime: "2025-04-16T12:53:22Z"

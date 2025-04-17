@@ -118,16 +118,17 @@ DATABASES = {
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "redis_password")
 REDIS_PORT = 6379
+REDIS_URL = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/0"
 
 # Caching (Redis)
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:6379/0",
+        "LOCATION": REDIS_URL,
     },
     "results": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:6379/1",
+        "LOCATION": REDIS_URL,
     },
 }
 
@@ -135,18 +136,13 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:6379/1"],
+            "hosts": [REDIS_URL],
         },
     },
 }
 
-# -----------------------------------------------
-# Celery Configuration (RabbitMQ)
-# -----------------------------------------------
-CELERY_BROKER_URL = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:6379/0"
-CELERY_RESULT_BACKEND = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:6379/0"
-CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
-
+CELERY_BROKER_URL = REDIS_URL
+CELERY_RESULT_BACKEND = REDIS_URL
 
 # -----------------------------------------------
 # Email Backend (Console for Staging)

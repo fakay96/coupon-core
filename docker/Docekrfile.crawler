@@ -1,0 +1,40 @@
+FROM python:3.12-slim AS builder
+ENV PYTHONUNBUFFERED=1
+WORKDIR /build
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential libffi-dev libssl-dev \
+    libxml2-dev libxslt1-dev zlib1g-dev \
+    libjpeg-dev \
+    libnss3 libatk-bridge2.0-0 libgtk-3-0 libx11-xcb1 \
+    libxcomposite1 libxcursor1 libxdamage1 libxi6 libxtst6 \
+    libxss1 libasound2 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+
+RUN python -m venv /opt/venv && \
+    /opt/venv/bin/pip install --upgrade pip && \
+    /opt/venv/bin/pip install --no-cache-dir -r requirements.txt && \
+    /opt/venv/bin/python -m playwright install chromium --with-deps
+
+FROM python:3.12-slim
+ENV PYTHONUNBUFFERED=1 \
+    VIRTUAL_ENV=/opt/venv \
+    PATH="/opt/venv/bin:$PATH"
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libnss3 libatk-bridge2.0-0 libgtk-3-0 libx11-xcb1 \
+    libxcomposite1 libxcursor1 libxdamage1 libxi6 libxtst6 \
+    libxss1 libasound2 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /opt/venv /opt/venv
+COPY crawlers/discountscraper /app/discountscraper
+COPY crawlers/requirements.txt /app/requirements.txt
+COPY crawlers/scrapy.cfg /app/scrapy.cfg
+
+ENTRYPOINT ["scrapy"]
+CMD ["crawl", "discountspider"]
