@@ -1,0 +1,9 @@
+Metadata-Version: 2.4
+Name: discountcrawlers
+Version: 0.1.0
+Requires-Python: >=3.8
+Requires-Dist: scrapy>=2.11.0
+Requires-Dist: scrapy-playwright>=0.0.34
+Requires-Dist: playwright>=1.41.0
+Dynamic: requires-dist
+Dynamic: requires-python

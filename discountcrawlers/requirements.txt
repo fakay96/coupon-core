@@ -1,0 +1,30 @@
+# Core dependencies
+scrapy>=2.11.0
+scrapy-playwright>=0.0.30
+scrapy-splash>=0.8.0
+redis>=5.0.1
+aiohttp>=3.9.1
+python-dotenv>=1.0.0
+httpx>=0.26.0
+numpy>=1.26.0
+pydantic>=2.5.0
+asyncio>=3.4.3
+
+# Google Cloud
+google-cloud-aiplatform>=1.40.0  # For Vertex AI embeddings
+google-cloud-storage>=2.14.0  # For GCS operations
+google-auth>=2.27.0  # For authentication
+google-api-core>=2.18.0  # Core Google API client library
+
+# Vector search
+faiss-cpu>=1.7.4  # For vector similarity search
+scikit-learn>=1.4.0  # For text processing and clustering
+
+# Embedding and NLP
+sentence-transformers>=2.5.1
+torch>=2.2.0
+transformers>=4.38.0
+spacy>=3.7.2  # For text processing
+nltk>=3.8.1  # For text processing
+
+
