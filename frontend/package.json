@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
+    "build": "tsc -b && vite build --mode staging",
+    "build:prod": "tsc -b && vite build --mode production",
+    "preview": "vite preview --mode staging",
+    "preview:prod": "vite preview --mode production",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@headlessui/react": "^2.2.0",
