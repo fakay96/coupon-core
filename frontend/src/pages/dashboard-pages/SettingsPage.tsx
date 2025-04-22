@@ -13,21 +13,28 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { updateUserProfileMutation } from "@/queries/auth-queries";
+
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { DeleteUserAccountService, updateUserProfile } from "@/api/authApi";
+import { DeleteUserAccountService } from "@/api/authApi";
+import { useConfirm } from "@/hooks/use-confirm";
 
 const SettingsPage = () => {
   const { user, logout } = useAuth();
+  const { mutateAsync: updateUserProfile } = updateUserProfileMutation();
+
   const [preferences, setPreferences] = useState("");
   const [firstname, setFirstname] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [lastname, setLastname] = useState("");
-  // const [preference, setPreference] = useState({});
+  const [ConfirmDialog, confirm] = useConfirm(
+    "Are you sure?",
+    "You are about to delete this account"
+  );
   const handleSummit = async () => {
-    console.log(preferences)
     const user = {
       first_name: firstname,
       last_name: lastname,
@@ -46,12 +53,21 @@ const SettingsPage = () => {
     setLastname(user?.last_name || "");
   }, [user]);
 
+  const handleDelete = async () => {
+    const ok = await confirm();
+
+    if (ok) {
+      await DeleteUserAccountService();
+      logout();
+    }
+  };
   return (
     <div className="">
       <div className="bg-bg3xl bg-cover">
         <div className="flex flex-col h-full min-h-screen max-w-screen-xl px-4 sm:px-8 mx-auto">
           <SearchInputNavbar />
           <section className="flex flex-col sm:flex-row my-16 gap-8 w-full">
+            <ConfirmDialog />
             <main className="w-full space-y-8">
               <div className="">
                 <h1 className="font-bold font-syne text-md pb-2 -mt-2">
@@ -59,10 +75,11 @@ const SettingsPage = () => {
                 </h1>
                 <div className="relative flex flex-col bg-white p-4 md:p-8 rounded-xl w-full">
                   <div className="flex gap-2 flex-wrap items-center">
-                    <span className="font-bold text-sm font-syne">FirstName:</span>
+                    <span className="font-bold text-sm font-syne">
+                      FirstName:
+                    </span>
                     <span className="font-syne ">
                       {capitalize(user?.first_name)}{" "}
-                      
                     </span>
                   </div>
                   <div className="flex gap-2 flex-wrap items-center">
@@ -75,9 +92,7 @@ const SettingsPage = () => {
                   </div>
                   <div className="flex gap-2 flex-wrap items-center">
                     <span className="font-bold text-sm font-syne">Phone:</span>
-                    <span className="font-syne ">
-                      {user?.phone_number}
-                    </span>
+                    <span className="font-syne ">{user?.phone_number}</span>
                   </div>
                   <div className="absolute right-4 bottom-2 flex gap-2 font-syne font-bold">
                     <Dialog>
@@ -206,10 +221,7 @@ const SettingsPage = () => {
               </div>
               <div className="w-full flex justify-end">
                 <Button
-                  onClick={async () => {
-                    await DeleteUserAccountService();
-                    logout();
-                  }}
+                  onClick={handleDelete}
                   variant="destructive"
                   className="font-syne px-8 font-bold"
                 >

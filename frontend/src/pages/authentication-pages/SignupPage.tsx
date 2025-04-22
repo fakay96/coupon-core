@@ -18,33 +18,14 @@ import { useState } from "react";
 import { Loader } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { signUpSchema } from "@/validation-schemas";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { axiosGoogleLogin, loginUserService } from "@/api/authApi";
-import { loginCredentials } from "@/types";
-import { useGoogleLogin } from "@react-oauth/google";
 import { registerUserMutation } from "@/queries/auth-queries";
 import { toast } from "sonner";
 import AuthHeader from "@/components/auth-component/header";
-import GoogleButton from "@/components/auth-component/google-button";
 
 // SignUpPage component for user registration
 const SignUpPage = () => {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const [eyeToggle, setEyeToggle] = useState(true);
-
-  // Mutation for logging in the user
-  const { mutateAsync: loginUser } = useMutation<
-    unknown,
-    Error,
-    loginCredentials
-  >({
-    mutationFn: async (value: loginCredentials) =>
-      await loginUserService(value),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["userInfo"] });
-    },
-  });
 
   // Mutation for registering the user
   const { isPending, mutateAsync: registerUser } = registerUserMutation();
@@ -57,42 +38,13 @@ const SignUpPage = () => {
     },
   });
 
-  // Google login handler
-  const googleLogin = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      const { email, name } = await axiosGoogleLogin(tokenResponse);
-      const googleCredentials = {
-        email,
-        password: import.meta.env.VITE_GOOGLE_PASS,
-        username: email?.split("@")[0],
-        confirm_password: import.meta.env.VITE_GOOGLE_PASS,
-      };
-      const { confirm_password, ...restOfLoginCredentials } = googleCredentials;
-      toast.promise(
-        registerUser(googleCredentials).then(() => {
-          loginUser(restOfLoginCredentials).then(() => {
-            navigate("/dashboard", { replace: true });
-          });
-        }),
-        {
-          loading: `${name}, Dishpal AI is creating your account.`,
-          success: `${name}, Here is your dashboard! Explore!`,
-          error: (error) => error.message,
-        }
-      );
-    },
-    onError: () => {
-      console.error("Login Failed");
-    },
-  });
-
   // Form submit handler
   const onSubmit = async ({
     email,
     password,
   }: z.infer<typeof signUpSchema>) => {
     const username = email?.split("@")[0];
-    
+
     const validatedUser = {
       email,
       username: username,
@@ -101,12 +53,15 @@ const SignUpPage = () => {
     };
     toast.promise(
       registerUser(validatedUser).then(() => {
-        navigate("/auth/login", { replace: true, state: { username } });
+        navigate("/auth/resend-email", {
+          replace: true,
+          state: { username, email },
+        });
       }),
       {
         loading: `${username}, Dishpal AI is creating your account.`,
-        success: `${username}, Dishpal AI created your account successfully! Please login to continue.`,
-        error: (error) => error.message,
+        success: `${username}, Dishpal AI created your account successfully! Please verify your email to continue.`,
+        error: (error) => JSON.stringify(error),
       }
     );
   };
@@ -158,7 +113,6 @@ const SignUpPage = () => {
                 onSubmit={form.handleSubmit(onSubmit)}
                 className="space-y-6"
               >
-                
                 <div className="flex flex-col space-y-6">
                   <FormField
                     control={form.control}
@@ -256,12 +210,7 @@ const SignUpPage = () => {
                 </div>
                 <Separator className="bg-black w-full" />
               </div>
-              <div
-                onClick={() => {
-                  googleLogin();
-                }}
-                className="hidden md:flex gap-6 justify-center items-center"
-              >
+              <div className="hidden md:flex gap-6 justify-center items-center">
                 <div className="p-4 rounded-full hover:shadow-xl hover:cursor-pointer">
                   <img
                     src={"/images/google.png"}
@@ -290,16 +239,14 @@ const SignUpPage = () => {
                   />
                 </div>
               </div>
-              <GoogleButton
-                onClick={() => {
-                  googleLogin();
-                }}
-              />
             </div>
             <div className="space-y-6 md:hidden flex justify-center">
               <div className="flex gap-2">
                 <div className="font-syne">Already Have An Account ?</div>
-                <Link to="/auth/login" className="font-syne text-vividOrange font-bold hover:underline hover:cursor-pointer">
+                <Link
+                  to="/auth/login"
+                  className="font-syne text-vividOrange font-bold hover:underline hover:cursor-pointer"
+                >
                   Log In
                 </Link>
               </div>

@@ -12,24 +12,20 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { EyeIcon, EyeOff } from "lucide-react";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Loader } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Separator } from "@/components/ui/separator";
 import { signInSchema } from "@/validation-schemas";
 import { Input } from "@/components/ui/input";
-import { axiosGoogleLogin } from "@/api/authApi";
-import { useGoogleLogin } from "@react-oauth/google";
 import { toast } from "sonner";
 import { loginUserMutation } from "@/queries/auth-queries";
 import AuthHeader from "@/components/auth-component/header";
-import GoogleButton from "@/components/auth-component/google-button";
 
 // SignInPage component for user login
 const SignInPage = () => {
   const location = useLocation();
   const firstname = location.state?.firstname;
-  let googleInfo = useRef({ email: "", name: "" });
   const navigate = useNavigate();
   const [eyeToggle, setEyeToggle] = useState(true);
 
@@ -44,31 +40,9 @@ const SignInPage = () => {
     },
   });
 
-  // Google login handler
-  const googleLogin = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      const { email, name } = await axiosGoogleLogin(tokenResponse);
-      googleInfo.current = { email, name };
-      const googleCredentials = {
-        password: import.meta.env.VITE_GOOGLE_PASS,
-        email,
-      };
-      toast.promise(
-        loginUser(googleCredentials).then(() => {
-          navigate("/dashboard", { replace: true });
-        }),
-        {
-          loading: `${name}, Dishpal AI is logging you into your account now.`,
-          success: `${name}, Here is your dashboard! Explore!`,
-          error: (error) => error.message,
-        }
-      );
-    },
-  });
-
   // Form submit handler
   const onSubmit = ({ email, password }: z.infer<typeof signInSchema>) => {
-    const username = email?.split("@")[0]
+    const username = email?.split("@")[0];
     const userInfo = { password, email };
 
     toast.promise(
@@ -76,31 +50,23 @@ const SignInPage = () => {
         .then(() => {
           navigate("/dashboard", { replace: true });
         })
-        .catch((error) => {
-          const errorMessage =
-            error?.response?.data?.message ||
-            error?.message ||
-            "An error occurred";
+        .catch((error: any) => {
+          if (error.data.error.non_field_errors) {
+            throw error.data.error.non_field_errors?.join("");
+          }
 
-          if (typeof errorMessage === "object") {
-            throw new Error("Invalid username or password.");
-          }
-          if (
-            errorMessage &&
-            errorMessage?.toLowerCase().includes("your account is not verified")
-          ) {
+          if (error.status === 403) {
             navigate(`/auth/resend-email`, { state: { email } });
+            throw error.data.error ?? "Something went wrong.";
           }
-          throw new Error(errorMessage);
+          throw error.data ?? "Something went wrong.";
         }),
       {
         loading: `${
           firstname || username
         }, Dishpal AI is logging you into your account now.`,
-        success: `${
-          firstname || username
-        }, Here is your dashboard! Explore!`,
-        error: (error) => error.message,
+        success: `${firstname || username}, Here is your dashboard! Explore!`,
+        error: (error) => JSON.stringify(error),
       }
     );
   };
@@ -129,9 +95,6 @@ const SignInPage = () => {
           </div>
           <AuthHeader title="Welcome Back!" description="Log In" />
           <Button
-            onClick={() => {
-              googleLogin();
-            }}
             variant="outline"
             type="button"
             className="w-full py-6 border-none font-semibold hover:bg-slate-50 hover:shadow-xl font-syne bg-white hidden md:flex"
@@ -271,11 +234,6 @@ const SignInPage = () => {
                 </div>
                 <Separator className="bg-black w-full" />
               </div>
-              <GoogleButton
-                onClick={() => {
-                  googleLogin();
-                }}
-              />
             </div>
             <div className="space-y-6 md:hidden flex justify-center">
               <div className="flex gap-2">

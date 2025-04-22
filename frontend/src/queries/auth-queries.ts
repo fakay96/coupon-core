@@ -3,6 +3,7 @@ import {
   loginUserService,
   registerUserService,
   resendVerificationToken,
+  updateUserProfile,
   verifyEmailToken,
 } from "@/api/authApi";
 import { loginCredentials, RegisterUserData } from "@/types";
@@ -82,6 +83,16 @@ export const verifyEmailTokenMutation = () => {
     mutationKey: ["verifyEmailTokenMutation"],
     mutationFn: async (value: { email: string; token: string }) =>
       await verifyEmailToken(value),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["userInfo"] });
+    },
+  });
+};
+export const updateUserProfileMutation = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: ["updateUserProfileMutation"],
+    mutationFn: async (value: any) => await updateUserProfile(value),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["userInfo"] });
     },

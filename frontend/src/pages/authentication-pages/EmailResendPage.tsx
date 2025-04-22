@@ -25,13 +25,13 @@ const EmailResendPage = () => {
       <div className="flex flex-col items-center justify-center md:justify-start w-full max-w-lg mx-auto">
         <Link
           to="/"
-          className="hidden flex-col items-center my-8 mb-16 md:flex"
+          className="hidden flex-col items-center my-8 md:flex"
         >
           <div className="">
             <img src="/images/logo.svg" alt="log" />
           </div>
         </Link>
-        <div className="space-y-6 w-full mb-16">
+        <div className="w-full ">
           <div className="hidden md:block space-y-3 mb-3 text-center">
             <h1 className="font-bold text-xl xxx:text-3xl max-xx:text-center  font-syne">
               Check Your Inbox
@@ -55,7 +55,7 @@ const EmailResendPage = () => {
               <span
                 onClick={() =>
                   navigate(`/auth/verification`, {
-                    state: { email: state?.email },
+                    state: { ...state },
                   })
                 }
                 className="text-vividOrange mx-1 hover:cursor-pointer"
@@ -92,8 +92,8 @@ const EmailResendPage = () => {
               </p>
             </div>
           </div>
-          <div className="space-y-6 flex justify-center">
-            <img src="/images/message.png" className="max-sm:size-96" alt="" />
+          <div className="flex justify-center items-start size-64 mx-auto">
+            <img src="/images/message.png" className="" alt="" />
           </div>
         </div>
       </div>

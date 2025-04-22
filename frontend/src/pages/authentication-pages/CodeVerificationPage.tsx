@@ -34,9 +34,11 @@ const CodeVerificationPage = () => {
   const name = state?.email?.split("@")[0] ?? form.getValues("userEmail");
   const { mutateAsync, isPending } = verifyEmailTokenMutation();
 
-
-  const onSubmit = ({ code,userEmail }: z.infer<typeof verificationCodeSchema>) => {
-    if (state === null && !userEmail) {
+  const onSubmit = ({
+    code,
+    userEmail,
+  }: z.infer<typeof verificationCodeSchema>) => {
+    if (!state.email && !userEmail) {
       setEmailField(true);
       return toast.error("Email required");
     }
@@ -75,7 +77,9 @@ const CodeVerificationPage = () => {
               {state?.email &&
                 (state?.email ?? form.getValues("userEmail"))?.charAt(0) +
                   "***********" +
-                  (state?.email ?? form.getValues("userEmail"))?.split("@")[1]}{" "}
+                  (state?.email ?? form.getValues("userEmail"))?.split(
+                    "@"
+                  )[1]}{" "}
             </p>
           </div>
           <AuthHeader
