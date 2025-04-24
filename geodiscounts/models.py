@@ -35,6 +35,7 @@ from django.core.validators import FileExtensionValidator
 from django.conf import settings
 from storages.backends.s3boto3 import S3Boto3Storage
 from authentication.models import CustomUser
+
 class Category(models.Model):
     """
     Represents a discount category.
@@ -246,3 +247,84 @@ class SharedDiscount(models.Model):
     def __str__(self) -> str:
         """Returns a formatted string representing the shared discount."""
         return f"{self.group_name} - {self.discount.discount_code}"
+
+
+class WebSocketDiscountRequest(models.Model):
+    """
+    Tracks WebSocket discount requests and their status.
+
+    Attributes:
+        request_id (str): Unique identifier for the request
+        user (User): The user who made the request
+        location (Point): The location for the discount search
+        radius (float): Search radius in kilometers
+        category (Optional[Category]): The category to filter by
+        status (str): Current status of the request
+        results (Dict[str, Any]): The results of the request
+        created_at (datetime): When the request was created
+        updated_at (datetime): When the request was last updated
+    """
+    
+    request_id: str = models.CharField(
+        max_length=36,
+        unique=True,
+        help_text="Unique identifier for the WebSocket request"
+    )
+    user: models.ForeignKey = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="websocket_requests",
+        help_text="User who made the request"
+    )
+    location: models.PointField = models.PointField(
+        help_text="Location for the discount search"
+    )
+    radius: float = models.FloatField(
+        default=10.0,
+        help_text="Search radius in kilometers"
+    )
+    category: Optional[models.ForeignKey] = models.ForeignKey(
+        Category,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="websocket_requests",
+        help_text="Category to filter by"
+    )
+    status: str = models.CharField(
+        max_length=20,
+        choices=[
+            ("pending", "Pending"),
+            ("processing", "Processing"),
+            ("completed", "Completed"),
+            ("failed", "Failed")
+        ],
+        default="pending",
+        help_text="Current status of the request"
+    )
+    results: Dict[str, Any] = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Results of the request"
+    )
+    created_at: models.DateTimeField = models.DateTimeField(
+        auto_now_add=True,
+        help_text="When the request was created"
+    )
+    updated_at: models.DateTimeField = models.DateTimeField(
+        auto_now=True,
+        help_text="When the request was last updated"
+    )
+
+    def __str__(self) -> str:
+        """Returns a string representation of the request."""
+        return f"{self.user.username} - {self.request_id}"
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['request_id']),
+            models.Index(fields=['user']),
+            models.Index(fields=['status']),
+            models.Index(fields=['created_at']),
+        ]
+        ordering = ['-created_at']

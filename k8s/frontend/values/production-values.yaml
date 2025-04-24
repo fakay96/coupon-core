@@ -29,7 +29,7 @@ ingress:
   className: "nginx"
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /$1
-    cert-manager.io/cluster-issuer: letsencrypt-staging
+    cert-manager.io/cluster-issuer: letsencrypt-prod
   tls:
     - hosts:
         - app.dishpal.ai
@@ -40,5 +40,5 @@ autoscaling:
   enabled: false
   minReplicas: 1
   maxReplicas: 3
-  targetCPUUtilizationPercentage: 40
+  targetCPUUtilizationPercentage: 60
   targetMemoryUtilizationPercentage: 80

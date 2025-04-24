@@ -168,3 +168,4 @@ SIMPLE_JWT = {
     "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
 }
 CELERY_ALWAYS_EAGER=True
+FRONTEND_DOMAIN_NAME="https://app.dishpal.ai"

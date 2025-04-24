@@ -166,3 +166,4 @@ SIMPLE_JWT = {
 
 CORS_ALLOW_ALL_ORIGINS = True
 CELERY_ALWAYS_EAGER=True
+FRONTEND_DOMAIN_NAME="https://app-staging.dishpal.ai"

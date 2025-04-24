@@ -87,6 +87,14 @@ jobs:
         run: |
           kubectl get namespace $NAMESPACE || kubectl create namespace $NAMESPACE
 
+      - name: Select frontend repo
+        run: |
+          if [ "$NAMESPACE" = "staging" ]; then
+            echo "FRONTEND_REPO=fakay96/coupon-frontend-staging" >> $GITHUB_ENV
+          else
+            echo "FRONTEND_REPO=fakay96/coupon-frontend" >> $GITHUB_ENV
+          fi
+
       - name: Deploy Backend & Celery
         run: |
           helm upgrade --install coupon-service ./k8s/backend \
@@ -102,7 +110,7 @@ jobs:
       - name: Deploy Frontend
         run: |
           helm upgrade --install frontend ./k8s/frontend \
-            --set frontend.image.repository=fakay96/coupon-frontend \
+            --set frontend.image.repository=$FRONTEND_REPO \
             --set frontend.image.tag=$VERSION_TAG \
             --namespace $NAMESPACE --create-namespace \
             -f ./k8s/frontend/values/$NAMESPACE-values.yaml \

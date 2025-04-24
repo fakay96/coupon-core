@@ -1,18 +1,34 @@
-# Stage 1: Build the Frontend
 FROM node:18-alpine AS builder
+
+# ─────── Build-time switch: “staging” (default) or “production” ───────
+ARG BUILD_MODE=staging
+
 WORKDIR /app/frontend
 
-# Copy only package.json to leverage Docker cache for dependencies
+# Install only what package.json declares; keeps cache stable
 COPY frontend/package.json ./
-RUN npm install
+RUN npm ci
 
-# Copy the rest of the frontend source code and build for production
+# Copy source code and build according to BUILD_MODE
 COPY frontend/ .
-RUN npm run build
+RUN if [ "$BUILD_MODE" = "production" ]; then \
+      npm run build:prod ; \
+    else \
+      npm run build ; \
+    fi
 
-# Stage 2: Serve the Production Build with Nginx
+
+
 FROM nginx:alpine
+
+# Drop the compiled assets into Nginx’s default web root
 COPY --from=builder /app/frontend/dist /usr/share/nginx/html
-EXPOSE 80
-HEALTHCHECK --interval=30s --timeout=10s CMD curl -f http://localhost/ || exit 1
+
+EXPOSE 80  
+
+# Fail the container if the root URL stops responding
+HEALTHCHECK --interval=30s --timeout=10s \
+  CMD curl -f http://localhost/ || exit 1
+
+# Run Nginx in the foreground
 CMD ["nginx", "-g", "daemon off;"]
