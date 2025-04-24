@@ -169,3 +169,7 @@ SIMPLE_JWT = {
 }
 CELERY_ALWAYS_EAGER=True
 FRONTEND_DOMAIN_NAME="https://app.dishpal.ai"
+
+CORS_ALLOWED_ORIGINS=[
+    "https://app.dishpal.ai"
+]
