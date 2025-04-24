@@ -10,7 +10,7 @@ from authentication.v1.utils.redis_client import RedisClient
 
 redis_client = RedisClient()
 
-
+DISCOUNT_CHANNEL="dishpal_discount_channel"
 def cache_discount_query(key: str, results: list, expiry: int = 300) -> None:
     """
     Cache discount query results in Redis.
@@ -35,3 +35,6 @@ def get_cached_discount_query(key: str) -> list:
     """
     data = redis_client.get_token(key)
     return json.loads(data) if data else None
+
+
+
