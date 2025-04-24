@@ -22,6 +22,7 @@ from geodiscounts.v1.views.discount_views import (
     SearchDiscountsView,
     NearbyDiscountsView,
     CategoryListView,
+    CategoryView
 )
 from geodiscounts.v1.views.retailer_views import (
     RetailerListCreateView,
@@ -45,9 +46,11 @@ urlpatterns = [
     
     path('discounts/search/', SearchDiscountsView.as_view(), name='discount-search'),
     path('discounts/nearby/', NearbyDiscountsView.as_view(), name='discount-nearby'),
+
     
     # Category URLs
     path('categories/', CategoryListView.as_view(), name='category-list'),
+    path('discounts/categories/',CategoryView.as_view(), name='category-view'),
     
     # Retailer URLs
     path('retailers/', RetailerListCreateView.as_view(), name='retailer-list-create'),
