@@ -7,7 +7,7 @@ WORKDIR /app/frontend
 
 # Install only what package.json declares; keeps cache stable
 COPY frontend/package.json ./
-RUN npm ci
+RUN npm  install
 
 # Copy source code and build according to BUILD_MODE
 COPY frontend/ .
