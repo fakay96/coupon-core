@@ -19,13 +19,9 @@ Date: YYYY-MM-DD
 from django.urls import path
 
 from geodiscounts.v1.views.discount_views import (
-    DiscountListCreateView,
-    DiscountDetailView,
-    DiscountBatchView,
     SearchDiscountsView,
     NearbyDiscountsView,
     CategoryListView,
-    CategoryDetailView,
 )
 from geodiscounts.v1.views.retailer_views import (
     RetailerListCreateView,
@@ -37,24 +33,21 @@ from geodiscounts.v1.views.shared_discount_views import (
     SharedDiscountListCreateView,
     SharedDiscountDetailView,
 )
-from geodiscounts.v1.views.websocket_views import (
-    WebSocketDiscountRequestView,
-    WebSocketDiscountRequestDetailView,
-)
+# from geodiscounts.v1.views.websocket_views import (
+#     WebSocketDiscountRequestView,
+#     WebSocketDiscountRequestDetailView,
+# )
 
 app_name = "geodiscounts"
 
 urlpatterns = [
     # Discount URLs
-    path('discounts/', DiscountListCreateView.as_view(), name='discount-list-create'),
-    path('discounts/<int:pk>/', DiscountDetailView.as_view(), name='discount-detail'),
-    path('discounts/batch/', DiscountBatchView.as_view(), name='discount-batch'),
+    
     path('discounts/search/', SearchDiscountsView.as_view(), name='discount-search'),
     path('discounts/nearby/', NearbyDiscountsView.as_view(), name='discount-nearby'),
     
     # Category URLs
     path('categories/', CategoryListView.as_view(), name='category-list'),
-    path('categories/<int:pk>/', CategoryDetailView.as_view(), name='category-detail'),
     
     # Retailer URLs
     path('retailers/', RetailerListCreateView.as_view(), name='retailer-list-create'),
@@ -66,7 +59,7 @@ urlpatterns = [
     path('shared-discounts/', SharedDiscountListCreateView.as_view(), name='shared-discount-list-create'),
     path('shared-discounts/<int:pk>/', SharedDiscountDetailView.as_view(), name='shared-discount-detail'),
     
-    # WebSocket discount request URLs
-    path('websocket-requests/', WebSocketDiscountRequestView.as_view(), name='websocket-request-list-create'),
-    path('websocket-requests/<str:request_id>/', WebSocketDiscountRequestDetailView.as_view(), name='websocket-request-detail'),
+    # # WebSocket discount request URLs
+    # path('websocket-requests/', WebSocketDiscountRequestView.as_view(), name='websocket-request-list-create'),
+    # path('websocket-requests/<str:request_id>/', WebSocketDiscountRequestDetailView.as_view(), name='websocket-request-detail'),
 ]

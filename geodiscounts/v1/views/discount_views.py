@@ -28,8 +28,8 @@ from geodiscounts.v1.serializers import DiscountSerializer
 from geodiscounts.v1.serializers.discount_serializers import CategorySerializer
 from geodiscounts.v1.permissions import IsDiscountOwner, IsOwnerOrReadOnly
 from geodiscounts.v1.services.geo_services import GeoService
-from ..utils.embedding import generate_embedding
-from ..utils.redis_utils import get_redis_client, DISCOUNT_CHANNEL
+from geodiscounts.v1.utils.embedding_utils import generate_embedding
+from geodiscounts.v1.utils.redis_utils import DISCOUNT_CHANNEL, redis_client
 
 LOGGER = logging.getLogger(__name__)
 
@@ -79,7 +79,7 @@ class DiscountListView(generics.ListCreateAPIView):
             discount.save()
             
         # Publish to Redis channel
-        redis_client = get_redis_client()
+        redis_client = redis_client
         redis_client.publish(
             DISCOUNT_CHANNEL,
             json.dumps({
@@ -113,7 +113,7 @@ class DiscountDetailView(generics.RetrieveUpdateDestroyAPIView):
                 discount.save()
                 
         # Publish to Redis channel
-        redis_client = get_redis_client()
+        redis_client = redis_client
         redis_client.publish(
             DISCOUNT_CHANNEL,
             json.dumps({
@@ -131,7 +131,7 @@ class DiscountDetailView(generics.RetrieveUpdateDestroyAPIView):
     def perform_destroy(self, instance):
         """Delete a discount and publish to Redis."""
         # Publish to Redis channel before deletion
-        redis_client = get_redis_client()
+        redis_client = redis_client
         redis_client.publish(
             DISCOUNT_CHANNEL,
             json.dumps({
@@ -154,39 +154,39 @@ class CategoryListView(generics.ListCreateAPIView):
     serializer_class = CategorySerializer
     permission_classes = [IsAuthenticated]
 
-class RetailerListView(generics.ListCreateAPIView):
-    """View for listing and creating retailers."""
+# class RetailerListView(generics.ListCreateAPIView):
+#     """View for listing and creating retailers."""
     
-    queryset = Retailer.objects.all()
-    serializer_class = RetailerSerializer
-    permission_classes = [IsAuthenticated]
+#     queryset = Retailer.objects.all()
+#     serializer_class = RetailerSerializer
+#     permission_classes = [IsAuthenticated]
 
-class WebSocketDiscountRequestView(generics.CreateAPIView):
-    """View for creating WebSocket discount requests."""
+# class WebSocketDiscountRequestView(generics.CreateAPIView):
+#     """View for creating WebSocket discount requests."""
     
-    serializer_class = WebSocketDiscountRequestSerializer
-    permission_classes = [IsAuthenticated]
+#     serializer_class = WebSocketDiscountRequestSerializer
+#     permission_classes = [IsAuthenticated]
     
-    def perform_create(self, serializer):
-        """Create a new WebSocket discount request."""
-        request = serializer.save(user=self.request.user)
+#     def perform_create(self, serializer):
+#         """Create a new WebSocket discount request."""
+#         request = serializer.save(user=self.request.user)
         
-        # Publish to Redis channel
-        redis_client = get_redis_client()
-        redis_client.publish(
-            DISCOUNT_CHANNEL,
-            json.dumps({
-                'type': 'websocket_request_created',
-                'request_id': request.request_id,
-                'user_id': request.user.id,
-                'location': {
-                    'lat': request.location.y,
-                    'lng': request.location.x
-                },
-                'radius': request.radius,
-                'category_id': request.category.id if request.category else None
-            })
-        )
+#         # Publish to Redis channel
+#         redis_client = redis_client
+#         redis_client.publish(
+#             DISCOUNT_CHANNEL,
+#             json.dumps({
+#                 'type': 'websocket_request_created',
+#                 'request_id': request.request_id,
+#                 'user_id': request.user.id,
+#                 'location': {
+#                     'lat': request.location.y,
+#                     'lng': request.location.x
+#                 },
+#                 'radius': request.radius,
+#                 'category_id': request.category.id if request.category else None
+#             })
+#         )
 
 class NearbyDiscountsView(generics.ListAPIView):
     """
