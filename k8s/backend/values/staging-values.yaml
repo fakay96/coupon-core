@@ -29,7 +29,7 @@ backend:
       memory: "256Mi"
       cpu: "200m"  # Increased from 100m → 500m
     limits:
-      memory: "512Mi"  # Increased from 512Mi → 768Mi
+      memory: "768Mi"  # Increased from 512Mi → 768Mi
       cpu: "800m"  # Increased from 800m → 1200m
 
   nodeSelector:
