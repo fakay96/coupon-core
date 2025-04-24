@@ -29,3 +29,5 @@ req.txt
 .coverage
 
 .txt
+.cache
+venv/

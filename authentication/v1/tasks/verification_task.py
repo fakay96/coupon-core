@@ -3,7 +3,8 @@ from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from coupon_core.settings import (
     BASE_DOMAIN,
-    DEFAULT_FROM_EMAIL
+    DEFAULT_FROM_EMAIL,
+    FRONTEND_DOMAIN_NAME
 )
 import logging
 
@@ -24,7 +25,7 @@ def send_verification_email_task(user_email: str, token: str, logo_url: str = No
     """
     try:
         subject: str = "Verify Your Account"
-        verification_link: str = f"{BASE_DOMAIN}authentication/v1/activate/?token={token}&email={user_email}"
+        verification_link: str = f"{FRONTEND_DOMAIN_NAME}/authentication/v1/activate/?token={token}&email={user_email}"
 
         # Context for template rendering
         context = {
