@@ -20,12 +20,9 @@ api.interceptors.request.use(
     }
     return config;
   },
-  (error) =>
-    Promise.reject({
-      message: error.response.data.error,
-      status: error.response.status,
-      statusText: error.response.statusText,
-    })
+  (error) => {
+    return Promise.reject(error.response);
+  }
 );
 
 let isRefreshing = false;
@@ -46,7 +43,6 @@ api.interceptors.response.use(
   },
   async (error) => {
     const originalRequest = error.config;
-    // console.log("ERROR IN AXIOS CLIENT : ", error)
 
     // If the response status is 401 (Unauthorized) and the request has not been retried yet
     if (error?.response?.status === 401 && !originalRequest._retry) {
@@ -86,11 +82,7 @@ api.interceptors.response.use(
       }
     }
     // Return the error response with additional error information
-    return Promise.reject({
-      message: error.response.data.error,
-      status: error.response.status,
-      statusText: error.response.statusText,
-    });
+    return Promise.reject(error.response);
   }
 );
 

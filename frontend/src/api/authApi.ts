@@ -10,11 +10,15 @@ import axios from "axios";
  * @throws {ApiError} If authentication fails
  */
 export const loginUserService = async (credentials: loginCredentials) => {
-  const response = await axiosInstance.post(
-    "/api/authentication/v1/login/",
-    credentials
-  );
-  return response.data;
+  try {
+    const response = await axiosInstance.post(
+      "/api/authentication/v1/login/",
+      credentials
+    );
+    return response.data;
+  } catch (error: any) {
+    throw error;
+  }
 };
 
 /**
@@ -24,7 +28,6 @@ export const loginUserService = async (credentials: loginCredentials) => {
  * @throws {ApiError} If update fails or user is not authenticated
  */
 export const updateUserProfile = async (userProfile: any) => {
-  console.log(userProfile);
   const response = await axiosInstance.put(
     "/api/authentication/v1/user-profile/",
     userProfile
@@ -41,11 +44,18 @@ export const updateUserProfile = async (userProfile: any) => {
 export const registerUserService = async (
   data: RegisterUserData
 ): Promise<any> => {
-  const response = await axiosInstance.post(
-    "/api/authentication/v1/register/",
-    data
-  );
-  return response.data;
+  try {
+    const response = await axiosInstance.post(
+      "/api/authentication/v1/register/",
+      data
+    );
+    return response.data;
+  } catch (error: any) {
+    if (typeof error.data.errors === "object") {
+      throw Object.values(error.data.errors)?.[0];
+    }
+    throw error.errors;
+  }
 };
 
 /**

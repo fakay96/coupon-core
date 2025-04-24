@@ -1,9 +1,8 @@
 import { AxiosResponse } from "axios";
 
 interface loginCredentials {
-  email: string;
   password: string;
-  username: string;
+  email: string;
 }
 
 interface authContextType {
@@ -21,20 +20,10 @@ interface RegisterUserData {
 }
 
 export type userT = {
-  created_at: string;
-  id: number;
-  location: string;
-  phone_number: string;
   preferences: string;
-  updated_at: string;
-  user: {
-    email: string;
-    first_name: string;
-    id: number;
-    last_name: string;
-    phone_number: null;
-    username: string;
-  };
+  first_name: string;
+  last_name: string;
+  phone_number: null;
 };
 
 export interface Product {

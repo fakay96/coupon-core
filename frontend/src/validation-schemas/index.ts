@@ -62,8 +62,6 @@ export const RegisterSchema = z.object({
 
 // Define a schema for sign-up validation
 export const signUpSchema = z.object({
-  firstname: z.string().min(2, { message: "Enter a valid firstname" }).max(50),
-  lastname: z.string().min(2, { message: "Enter a valid lastname" }).max(50),
   email: z.string().email({ message: "Enter a valid email" }),
   password: z
     .string()

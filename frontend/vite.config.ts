@@ -7,26 +7,34 @@ import fs from "fs";
 // Load OS environment variables first
 dotenv.config();
 
-// Check if the "./env" directory exists before trying to load
-const envDirPath = path.resolve(__dirname, './env');
-const env = fs.existsSync(envDirPath) ? loadEnv(process.env.NODE_ENV as string, envDirPath) : process.env;
 
 
-export default defineConfig({
-  plugins: [react()], // Enables React support
-  envDir: './env', // Specify the directory containing your .env files
+export default defineConfig(({ mode }) => {
+  // Check if the "./env" directory exists before trying to load
+  
+  const envDirPath = path.resolve(__dirname, "./env");
+  const env = fs.existsSync(envDirPath)
+    ? loadEnv(mode, envDirPath)
+    : process.env;
 
-  define: {
-    'import.meta.env.VITE_API_URL': JSON.stringify(env.VITE_API_URL || process.env.VITE_API_URL),
-  },
+  return {
+    plugins: [react()], // Enables React support
+    envDir: "./env", // Specify the directory containing your .env files
 
-  server: {
-    host: true, 
-  },
-
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"), // Creates a shorthand for importing from "src"
+    define: {
+      "import.meta.env.VITE_API_URL": JSON.stringify(
+        env.VITE_API_URL || process.env.VITE_API_URL
+      ),
     },
-  },
+
+    server: {
+      host: true,
+    },
+
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, "./src"), // Creates a shorthand for importing from "src"
+      },
+    },
+  };
 });

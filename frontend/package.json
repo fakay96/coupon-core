@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
+    "build": "tsc -b && vite build --mode staging",
+    "build:prod": "tsc -b && vite build --mode production",
+    "preview": "vite preview --mode staging",
+    "preview:prod": "vite preview --mode production",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@headlessui/react": "^2.2.0",
@@ -83,6 +85,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.15.0",
+    "@sentry/react": "^9.12.0",
     "@tanstack/eslint-plugin-query": "^5.66.0",
     "@types/js-cookie": "^3.0.6",
     "@types/lodash": "^4.17.15",

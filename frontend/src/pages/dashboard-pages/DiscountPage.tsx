@@ -281,7 +281,6 @@ const SearchInputBox = ({ discount }: { discount: string | null }) => {
       {(value || discount) && (
         <div
           onClick={() => {
-            console.log(discount);
             setValue("");
             navigate(`/dashboard/discount${discount ? "" : "?discount=All"}`);
           }}

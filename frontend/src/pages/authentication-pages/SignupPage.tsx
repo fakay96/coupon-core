@@ -18,73 +18,23 @@ import { useState } from "react";
 import { Loader } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { signUpSchema } from "@/validation-schemas";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { axiosGoogleLogin, loginUserService } from "@/api/authApi";
-import { loginCredentials } from "@/types";
-import { useGoogleLogin } from "@react-oauth/google";
 import { registerUserMutation } from "@/queries/auth-queries";
 import { toast } from "sonner";
 import AuthHeader from "@/components/auth-component/header";
-import GoogleButton from "@/components/auth-component/google-button";
 
 // SignUpPage component for user registration
 const SignUpPage = () => {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const [eyeToggle, setEyeToggle] = useState(true);
-
-  // Mutation for logging in the user
-  const { mutateAsync: loginUser } = useMutation<
-    unknown,
-    Error,
-    loginCredentials
-  >({
-    mutationFn: async (value: loginCredentials) =>
-      await loginUserService(value),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["userInfo"] });
-    },
-  });
 
   // Mutation for registering the user
   const { isPending, mutateAsync: registerUser } = registerUserMutation();
   const form = useForm<z.infer<typeof signUpSchema>>({
     resolver: zodResolver(signUpSchema),
     defaultValues: {
-      firstname: "",
-      lastname: "",
       email: "",
       password: "",
       terms: true,
-    },
-  });
-
-  // Google login handler
-  const googleLogin = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      const { email, name } = await axiosGoogleLogin(tokenResponse);
-      const googleCredentials = {
-        email,
-        password: import.meta.env.VITE_GOOGLE_PASS,
-        username: email?.split("@")[0],
-        confirm_password: import.meta.env.VITE_GOOGLE_PASS,
-      };
-      const { confirm_password, ...restOfLoginCredentials } = googleCredentials;
-      toast.promise(
-        registerUser(googleCredentials).then(() => {
-          loginUser(restOfLoginCredentials).then(() => {
-            navigate("/dashboard", { replace: true });
-          });
-        }),
-        {
-          loading: `${name}, Dishpal AI is creating your account.`,
-          success: `${name}, Here is your dashboard! Explore!`,
-          error: (error) => error.message,
-        }
-      );
-    },
-    onError: () => {
-      console.error("Login Failed");
     },
   });
 
@@ -92,34 +42,38 @@ const SignUpPage = () => {
   const onSubmit = async ({
     email,
     password,
-    firstname,
   }: z.infer<typeof signUpSchema>) => {
+    const username = email?.split("@")[0];
+
     const validatedUser = {
       email,
-      username: email?.split("@")[0],
+      username: username,
       password,
       confirm_password: password,
     };
     toast.promise(
       registerUser(validatedUser).then(() => {
-        navigate("/auth/login", { replace: true, state: { firstname } });
+        navigate("/auth/resend-email", {
+          replace: true,
+          state: { username, email },
+        });
       }),
       {
-        loading: `${firstname}, Dishpal AI is creating your account.`,
-        success: `${firstname}, Dishpal AI created your account successfully! Please login to continue.`,
-        error: (error) => error.message,
+        loading: `${username}, Dishpal AI is creating your account.`,
+        success: `${username}, Dishpal AI created your account successfully! Please verify your email to continue.`,
+        error: (error) => JSON.stringify(error),
       }
     );
   };
 
   return (
-    <div className="h-full min-h-screen flex bg-bg3xl bg-cover md:grid  md:grid-cols-2 gap-4 md:gap-8 max-sm:p-6 max-2xl:p-8 justify-center items-center">
+    <div className="h-full min-h-screen flex bg-bg3xl bg-cover md:grid  md:grid-cols-2 gap-4 md:gap-8 max-sm:p-6 max-2xl:p-8 justify-center items-center 2xl:gap-16">
       <img
         src="/images/signup.png"
         width={500}
         height={600}
         alt=""
-        className="hidden md:block place-self-center "
+        className="hidden md:block place-self-center 2xl:ml-auto"
       />
       {/* <div className="relative hidden 2xl:grid">
         <img
@@ -133,7 +87,7 @@ const SignUpPage = () => {
           className="2xl:absolute 2xl:h-full 2xl:w-full place-self-center justify-self-end "
         />
       </div> */}
-      <div className="flex items-center justify-center md:justify-start 2xl:mx-auto w-full max-w-lg mb-16 ">
+      <div className="flex items-center justify-center md:justify-start 2xl:mr-auto w-full max-w-lg mb-16">
         <div className="space-y-4 sm:space-y-6 w-full">
           <div className="space-y-3 mb-12 hidden md:block">
             <h1 className="font-bold text-xl xxx:text-3xl  xl:text-5xl max-xx:text-center xl:text-center font-syne">
@@ -159,41 +113,6 @@ const SignUpPage = () => {
                 onSubmit={form.handleSubmit(onSubmit)}
                 className="space-y-6"
               >
-                <div className="flex gap-6 w-full">
-                  <FormField
-                    control={form.control}
-                    name="firstname"
-                    render={({ field }) => (
-                      <FormItem className="w-full">
-                        <FormControl>
-                          <Input
-                            className="h-12 bg-white border-none rounded-none placeholder:font-semibold placeholder:font-syne  placeholder:!text-gray-300 placeholder:text-center"
-                            placeholder="First Name"
-                            {...field}
-                          />
-                        </FormControl>
-
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="lastname"
-                    render={({ field }) => (
-                      <FormItem className="w-full">
-                        <FormControl>
-                          <Input
-                            className="h-12 bg-white border-none rounded-none placeholder:font-semibold placeholder:font-syne  placeholder:!text-gray-300 placeholder:text-center"
-                            placeholder="Last Name"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
                 <div className="flex flex-col space-y-6">
                   <FormField
                     control={form.control}
@@ -280,46 +199,58 @@ const SignUpPage = () => {
                 </Button>
               </form>
             </Form>
-
-            <div className="flex gap-6 items-center justify-center overflow-hidden">
-              <Separator className="bg-black w-full" />
-              <div className="font-syne text-nowrap hidden md:block">
-                Or Register With
+            <div className="space-y-6 hidden md:flex md:flex-col">
+              <div className="flex gap-6 items-center justify-center overflow-hidden">
+                <Separator className="bg-black w-full" />
+                <div className="font-syne text-nowrap hidden md:block">
+                  Or Register With
+                </div>
+                <div className="font-syne text-nowrap md:hidden">
+                  Or Continue With
+                </div>
+                <Separator className="bg-black w-full" />
               </div>
-              <div className="font-syne text-nowrap md:hidden">
-                Or Continue With
+              <div className="hidden md:flex gap-6 justify-center items-center">
+                <div className="p-4 rounded-full hover:shadow-xl hover:cursor-pointer">
+                  <img
+                    src={"/images/google.png"}
+                    alt=""
+                    width={32}
+                    height={32}
+                  />
+                </div>
+                <div className="p-4 rounded-full hover:shadow-xl hover:cursor-pointer">
+                  <img
+                    src={"/images/instagram.png"}
+                    alt=""
+                    width={32}
+                    height={32}
+                  />
+                </div>
+                <div className="p-4 rounded-full hover:shadow-xl hover:cursor-pointer">
+                  <img src={"/images/x.png"} alt="" width={32} height={32} />
+                </div>
+                <div className="p-4 rounded-full hover:shadow-xl hover:cursor-pointer">
+                  <img
+                    src={"/images/apple.png"}
+                    alt=""
+                    width={32}
+                    height={32}
+                  />
+                </div>
               </div>
-              <Separator className="bg-black w-full" />
             </div>
-            <div
-              onClick={() => {
-                googleLogin();
-              }}
-              className="hidden md:flex gap-6 justify-center items-center"
-            >
-              <div className="p-4 rounded-full hover:shadow-xl hover:cursor-pointer">
-                <img src={"/images/google.png"} alt="" width={32} height={32} />
-              </div>
-              <div className="p-4 rounded-full hover:shadow-xl hover:cursor-pointer">
-                <img
-                  src={"/images/instagram.png"}
-                  alt=""
-                  width={32}
-                  height={32}
-                />
-              </div>
-              <div className="p-4 rounded-full hover:shadow-xl hover:cursor-pointer">
-                <img src={"/images/x.png"} alt="" width={32} height={32} />
-              </div>
-              <div className="p-4 rounded-full hover:shadow-xl hover:cursor-pointer">
-                <img src={"/images/apple.png"} alt="" width={32} height={32} />
+            <div className="space-y-6 md:hidden flex justify-center">
+              <div className="flex gap-2">
+                <div className="font-syne">Already Have An Account ?</div>
+                <Link
+                  to="/auth/login"
+                  className="font-syne text-vividOrange font-bold hover:underline hover:cursor-pointer"
+                >
+                  Log In
+                </Link>
               </div>
             </div>
-            <GoogleButton
-              onClick={() => {
-                googleLogin();
-              }}
-            />
           </div>
         </div>
       </div>

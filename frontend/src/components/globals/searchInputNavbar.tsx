@@ -16,7 +16,6 @@ import { cardNavLinks } from "@/constants";
 
 const SearchInputNavbar = ({ link }: { link?: string }) => {
   const { logout, user, isLoading } = useAuth();
-
   const navigate = useNavigate();
 
   return (
@@ -58,7 +57,7 @@ const SearchInputNavbar = ({ link }: { link?: string }) => {
               <Avatar className="size-10">
                 {/* <AvatarImage src={user} alt="@avatar" /> */}
                 <AvatarFallback className="uppercase">
-                  {user?.user?.username?.charAt(0) || user?.user?.first_name}
+                  {user?.first_name?.charAt(0) || user?.last_name || "A"}
                 </AvatarFallback>
               </Avatar>
             </DropdownMenuTrigger>
