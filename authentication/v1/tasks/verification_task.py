@@ -25,7 +25,7 @@ def send_verification_email_task(user_email: str, token: str, logo_url: str = No
     """
     try:
         subject: str = "Verify Your Account"
-        verification_link: str = f"{FRONTEND_DOMAIN_NAME}/authentication/v1/activate/?token={token}&email={user_email}"
+        verification_link: str = f"{FRONTEND_DOMAIN_NAME}/auth?token={token}&email={user_email}"
 
         # Context for template rendering
         context = {

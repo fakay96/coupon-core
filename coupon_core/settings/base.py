@@ -215,33 +215,3 @@ EMAIL_HOST_USER = os.getenv("DISHPAL_EMAIL")
 EMAIL_HOST_PASSWORD = os.getenv("DISHPAL_EMAIL_PASSWORD")
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
-# Redis Configuration
-REDIS_CONFIG = {
-    'host': os.getenv('REDIS_HOST', 'localhost'),
-    'port': int(os.getenv('REDIS_PORT', 6379)),
-    'db': int(os.getenv('REDIS_DB', 0)),
-    'password': os.getenv('REDIS_PASSWORD', None),
-    'channel_prefix': os.getenv('REDIS_CHANNEL_PREFIX', 'discount_request_'),
-    'request_channel': os.getenv('REDIS_REQUEST_CHANNEL', 'discount_crawler_requests'),
-}
-
-# Caching (Redis)
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": f"redis://:{REDIS_CONFIG['password']}@{REDIS_CONFIG['host']}:{REDIS_CONFIG['port']}/{REDIS_CONFIG['db']}",
-    },
-    "results": {
-        "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": f"redis://:{REDIS_CONFIG['password']}@{REDIS_CONFIG['host']}:{REDIS_CONFIG['port']}/1",
-    },
-}
-
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {
-            "hosts": [f"redis://:{REDIS_CONFIG['password']}@{REDIS_CONFIG['host']}:{REDIS_CONFIG['port']}/1"],
-        },
-    },
-}
