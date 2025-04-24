@@ -32,3 +32,4 @@ HEALTHCHECK --interval=30s --timeout=10s \
 
 # Run Nginx in the foreground
 CMD ["nginx", "-g", "daemon off;"]
+
