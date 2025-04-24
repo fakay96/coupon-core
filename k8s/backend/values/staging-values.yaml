@@ -30,7 +30,7 @@ backend:
       cpu: "200m"  # Increased from 100m → 500m
     limits:
       memory: "512Mi"  # Increased from 512Mi → 768Mi
-      cpu: "500m"  # Increased from 800m → 1200m
+      cpu: "800m"  # Increased from 800m → 1200m
 
   nodeSelector:
     workload: backend
