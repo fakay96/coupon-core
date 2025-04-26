@@ -19,10 +19,9 @@ Date: YYYY-MM-DD
 from django.urls import path
 
 from geodiscounts.v1.views.discount_views import (
-    SearchDiscountsView,
-    NearbyDiscountsView,
-    CategoryListView,
-    CategoryView
+    
+    CategoryView,
+    
 )
 from geodiscounts.v1.views.retailer_views import (
     RetailerListCreateView,
@@ -34,6 +33,10 @@ from geodiscounts.v1.views.shared_discount_views import (
     SharedDiscountListCreateView,
     SharedDiscountDetailView,
 )
+
+from geodiscounts.v1.views.geodiscount_views import(
+    SearchDiscountsView
+)
 # from geodiscounts.v1.views.websocket_views import (
 #     WebSocketDiscountRequestView,
 #     WebSocketDiscountRequestDetailView,
@@ -43,14 +46,9 @@ app_name = "geodiscounts"
 
 urlpatterns = [
     # Discount URLs
-    
-    path('discounts/search/', SearchDiscountsView.as_view(), name='discount-search'),
-    path('discounts/nearby/', NearbyDiscountsView.as_view(), name='discount-nearby'),
 
-    
-    # Category URLs
-    path('categories/', CategoryListView.as_view(), name='category-list'),
     path('discounts/categories/',CategoryView.as_view(), name='category-view'),
+    path('discount/geodiscount/',SearchDiscountsView.as_view(),name='discount-search'),
     
     # Retailer URLs
     path('retailers/', RetailerListCreateView.as_view(), name='retailer-list-create'),

@@ -30,8 +30,7 @@ from rest_framework.status import (
 from rest_framework.views import APIView
 
 from geodiscounts.models import Discount, Category
-from geodiscounts.v1.serializers import DiscountSerializer, CategorySerializer
-from geodiscounts.v1.utils.embedding_utils import generate_embedding
+from geodiscounts.v1.serializers.discount_serializers import DiscountSerializer, CategorySerializer
 from geodiscounts.v1.utils.ip_geolocation import (
     get_location_from_ip,
     validate_max_distance,
@@ -362,7 +361,7 @@ class SearchDiscountsView(APIView):
                 raise ValidationError("A valid search query must be provided as a string.")
 
             try:
-                query_vector: List[float] = generate_embedding(query)
+                query_vector: List[float] = query
             except Exception as e:
                 raise ValidationError(f"Failed to generate embedding for the query: {str(e)}")
 
