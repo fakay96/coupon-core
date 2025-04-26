@@ -13,6 +13,13 @@ import uuid
 from django.utils import timezone
 import logging
 from datetime import datetime
+from typing import Any
+from django.db.models import QuerySet
+from django.utils import timezone
+from django.utils.html import format_html
+from django import forms
+from django.contrib import admin
+from django.http import HttpRequest
 
 logger = logging.getLogger(__name__)
 
@@ -371,3 +378,102 @@ class ProfileVerification(models.Model):
         return f"Verification for {self.user.username} - {status}"
 
 
+
+class PasswordResetRequestForm(forms.ModelForm):
+    """
+    Sophisticated form for managing PasswordResetRequest instances.
+    Includes validation to ensure token integrity.
+    """
+
+    class Meta:
+        model = PasswordResetRequest
+        fields = "__all__"
+        widgets = {
+            "expires_at": forms.DateTimeInput(attrs={"type": "datetime-local"}),
+        }
+
+    def clean(self) -> dict[str, Any]:
+        """
+        Validate the form before saving.
+        """
+        cleaned_data = super().clean()
+        expires_at = cleaned_data.get("expires_at")
+        used = cleaned_data.get("used")
+
+        if expires_at and expires_at < timezone.now() and not used:
+            raise forms.ValidationError(
+                "You cannot leave a token unused if it has already expired."
+            )
+
+        return cleaned_data
+
+    def clean_user(self) -> Any:
+        """
+        Prevent changing the user field after creation.
+        """
+        if self.instance.pk:
+            return self.instance.user
+        return self.cleaned_data.get("user")
+
+    def clean_token(self) -> Any:
+        """
+        Prevent changing the token field after creation.
+        """
+        if self.instance.pk:
+            return self.instance.token
+        return self.cleaned_data.get("token")
+
+
+@admin.register(PasswordResetRequest)
+class PasswordResetRequestAdmin(admin.ModelAdmin):
+    """
+    Advanced admin configuration for PasswordResetRequest.
+    Provides rich UX and strong data protection.
+    """
+
+    form = PasswordResetRequestForm
+
+    list_display: tuple[str, ...] = (
+        "user",
+        "short_token",
+        "created_at",
+        "expires_at",
+        "used",
+        "status_display",
+    )
+    list_filter: tuple[str, ...] = ("used", "created_at", "expires_at")
+    search_fields: tuple[str, ...] = ("user__email", "user__username", "token")
+    ordering: tuple[str, ...] = ("-created_at",)
+    readonly_fields: tuple[str, ...] = ("created_at", "token", "user", "status_display")
+    fieldsets: tuple[tuple[str, dict[str, Any]], ...] = (
+        (None, {
+            "fields": ("user", "token", "created_at", "expires_at", "used", "status_display")
+        }),
+    )
+
+    def short_token(self, obj: PasswordResetRequest) -> str:
+        """
+        Shorten token display for better readability in list view.
+        """
+        return str(obj.token)[:8] + "..."
+
+    short_token.short_description = "Token"
+
+    def status_display(self, obj: PasswordResetRequest) -> str:
+        """
+        Visually enhanced status of the token (valid, expired, used).
+        """
+        if obj.used:
+            return format_html('<span style="color: gray;">✅ Used</span>')
+        elif obj.is_expired():
+            return format_html('<span style="color: red;">❌ Expired</span>')
+        else:
+            return format_html('<span style="color: green;">✅ Valid</span>')
+
+    status_display.short_description = "Status"
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[PasswordResetRequest]:
+        """
+        Use authentication shard for consistency with CustomUser admin.
+        """
+        return super().get_queryset(request).using("authentication_shard")
