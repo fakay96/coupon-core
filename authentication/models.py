@@ -81,6 +81,26 @@ class CustomUser(AbstractUser):
             str: The username of the user.
         """
         return self.username
+    
+    def send_password_reset_email(self) -> None:
+        """
+        Create a new PasswordResetRequest with a fresh token and enqueue a task to send the password reset email asynchronously.
+        """
+        from authentication.v1.tasks.verification_task import send_password_reset_email_task
+        from django.utils import timezone
+        from uuid import uuid4
+        from authentication.models import PasswordResetRequest
+
+        # Create a new password reset request with a fresh token and expiration
+        reset_request = PasswordResetRequest.objects.create(
+            user=self,
+            token=uuid4(),
+            created_at=timezone.now(),
+            expires_at=timezone.now() + timezone.timedelta(minutes=10),
+            used=False,
+        )
+        send_password_reset_email_task.delay(self.email, str(reset_request.token))
+        
 
 
 class Role(models.Model):
@@ -116,6 +136,70 @@ class Role(models.Model):
             str: The name of the role.
         """
         return self.name
+
+
+class PasswordResetRequest(models.Model):
+    """
+    Model to record password reset requests and tokens.
+
+    Attributes:
+        user (CustomUser): The user who requested the password reset.
+        token (UUID): Unique token for password reset.
+        created_at (datetime): Timestamp when the request was created.
+        expires_at (datetime): Timestamp when the token expires.
+        used (bool): Whether the token has been used.
+    """
+
+    user = models.ForeignKey(
+        "CustomUser",
+        on_delete=models.CASCADE,
+        related_name="password_reset_requests",
+        help_text="The user who requested the password reset.",
+    )
+    token = models.UUIDField(
+        default=uuid.uuid4,
+        unique=True,
+        help_text="Unique token for password reset.",
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        help_text="Timestamp when the request was created.",
+    )
+    expires_at = models.DateTimeField(
+        help_text="Timestamp when the token expires.",
+    )
+    used = models.BooleanField(
+        default=False,
+        help_text="Indicates whether the token has been used.",
+    )
+
+    def save(self, *args, **kwargs) -> None:
+        """
+        Ensure expires_at is set to 10 minutes from creation if not provided.
+        """
+        if not self.expires_at:
+            self.expires_at = timezone.now() + timezone.timedelta(minutes=10)
+        super().save(*args, **kwargs)
+
+    def is_expired(self) -> bool:
+        """
+        Check if the token is expired.
+
+        Returns:
+            bool: True if expired, False otherwise.
+        """
+        return timezone.now() > self.expires_at
+
+    def mark_as_used(self) -> None:
+        """
+        Mark the token as used.
+        """
+        if not self.used:
+            self.used = True
+            self.save(update_fields=["used"])
+
+    def __str__(self) -> str:
+        return f"Password reset request for {self.user.email} - {'Used' if self.used else 'Pending'}"
 
 
 class UserProfile(models.Model):

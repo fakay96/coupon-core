@@ -14,7 +14,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 # Import serializers and token manager.
-from authentication.v1.serializers import LoginSerializer, RegisterSerializer
+from authentication.v1.serializers import LoginSerializer, RegisterSerializer,PasswordResetSerializer
 from authentication.v1.utils.token_manager import TokenManager
 
 # drf-yasg imports for OpenAPI documentation
@@ -291,3 +291,38 @@ class UserInfoView(APIView):
                 {"error": "An unexpected error occurred."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+        
+
+
+class PasswordResetView(APIView):
+    """Handles password reset requests."""
+
+    permission_classes = [AllowAny]
+
+    def post(self, request: Any) -> Response:
+        """
+        Handle POST requests for password reset.
+
+        Args:
+            request (Any): The HTTP request containing password reset data.
+
+        Returns:
+            Response: A DRF Response with a success message or an error message.
+        """
+        try:
+            serializer = PasswordResetSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+
+            serializer.save()
+            return Response(
+                {"message": "Password reset email sent."},
+                status=status.HTTP_200_OK,
+            )   
+        
+        except Exception as e:
+            logger.error(f"Unexpected error during password reset: {str(e)}")
+            return Response(
+                {"error": "An unexpected error occurred. Please try again later."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )       
+        
