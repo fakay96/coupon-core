@@ -303,3 +303,41 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
         instance.save()
         return instance
+class PasswordResetSerializer(serializers.Serializer):
+    """
+    Serializer for password reset requests.
+
+    Handles validation of email and sending a password reset email.
+    """
+    email = serializers.EmailField(required=True)
+
+    def validate_email(self, value: str) -> str:
+        """
+        Validate the email address.
+
+        Args:
+            value (str): Email to validate.
+
+        Returns:
+            str: Validated email.   
+
+        Raises:
+            serializers.ValidationError: If the email is not found.
+        """
+        try:
+            CustomUser.objects.get(email=value)
+            return value    
+        except CustomUser.DoesNotExist:
+            raise serializers.ValidationError(_("No user found with the provided email."))
+
+    def save(self) -> None:
+        """
+        Send a password reset email to the validated email address. 
+
+        Raises:
+            serializers.ValidationError: If the email is not found.
+        """
+        email = self.validated_data["email"]
+        user = CustomUser.objects.get(email=email)
+        user.send_password_reset_email()
+

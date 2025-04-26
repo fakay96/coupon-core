@@ -40,6 +40,7 @@ DOWNLOADER_MIDDLEWARES = {
 # Configure item pipelines
 ITEM_PIPELINES = {
     'discountcrawlers.pipelines.pipelines.DiscountPipeline': 300,
+    'discountcrawlers.pipelines.pipelines.DealsAndEmbedPipeline': 400,
 }
 
 # Enable and configure the AutoThrottle extension

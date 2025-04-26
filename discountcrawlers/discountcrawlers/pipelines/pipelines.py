@@ -17,17 +17,19 @@ from discountcrawlers.items import DiscountItem
 
 LOGGER = logging.getLogger(__name__)
 
-class DiscountPipeline:
+class DiscountPipeline(BasePipeline):
     """Pipeline for processing discount items."""
     
-    def __init__(self):
-        self.logger = logging.getLogger(f"{self.__class__.__name__}")
-    
-    def process_item(self, item: Item, spider: Any) -> Optional[Item]:
-        """Process a discount item."""
-        if not isinstance(item, DiscountItem):
-            return item
+    def _process_item(self, item: Dict[str, Any], spider: Spider) -> Optional[Dict[str, Any]]:
+        """Process a discount item.
+        
+        Args:
+            item: The item to process
+            spider: The spider that yielded the item
             
+        Returns:
+            Optional[Dict[str, Any]]: The processed item or None if processing failed
+        """
         try:
             # Validate required fields
             if not self._validate_required_fields(item):
@@ -50,12 +52,12 @@ class DiscountPipeline:
             return item
             
         except Exception as e:
-            self.logger.error(f"Error processing item: {e}")
+            LOGGER.error(f"Error processing item: {e}")
             item['processing_status'] = 'error'
             item['error_message'] = str(e)
             raise DropItem(f"Error processing item: {e}")
     
-    def _validate_required_fields(self, item: DiscountItem) -> bool:
+    def _validate_required_fields(self, item: Dict[str, Any]) -> bool:
         """Validate that all required fields are present."""
         required_fields = [
             'title',
@@ -67,11 +69,11 @@ class DiscountPipeline:
         
         missing_fields = [field for field in required_fields if not item.get(field)]
         if missing_fields:
-            self.logger.warning(f"Missing required fields: {missing_fields}")
+            LOGGER.warning(f"Missing required fields: {missing_fields}")
             return False
         return True
     
-    def _clean_data(self, item: DiscountItem) -> DiscountItem:
+    def _clean_data(self, item: Dict[str, Any]) -> Dict[str, Any]:
         """Clean and normalize item data."""
         # Clean title
         if item.get('title'):
@@ -104,7 +106,7 @@ class DiscountPipeline:
         try:
             return ((original_price - current_price) / original_price) * 100
         except (ValueError, TypeError, ZeroDivisionError) as e:
-            self.logger.error(f"Error calculating discount percentage: {e}")
+            LOGGER.error(f"Error calculating discount percentage: {e}")
             return 0.0
 
 class DealsAndEmbedPipeline(BatchProcessingPipeline):
@@ -121,9 +123,9 @@ class DealsAndEmbedPipeline(BatchProcessingPipeline):
         """
         parts = []
         
-        # Add name if available (most important field)
-        if item.get('name'):
-            parts.append(f"Product: {item['name']}")
+        # Add title if available (most important field)
+        if item.get('title'):
+            parts.append(f"Product: {item['title']}")
         
         # Add brand if available
         if item.get('brand'):
@@ -133,13 +135,9 @@ class DealsAndEmbedPipeline(BatchProcessingPipeline):
         if item.get('category'):
             parts.append(f"Category: {item['category']}")
         
-        # Add size if available
-        if item.get('size'):
-            parts.append(f"Size: {item['size']}")
-        
         # Add price information
-        if item.get('sale_price') is not None:
-            parts.append(f"Sale Price: {item['sale_price']}")
+        if item.get('price') is not None:
+            parts.append(f"Price: {item['price']}")
         
         if item.get('original_price') is not None:
             parts.append(f"Original Price: {item['original_price']}")
@@ -150,18 +148,14 @@ class DealsAndEmbedPipeline(BatchProcessingPipeline):
                 parts.append(f"Discount: {discount}%")
             else:
                 parts.append(f"Discount: {discount}")
-                
-        if item.get('price_per_unit') is not None:
-            parts.append(f"Price Per Unit: {item['price_per_unit']}")
-            
-        # Add stock information if available
-        if item.get('stock_info'):
-            parts.append(f"Stock: {item['stock_info']}")
+        
+        # Add description if available
+        if item.get('description'):
+            parts.append(f"Description: {item['description']}")
         
         # Add validity dates if available
-        if item.get('validity_dates'):
-            validity = item['validity_dates'].replace('von', 'from').replace('bis', 'to')
-            parts.append(f"Valid: {validity}")
+        if item.get('valid_from') and item.get('valid_until'):
+            parts.append(f"Valid: {item['valid_from']} to {item['valid_until']}")
         
         # If no text fields are available, use a placeholder
         if not parts:
@@ -196,11 +190,11 @@ class DealsAndEmbedPipeline(BatchProcessingPipeline):
                 # Store in Redis with metadata
                 try:
                     store_processed_url(
-                        url=item['source_url'],
+                        url=item['product_url'],  # Use product_url instead of source_url
                         data=json.dumps(item, ensure_ascii=False),
                         metadata={
                             'category': category,
-                            'timestamp': item.get('timestamp', int(time.time())),
+                            'timestamp': item.get('crawled_at', int(time.time())),
                             'spider': spider.name
                         }
                     )

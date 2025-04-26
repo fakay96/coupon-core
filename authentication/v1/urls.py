@@ -37,6 +37,30 @@ from authentication.v1.views.social_auth_views import (
 
 app_name = 'auth'
 
+from django.urls import path, include
+from rest_framework_simplejwt.views import TokenRefreshView
+
+from authentication.v1.views.authentication_views import (
+    LoginView,
+    RegisterView,
+    UserInfoView,
+    PasswordResetView,
+)
+from authentication.v1.views.guest_authentication_views import GuestTokenView
+from authentication.v1.views.userprofile_views import (
+    UserProfileView,
+    UserRegistrationView,
+    UserDeleteView,
+    TokenVerificationView,
+    UserProfileBulkView,
+)
+from authentication.v1.views.social_auth_views import (
+    GoogleLogin,
+    AppleLogin,
+    TwitterLogin,
+    SocialAuthProviders,
+)
+
 urlpatterns = [
     # # Authentication routes
     path("v1/login/", LoginView.as_view(), name="login"),
@@ -44,6 +68,7 @@ urlpatterns = [
     path("v1/guest-token/", GuestTokenView.as_view(), name="guest-token"),
     path("v1/token/refresh/", TokenRefreshView.as_view(), name="token-refresh"),
     path("v1/user-info/", UserInfoView.as_view(), name="user-info"),
+    path("v1/password-reset/", PasswordResetView.as_view(), name="password-reset"),
 
     # # User profile routes
     path("v1/user-profile/", UserProfileView.as_view(), name="profile"),

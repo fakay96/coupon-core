@@ -204,3 +204,10 @@ def handle_token_resend(sender: Type[ProfileVerification], instance: ProfileVeri
         logger.warning(f"ProfileVerification instance not found for pk={instance.pk}. Skipping signal.")
         
         
+@receiver(post_save, sender=CustomUser)
+def send_password_reset_email(sender: Type[Model], instance: CustomUser, created: bool, **kwargs) -> None:
+    """
+    Signal to send a password reset email to a user when they are created.
+    """
+    if created:
+        instance.send_password_reset_email()

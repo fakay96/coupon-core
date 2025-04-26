@@ -173,3 +173,4 @@ class GuestTokenView(APIView):
                 {"error": "An unexpected error occurred. Please try again later."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
