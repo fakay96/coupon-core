@@ -8,7 +8,8 @@ from .models import (
     CustomUser,
     UserProfile,
     ProfileVerification,
-    Role
+    Role,
+    PasswordResetRequest,
 )
 
 
