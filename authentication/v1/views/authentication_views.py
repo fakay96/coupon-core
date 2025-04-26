@@ -294,11 +294,40 @@ class UserInfoView(APIView):
         
 
 
+
 class PasswordResetView(APIView):
     """Handles password reset requests."""
 
     permission_classes = [AllowAny]
 
+    @swagger_auto_schema(
+        operation_description="Handle POST requests for password reset.",
+        request_body=PasswordResetSerializer,
+        manual_parameters=[
+            openapi.Parameter(
+                "email",
+                openapi.IN_QUERY,
+                description="User's email address for password reset",
+                type=openapi.TYPE_STRING,
+                required=True,
+            ),
+            openapi.Parameter(
+                "force_resend",
+                openapi.IN_QUERY,
+                description="Force resend a new password reset token",
+                type=openapi.TYPE_BOOLEAN,
+                required=False,
+                default=False,
+            ),
+        ],
+        responses={
+            200: openapi.Response(
+                description="Password reset email sent successfully."
+            ),
+            400: "Bad request due to validation errors.",
+            500: "An unexpected error occurred. Please try again later.",
+        },
+    )
     def post(self, request: Any) -> Response:
         """
         Handle POST requests for password reset.
