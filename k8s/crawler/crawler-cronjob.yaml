@@ -1,0 +1,50 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: discount-crawler-cron
+  namespace: coupon-core
+spec:
+  schedule: "0 */6 * * *"  # Run every 6 hours
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: crawler
+            image: discount-crawler:latest
+            imagePullPolicy: IfNotPresent
+            env:
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: redis_host
+            - name: REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: redis_port
+            - name: SPACES_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: spaces-credentials
+                  key: access_key
+            - name: SPACES_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: spaces-credentials
+                  key: secret_key
+            - name: SPACES_BUCKET
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: spaces_bucket
+            volumeMounts:
+            - name: crawler-logs
+              mountPath: /app/logs
+          volumes:
+          - name: crawler-logs
+            persistentVolumeClaim:
+              claimName: crawler-logs-pvc
+          restartPolicy: Never
+      backoffLimit: 2 

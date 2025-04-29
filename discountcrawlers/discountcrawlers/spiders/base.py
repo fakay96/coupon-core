@@ -25,11 +25,7 @@ class BaseDiscountSpider(Spider):
     
     # Custom settings
     custom_settings: Dict[str, Any] = {
-        'ROBOTSTXT_OBEY': True,
-        'CONCURRENT_REQUESTS': 16,
-        'CONCURRENT_REQUESTS_PER_DOMAIN': 8,
-        'DOWNLOAD_DELAY': 2,
-        'RANDOMIZE_DOWNLOAD_DELAY': True,
+       
     }
     
     def __init__(self, *args, **kwargs):

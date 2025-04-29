@@ -151,6 +151,21 @@ class ZalandoSpider(BaseDealsSpider):
 
                     if url := item.get("url"):
                         item["url"] = response.urljoin(url.strip())
+                        item["product_url"] = item["url"]  # Set product_url to match url
+
+                    # Set required fields
+                    item["title"] = item.get("name", "")  # Use name as title
+                    
+                    # Handle price - ensure it's properly set
+                    if "sale_price" in item:
+                        item["price"] = item["sale_price"]
+                    elif "original_price" in item:
+                        item["price"] = item["original_price"]
+                    else:
+                        item["price"] = None
+                        
+                    item["store_name"] = "Zalando"  # Set store name
+                    item["source"] = "zalando.at"  # Set source
 
                     if item.get("url") and (item.get("brand") or item.get("name")):
                         yield item

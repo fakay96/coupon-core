@@ -1,0 +1,37 @@
+# Crawler service configuration
+crawler:
+  # Image configuration
+  image:
+    repository: fakay96/coupon-crawler
+    tag: latest
+    pullPolicy: Always
+  
+  # Job configuration
+  job:
+    backoffLimit: 2
+    restartPolicy: Never
+    activeDeadlineSeconds: 3600  # 1 hour timeout
+  
+  # Resource configuration
+  resources:
+    requests:
+      memory: "4Gi"
+      cpu: "2000m"
+    limits:
+      memory: "8Gi"
+      cpu: "4000m"
+  
+  # Logging configuration
+  logging:
+    level: "INFO"
+  
+  # Redis configuration
+  redis:
+    host: redis
+    port: 6379
+    db: 0
+  
+  # DigitalOcean Spaces configuration
+  spaces:
+    bucket: discount-crawler-data
+    region: fra1 

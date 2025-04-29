@@ -1,0 +1,64 @@
+FROM python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Create necessary directories
+RUN mkdir -p /app/discountcrawlers/spiders
+RUN mkdir -p /app/discountcrawlers/middlewares
+RUN mkdir -p /app/discountcrawlers/pipelines
+RUN mkdir -p /app/discountcrawlers/utils
+RUN mkdir -p /app/logs
+
+# Copy only the required files for crawling
+COPY discountcrawlers/__init__.py /app/discountcrawlers/
+COPY discountcrawlers/settings.py /app/discountcrawlers/
+COPY discountcrawlers/items.py /app/discountcrawlers/
+
+# Copy spiders
+COPY discountcrawlers/spiders/__init__.py /app/discountcrawlers/spiders/
+COPY discountcrawlers/spiders/base.py /app/discountcrawlers/spiders/
+COPY discountcrawlers/spiders/penny_spider.py /app/discountcrawlers/spiders/
+COPY discountcrawlers/spiders/zalando_spider.py /app/discountcrawlers/spiders/
+COPY discountcrawlers/spiders/mueller_spider.py /app/discountcrawlers/spiders/
+COPY discountcrawlers/spiders/spar_spider.py /app/discountcrawlers/spiders/
+COPY discountcrawlers/spiders/xxxlutz_spider.py /app/discountcrawlers/spiders/
+COPY discountcrawlers/spiders/adidas_spider.py /app/discountcrawlers/spiders/
+COPY discountcrawlers/spiders/billa_spider.py /app/discountcrawlers/spiders/
+COPY discountcrawlers/spiders/bipa_spider.py /app/discountcrawlers/spiders/
+COPY discountcrawlers/spiders/ca_spider.py /app/discountcrawlers/spiders/
+COPY discountcrawlers/spiders/hm_spider.py /app/discountcrawlers/spiders/
+COPY discountcrawlers/spiders/ikea_spider.py /app/discountcrawlers/spiders/
+COPY discountcrawlers/spiders/lidl_spider.py /app/discountcrawlers/spiders/
+COPY discountcrawlers/spiders/mediamarkt_spider.py /app/discountcrawlers/spiders/
+COPY discountcrawlers/spiders/moebelix_spider.py /app/discountcrawlers/spiders/
+COPY discountcrawlers/spiders/moemax_spider.py /app/discountcrawlers/spiders/
+
+# Copy middlewares
+COPY discountcrawlers/middlewares/__init__.py /app/discountcrawlers/middlewares/
+COPY discountcrawlers/middlewares/playwright_middleware.py /app/discountcrawlers/middlewares/
+
+# Copy pipelines
+COPY discountcrawlers/pipelines/__init__.py /app/discountcrawlers/pipelines/
+COPY discountcrawlers/pipelines/redis_pipeline.py /app/discountcrawlers/pipelines/
+
+# Copy utils
+COPY discountcrawlers/utils/__init__.py /app/discountcrawlers/utils/
+COPY discountcrawlers/utils/redis_utils.py /app/discountcrawlers/utils/
+
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV SCRAPY_SETTINGS_MODULE=discountcrawlers.settings
+
+# Command to run the crawler
+CMD ["scrapy", "crawl", "penny", "-a", "mode=job"] 

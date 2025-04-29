@@ -1,109 +1,101 @@
-"""S3 service for handling S3 operations."""
+"""S3 service for uploads, downloads, and presigned URLs to AWS or any
+S3-compatible storage (DigitalOcean Spaces, MinIO, Wasabi, …)."""
+
+from __future__ import annotations
 
 import logging
+from typing import Optional
+from urllib.parse import urlparse
+
 import boto3
 from botocore.exceptions import ClientError
 from django.conf import settings
-from django.utils import timezone
 
 LOGGER = logging.getLogger(__name__)
 
+
+def _infer_region_from_endpoint(endpoint_url: str | None) -> str | None:
+    if not endpoint_url:
+        return None
+    host = urlparse(endpoint_url).netloc
+    parts = host.split(".")
+    if host.endswith("digitaloceanspaces.com"):
+        return parts[0]
+    if host.endswith("amazonaws.com"):
+        parts = [p for p in parts if p != "dualstack"]
+        if len(parts) >= 3 and parts[0] == "s3":
+            return parts[1]
+    return None
+
+
 class S3Service:
-    """S3 service for handling file uploads and downloads."""
-    
-    def __init__(self):
-        """Initialize the S3 service."""
-        self.client = boto3.client(
-            's3',
-            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-            region_name=settings.AWS_REGION
+    def __init__(
+        self,
+        *,
+        endpoint_url: Optional[str] = None,
+        access_key_id: Optional[str] = None,
+        secret_access_key: Optional[str] = None,
+        bucket_name: Optional[str] = None,
+        region_name: Optional[str] = None,
+    ) -> None:
+        self.endpoint_url = endpoint_url or getattr(settings, "AWS_S3_ENDPOINT_URL", None)
+        self.bucket_name = bucket_name or getattr(settings, "AWS_STORAGE_BUCKET_NAME")
+        self.region_name = (
+            _infer_region_from_endpoint(self.endpoint_url)
         )
-        self.bucket_name = settings.AWS_STORAGE_BUCKET_NAME
-        
-    def upload_file(self, file_path: str, object_name: str) -> str:
-        """Upload a file to S3.
-        
-        Args:
-            file_path: Path to the file to upload
-            object_name: Name of the object in S3
-            
-        Returns:
-            str: URL of the uploaded file
-            
-        Raises:
-            ClientError: If the upload fails
-        """
+        self.client = boto3.client(
+            "s3",
+            endpoint_url=self.endpoint_url,
+            aws_access_key_id=access_key_id or getattr(settings, "AWS_ACCESS_KEY_ID"),
+            aws_secret_access_key=secret_access_key
+            or getattr(settings, "AWS_SECRET_ACCESS_KEY"),
+            region_name=self.region_name,
+        )
+
+    def upload_file(
+        self,
+        file_path: str,
+        object_name: str,
+        extra_args: Optional[dict] = None,
+    ) -> str:
         try:
-            self.client.upload_file(file_path, self.bucket_name, object_name)
-            
-            # Generate URL
-            url = f"https://{self.bucket_name}.s3.{settings.AWS_REGION}.amazonaws.com/{object_name}"
-            
-            return url
-            
-        except ClientError as e:
-            LOGGER.error(f"Failed to upload file to S3: {str(e)}")
+            self.client.upload_file(
+                Filename=file_path,
+                Bucket=self.bucket_name,
+                Key=object_name,
+                ExtraArgs=extra_args or {},
+            )
+        except ClientError as exc:
+            LOGGER.error("Failed to upload file to S3: %s", exc)
             raise
-            
+        if self.endpoint_url:
+            return f"{self.endpoint_url.rstrip('/')}/{self.bucket_name}/{object_name}"
+        region = self.region_name or "us-east-1"
+        return f"https://{self.bucket_name}.s3.{region}.amazonaws.com/{object_name}"
+
     def download_file(self, object_name: str, file_path: str) -> None:
-        """Download a file from S3.
-        
-        Args:
-            object_name: Name of the object in S3
-            file_path: Path to save the file to
-            
-        Raises:
-            ClientError: If the download fails
-        """
         try:
             self.client.download_file(self.bucket_name, object_name, file_path)
-            
-        except ClientError as e:
-            LOGGER.error(f"Failed to download file from S3: {str(e)}")
+        except ClientError as exc:
+            LOGGER.error("Failed to download file from S3: %s", exc)
             raise
-            
+
     def delete_file(self, object_name: str) -> None:
-        """Delete a file from S3.
-        
-        Args:
-            object_name: Name of the object in S3
-            
-        Raises:
-            ClientError: If the deletion fails
-        """
         try:
             self.client.delete_object(Bucket=self.bucket_name, Key=object_name)
-            
-        except ClientError as e:
-            LOGGER.error(f"Failed to delete file from S3: {str(e)}")
+        except ClientError as exc:
+            LOGGER.error("Failed to delete file from S3: %s", exc)
             raise
-            
-    def generate_presigned_url(self, object_name: str, expiration: int = 3600) -> str:
-        """Generate a presigned URL for a file.
-        
-        Args:
-            object_name: Name of the object in S3
-            expiration: Expiration time in seconds
-            
-        Returns:
-            str: Presigned URL
-            
-        Raises:
-            ClientError: If the URL generation fails
-        """
+
+    def generate_presigned_url(
+        self, object_name: str, expiration: int = 3600
+    ) -> str:
         try:
-            response = self.client.generate_presigned_url(
-                'get_object',
-                Params={
-                    'Bucket': self.bucket_name,
-                    'Key': object_name
-                },
-                ExpiresIn=expiration
+            return self.client.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": self.bucket_name, "Key": object_name},
+                ExpiresIn=expiration,
             )
-            
-            return response
-            
-        except ClientError as e:
-            LOGGER.error(f"Failed to generate presigned URL: {str(e)}")
-            raise 
+        except ClientError as exc:
+            LOGGER.error("Failed to generate presigned URL: %s", exc)
+            raise
