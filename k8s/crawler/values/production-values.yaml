@@ -1,0 +1,29 @@
+crawler:
+  enabled: true
+  image:
+    repository: fakay96/discount-crawler
+    pullPolicy: Always
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+  cron:
+    enabled: true
+    schedule: "0 */6 * * *"  # Run every 6 hours
+  logLevel: "INFO"
+
+operator:
+  enabled: true
+  image:
+    repository: fakay96/crawler-resource-operator
+    pullPolicy: Always
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "200m" 

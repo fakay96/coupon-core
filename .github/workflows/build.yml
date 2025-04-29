@@ -71,6 +71,20 @@ jobs:
             -t fakay96/coupon-celery:${{ env.VERSION_TAG }} \
             --platform linux/amd64 --push .
       
+      # ───────── crawler images ─────────
+      - name: Build crawler image
+        run: |
+          docker buildx build -f docker/Dockerfile.crawler \
+            -t fakay96/coupon-crawler:${{ env.VERSION_TAG }} \
+            --platform linux/amd64 --push .
+      
+      - name: Build inference service image
+        run: |
+          docker buildx build -f docker/Dockerfile.inference \
+            -t fakay96/coupon-inference:${{ env.VERSION_TAG }} \
+            --platform linux/amd64 --push .
+      
+      # ───────── frontend images ─────────
       - name: Build & push STAGING frontend image
         run: |
           docker buildx build -f docker/Dockerfile.frontend \

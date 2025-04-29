@@ -1,129 +1,84 @@
 """Metadata agent for processing discount metadata."""
 
-import json
 import logging
-import time
-from typing import Dict, Any, List, Optional
-from dataclasses import dataclass, asdict
+from typing import Dict, Any, List
+from datetime import datetime
+from django.utils import timezone
 
-from redis import Redis
-
-LOGGER = logging.getLogger(__name__)
-
-@dataclass
-class DiscountMetadata:
-    """Data class for discount metadata."""
-    source_url: str
-    name: str
-    brand: Optional[str] = None
-    category: Optional[str] = None
-    original_price: Optional[float] = None
-    sale_price: Optional[float] = None
-    discount_percentage: Optional[float] = None
-    price_per_unit: Optional[float] = None
-    size: Optional[str] = None
-    stock_info: Optional[str] = None
-    validity_dates: Optional[str] = None
-    embedding: Optional[List[float]] = None
-    timestamp: int = int(time.time())
+LOGGER: logging.Logger = logging.getLogger(__name__)
 
 class MetadataAgent:
-    """Agent for processing and storing discount metadata."""
+    """Agent for processing and storing discount metadata.
     
-    def __init__(self, redis_client: Redis, batch_size: int = 30):
-        """Initialize the metadata agent.
-        
-        Args:
-            redis_client: Redis client instance
-            batch_size: Number of items to process in each batch
-        """
-        self.redis = redis_client
-        self.batch_size = batch_size
-        self.current_batch: List[Dict[str, Any]] = []
+    This agent is responsible for collecting and processing metadata
+    about discounts, including statistics and performance metrics.
+    
+    Attributes:
+        stats: Dictionary containing processing statistics
+        processed_items: List of processed metadata items
+    """
+    
+    def __init__(self) -> None:
+        """Initialize the metadata agent."""
+        self.stats: Dict[str, int] = {
+            'total_processed': 0,
+            'successful': 0,
+            'failed': 0
+        }
+        self.processed_items: List[Dict[str, Any]] = []
         
     def start(self) -> None:
         """Start the metadata agent."""
-        LOGGER.info("Starting metadata agent...")
-        self._listen_for_messages()
+        LOGGER.info("Metadata agent started")
         
-    def _listen_for_messages(self) -> None:
-        """Listen for messages on the metadata channel."""
-        pubsub = self.redis.pubsub()
-        pubsub.subscribe('discount_metadata')
-        
-        LOGGER.info("Listening for messages on 'discount_metadata' channel...")
-        
-        for message in pubsub.listen():
-            if message['type'] == 'message':
-                try:
-                    data = json.loads(message['data'])
-                    self._process_message(data)
-                except json.JSONDecodeError as e:
-                    LOGGER.error(f"Failed to decode message: {e}")
-                except Exception as e:
-                    LOGGER.error(f"Error processing message: {e}")
-                    
-    def _process_message(self, data: Dict[str, Any]) -> None:
-        """Process a single message.
+    def process_metadata(self, metadata: Dict[str, Any]) -> None:
+        """Process a metadata item.
         
         Args:
-            data: Message data dictionary
+            metadata: Dictionary containing metadata information
+            
+        Raises:
+            ValueError: If metadata is invalid
         """
+        if not isinstance(metadata, dict):
+            raise ValueError("Invalid metadata format")
+            
+        self.stats['total_processed'] += 1
+        
         try:
-            # Create metadata object
-            metadata = DiscountMetadata(
-                source_url=data['source_url'],
-                name=data['name'],
-                brand=data.get('brand'),
-                category=data.get('category'),
-                original_price=data.get('original_price'),
-                sale_price=data.get('sale_price'),
-                discount_percentage=data.get('discount_percentage'),
-                price_per_unit=data.get('price_per_unit'),
-                size=data.get('size'),
-                stock_info=data.get('stock_info'),
-                validity_dates=data.get('validity_dates'),
-                embedding=data.get('embedding')
-            )
+            # Validate required fields
+            required_fields = ['source_url', 'name']
+            for field in required_fields:
+                if field not in metadata:
+                    raise ValueError(f"Missing required field: {field}")
+                    
+            # Add timestamp
+            metadata['processed_at'] = timezone.now()
             
-            # Add to current batch
-            self.current_batch.append(asdict(metadata))
-            
-            # Process batch if size reached
-            if len(self.current_batch) >= self.batch_size:
-                self._process_batch()
-                
-        except KeyError as e:
-            LOGGER.error(f"Missing required field in message: {e}")
-        except Exception as e:
-            LOGGER.error(f"Error processing message: {e}")
-            
-    def _process_batch(self) -> None:
-        """Process the current batch of items."""
-        if not self.current_batch:
-            return
-            
-        try:
-            # Store batch in Redis
-            timestamp = int(time.time())
-            batch_key = f"metadata:batch:{timestamp}"
-            
-            # Store each item
-            for item in self.current_batch:
-                item_key = f"metadata:item:{item['source_url']}"
-                self.redis.set(item_key, json.dumps(item))
-                
-            # Store batch reference
-            self.redis.set(batch_key, json.dumps({
-                'timestamp': timestamp,
-                'items': [item['source_url'] for item in self.current_batch]
-            }))
-            
-            LOGGER.info(f"Processed batch of {len(self.current_batch)} items")
+            # Store processed item
+            self.processed_items.append(metadata)
+            self.stats['successful'] += 1
             
         except Exception as e:
-            LOGGER.error(f"Failed to process batch: {e}")
+            self.stats['failed'] += 1
+            LOGGER.error(f"Failed to process metadata: {str(e)}")
+            raise
             
-        finally:
-            # Clear current batch
-            self.current_batch = [] 
+    def get_stats(self) -> Dict[str, int]:
+        """Get current processing statistics.
+        
+        Returns:
+            Dictionary containing processing statistics
+        """
+        return self.stats.copy()
+        
+    def get_recent_items(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Get recently processed items.
+        
+        Args:
+            limit: Maximum number of items to return
+            
+        Returns:
+            List of recently processed metadata items
+        """
+        return self.processed_items[-limit:] 

@@ -13,24 +13,22 @@ ingress:
       secretName: api-staging-dishpal-ai-tls
 
 backend:
-  replicaCount: 1
-
+  enabled: true
   image:
-    repository: fakay96/backend  
-    tag: ""
-    pullPolicy: Always
+    repository: fakay96/coupon-core
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  replicas: 1
 
   service:
     type: ClusterIP
     port: 8000
-
-  resources:
-    requests:
-      memory: "256Mi"
-      cpu: "200m"  # Increased from 100m → 500m
-    limits:
-      memory: "768Mi"  
-      cpu: "350m"  
 
   nodeSelector:
     workload: backend
@@ -55,24 +53,22 @@ backend:
     logLevel: debug
 
 celery:
-  replicaCount: 1
-
+  enabled: true
   image:
     repository: fakay96/coupon-celery
-    tag: ""
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  workerCount: 1
 
   service:
     type: ClusterIP
     port: 8000
-
-  resources:
-    requests:
-      memory: "256Mi"
-      cpu: "50m"
-    limits:
-      memory: "768Mi"  # Increased from 512Mi → 768Mi
-      cpu: "200m"
 
   nodeSelector:
     workload: celery
@@ -141,3 +137,19 @@ autoscaling:
 tolerations: []
 
 affinity: {}
+
+inference:
+  enabled: true
+  image:
+    repository: fakay96/coupon-inference
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+  replicas: 1
+  hpa:
+    enabled: false  # Disable HPA in staging

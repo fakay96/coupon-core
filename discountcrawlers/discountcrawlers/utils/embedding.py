@@ -1,309 +1,248 @@
-"""discountcrawlers.utils.embedding
+"""
+discountcrawlers.utils.embedding
+================================
 
-Utility functions for generating embeddings using Google's Generative AI API.
-Integrated with Twisted's deferred model for asynchronous operations (though the current implementation is synchronous blocking).
+High-level helper for **Google Generative AI (Gemini)** embeddings
+plus a lightweight text-to-category mapping.
 
-Key features
-------------
-* Safe configuration – no API key baked into the source.
-* One public function, ``generate_embedding``,
-  accepts **either** a single string **or** a list of strings and returns
-  the corresponding embedding(s).
-* Robust batching with index‑safe round‑tripping (when batching is used).
-* Item categorization into predefined categories.
+Key points
+----------
+*   Reads the API key from the **GEMINI_API_KEY** environment variable
+    (no secrets in the repo).
+*   Supports **single text** or **batch** input with the public functions
+    `generate_embedding()` and `generate_embeddings_batch()`.
+*   Uses the high-throughput **text-embedding-004** model
+    (≈ 500 items per call).
+*   Adds an optional “best-effort” categorisation step with *gemini-1.5-flash*.
+*   Provides a Twisted-friendly wrapper `generate_embedding_deferred()`.
 """
 
 from __future__ import annotations
 
-import os
 import json
 import logging
-from typing import List, Optional, Union, Dict, Any, Tuple
+import os
+from pathlib import Path
+from typing import Any, List, Optional, Tuple, Union
 
 import numpy as np
-from google import genai
 from dotenv import load_dotenv
-from twisted.internet import defer, threads
 
-# ---------------------------------------------------------------------------
-# Configuration & Constants
-# ---------------------------------------------------------------------------
+# Import the new SDK
+from google import generativeai as genai
+from google.generativeai import types
+from twisted.internet import defer, threads
 
 load_dotenv()
 LOGGER = logging.getLogger(__name__)
 
-# Define the model name and expected dimension
-# Model list: https://ai.google.dev/models/gemini
-# Embedding models: https://ai.google.dev/docs/embeddings#available_models
-EMBEDDING_MODEL_NAME = "models/embedding-001"
-EMBEDDING_DIMENSION = 768  # Dimension for embedding-001
-# Max batch size for the embedding model (consult documentation if needed, 100 is often safe)
-MAX_BATCH_SIZE = 100
+# ─────────────────────────── configuration ────────────────────────────
 
-# Define available categories
-CATEGORIES = {
-    "flight": "Travel and flight-related deals",
-    "fashion": "Clothing, accessories, and fashion items",
-    "furniture": "Home furniture and decor",
+EMBEDDING_MODEL_NAME: str = "models/text-embedding-005"  # Correct model name
+EMBEDDING_DIMENSION: int = 768
+MAX_BATCH_SIZE: int = 500  # limit for text-embedding-004
+
+CATEGORIES: dict[str, str] = {
+    "flight":      "Travel and flight-related deals",
+    "fashion":     "Clothing and accessories",
+    "furniture":   "Home furniture and decor",
     "electronics": "Electronic devices and gadgets",
-    "grocery": "Food and grocery items"
+    "grocery":     "Food and grocery items",
 }
 
-_genai_initialized = False
+_genai_client: Optional[genai.GenerativeModel] = None
 
-def initialize_client() -> bool:
-    """Initialize the Google Generative AI client with API key.
+# ───────────────────── initialisation helper ──────────────────────
 
-    Returns:
-        bool: True if initialization was successful or already done, False otherwise.
+def _init_genai() -> bool:
     """
-    global _genai_initialized
-    if _genai_initialized:
+    Configure the Google Generative AI client once per process.
+
+    Returns
+    -------
+    bool
+        *True* when the client is ready; *False* on failure.
+    """
+    global _genai_client
+    if _genai_client is not None:
         return True
 
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key: str | None = os.getenv("GEMINI_API_KEY")
     if not api_key:
         LOGGER.error("GEMINI_API_KEY environment variable not set")
         return False
+
     try:
-        genai.Client(api_key=api_key)
-        LOGGER.info("Google Generative AI client initialized successfully.")
-        _genai_initialized = True
+        genai.configure(api_key=api_key)  # configure API key
+        _genai_client = genai.GenerativeModel('gemini-1.5-flash')
+        LOGGER.info("Google Generative AI client initialised")
         return True
-    except Exception as e:
-        LOGGER.exception(f"Failed to initialize Google Generative AI client: {e}")
+    except Exception as exc:
+        LOGGER.exception("Failed to initialise Gemini client: %s", exc)
         return False
 
-# ---------------------------------------------------------------------------
-# Core embedding functions
-# ---------------------------------------------------------------------------
+# ────────────────────────── low-level calls ──────────────────────────
 
-def _generate_single_embedding(text: str) -> Optional[np.ndarray]:
-    """Generate an embedding for a single non-empty text string using the API."""
-    try:
-        # Use the top-level genai.embed_content function
-        result = genai.embed_content(
-            model=EMBEDDING_MODEL_NAME,
-            content=text,
-            task_type="RETRIEVAL_DOCUMENT"  # Or choose appropriate task type
-            # Other task types: RETRIEVAL_QUERY, SEMANTIC_SIMILARITY, CLASSIFICATION, CLUSTERING
-        )
-        # The result is a dictionary containing the embedding list
-        if 'embedding' in result and result['embedding']:
-            return np.array(result['embedding'], dtype=np.float32)
-        else:
-            LOGGER.error("No embedding returned from model for text: %s...", text[:50])
-            return None
-    except Exception as e:
-        LOGGER.error(f"Failed to generate embedding for text '{text[:50]}...': {str(e)}")
+def _embed_single(text: str) -> Optional[np.ndarray]:
+    """Return a vector for *text* or *None* on failure."""
+    if not _init_genai():
         return None
-
-def _categorize_item(text: str) -> str:
-    """Categorize an item based on its description using Gemini API.
-    
-    Args:
-        text: The item description to categorize.
-        
-    Returns:
-        str: The category name (one of the keys in CATEGORIES) or 'unknown' if categorization fails.
-    """
-    if not initialize_client():
-        LOGGER.error("Cannot categorize item, client not initialized.")
-        return "unknown"
-
     try:
-        # Create a prompt for categorization
-        prompt = f"""Categorize the following item into one of these categories: {', '.join(CATEGORIES.keys())}.
-        Return ONLY the category name, nothing else.
-        
-        Item description: {text}
-        """
-        
-        # Use Gemini for categorization
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(prompt)
-        
-        # Extract the category from the response
-        category = response.text.strip().lower()
-        
-        # Validate the category
-        if category in CATEGORIES:
-            return category
-        else:
-            LOGGER.warning(f"Invalid category returned: {category}")
-            return "unknown"
-            
-    except Exception as e:
-        LOGGER.error(f"Failed to categorize item: {str(e)}")
-        return "unknown"
+        model = genai.GenerativeModel(EMBEDDING_MODEL_NAME)
+        response = model.embed_content(content=text)
+        return np.asarray(response.embedding.value, dtype=np.float32)
+    except Exception as exc:
+        LOGGER.error("Embedding failed for %.50s… : %s", text, exc)
+    return None
 
-def _generate_batch_embeddings(texts: List[str]) -> List[Optional[np.ndarray]]:
-    """Generate embeddings for a batch of non-empty text strings using the API."""
+
+def _embed_batch(texts: List[str]) -> List[Optional[np.ndarray]]:
+    """Embed up to `MAX_BATCH_SIZE` texts in one API call."""
     if not texts:
         return []
+    if not _init_genai():
+        return [None] * len(texts)
     try:
-        # Use the top-level genai.embed_content function for batching
-        result = genai.embed_content(
-            model=EMBEDDING_MODEL_NAME,
-            content=texts,
-            task_type="RETRIEVAL_DOCUMENT"  # Use consistent task type for batch
-        )
-        # The result contains a list of embeddings under the 'embedding' key
-        if 'embedding' in result and isinstance(result['embedding'], list) and len(result['embedding']) == len(texts):
-            # Convert each list embedding to a numpy array
-            return [np.array(emb, dtype=np.float32) if emb else None for emb in result['embedding']]
-        else:
-            LOGGER.error(f"Mismatched result count or missing embedding key in batch response. Expected {len(texts)} embeddings.")
-            return [None] * len(texts)  # Return None for all if batch failed
-    except Exception as e:
-        LOGGER.error(f"Failed to generate embeddings batch (first text: '{texts[0][:50]}...'): {str(e)}")
-        return [None] * len(texts)  # Return None for all if batch failed
+        model = genai.GenerativeModel(EMBEDDING_MODEL_NAME)
+        response = model.embed_content(content=texts)
+        return [np.asarray(embedding.value, dtype=np.float32) for embedding in response.embeddings]
+    except Exception as exc:
+        LOGGER.error("Batch embedding failed: %s", exc)
+    return [None] * len(texts)
 
-def generate_embeddings_batch(texts: List[str]) -> Tuple[List[np.ndarray], List[str]]:
-    """Generate embeddings and categories for a batch of texts.
 
-    Args:
-        texts: List of texts to generate embeddings for.
-
-    Returns:
-        Tuple containing:
-        - List of numpy arrays containing embedding vectors
-        - List of category names for each text
+def _categorise(text: str) -> str:
     """
-    if not initialize_client():
-        LOGGER.error("Cannot generate embeddings, client not initialized.")
-        return (
-            [np.zeros(EMBEDDING_DIMENSION, dtype=np.float32) for _ in texts],
-            ["unknown"] * len(texts)
-        )
+    Return one of the keys in ``CATEGORIES`` or ``'unknown'``.
+    The prompt is intentionally strict: we expect exactly a category name back.
+    """
+    if not _init_genai():
+        return "unknown"
 
-    if not texts:
-        return [], []
+    prompt = (
+        "Categorise this item into one of these categories: "
+        + ", ".join(CATEGORIES.keys())
+        + ". Return just the category name.\nItem: "
+        + text
+    )
+    try:
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        response = model.generate_content(prompt)
+        cat = response.text.strip().lower()
+        return cat if cat in CATEGORIES else "unknown"
+    except Exception as exc:
+        LOGGER.error("Categorisation failed: %s", exc)
+        return "unknown"
 
-    results: List[Optional[np.ndarray]] = [None] * len(texts)
+# ─────────────────────── public batch function ───────────────────────
+
+def generate_embeddings_batch(
+    texts: List[str],
+) -> Tuple[List[np.ndarray], List[str]]:
+    """
+    Embed and categorise a list of strings.
+
+    Returns
+    -------
+    Tuple[List[np.ndarray], List[str]]
+        *embedding_vectors*, *categories*
+    """
+    if not _init_genai():
+        zeros = np.zeros(EMBEDDING_DIMENSION, dtype=np.float32)
+        return [zeros] * len(texts), ["unknown"] * len(texts)
+
+    vectors: List[Optional[np.ndarray]] = [None] * len(texts)
     categories: List[str] = ["unknown"] * len(texts)
-    non_empty_indices: List[int] = []
-    non_empty_texts: List[str] = []
 
-    # Identify non-empty texts and their original indices
-    for i, text in enumerate(texts):
-        if text and text.strip():
-            non_empty_indices.append(i)
-            non_empty_texts.append(text.strip())  # Use stripped text
-            # Categorize the item
-            categories[i] = _categorize_item(text.strip())
+    non_empty_idx: List[int] = []
+    non_empty_txt: List[str] = []
+
+    for i, t in enumerate(texts):
+        if t and t.strip():
+            non_empty_idx.append(i)
+            non_empty_txt.append(t.strip())
+            categories[i] = _categorise(t.strip())
         else:
-            LOGGER.warning(f"Empty text provided at index {i} in batch, using zero vector.")
-            results[i] = np.zeros(EMBEDDING_DIMENSION, dtype=np.float32)
+            vectors[i] = np.zeros(EMBEDDING_DIMENSION, dtype=np.float32)
 
-    # Process non-empty texts in batches respecting the API limit
-    for i in range(0, len(non_empty_texts), MAX_BATCH_SIZE):
-        batch_texts = non_empty_texts[i:i + MAX_BATCH_SIZE]
-        batch_indices = non_empty_indices[i:i + MAX_BATCH_SIZE]
+    for i in range(0, len(non_empty_txt), MAX_BATCH_SIZE):
+        batch = non_empty_txt[i : i + MAX_BATCH_SIZE]
+        idxs = non_empty_idx[i : i + MAX_BATCH_SIZE]
+        vecs = _embed_batch(batch)
+        for j, v in enumerate(vecs):
+            vectors[idxs[j]] = (
+                v if v is not None
+                else np.zeros(EMBEDDING_DIMENSION, dtype=np.float32)
+            )
 
-        if not batch_texts:  # Should not happen with the range logic, but safe check
-            continue
+    return [v for v in vectors], categories
 
-        LOGGER.debug(f"Generating embeddings for batch of {len(batch_texts)} texts (starting index {batch_indices[0]})")
-        batch_embeddings = _generate_batch_embeddings(batch_texts)
+# ────────────────────── public single / mixed API ─────────────────────
 
-        # Place successful embeddings back into the results list, use zeros for failures
-        for j, embedding in enumerate(batch_embeddings):
-            original_index = batch_indices[j]
-            if embedding is not None and embedding.shape == (EMBEDDING_DIMENSION,):
-                results[original_index] = embedding
-            else:
-                LOGGER.warning(f"Failed to generate embedding for text at original index {original_index}, using zero vector.")
-                results[original_index] = np.zeros(EMBEDDING_DIMENSION, dtype=np.float32)
-
-    # Final check: ensure all slots in results are filled (they should be by now)
-    final_embeddings = []
-    for i, res in enumerate(results):
-        if res is None:
-            LOGGER.error(f"Result at index {i} remained None unexpectedly. Using zero vector.")
-            final_embeddings.append(np.zeros(EMBEDDING_DIMENSION, dtype=np.float32))
-        else:
-            final_embeddings.append(res)
-
-    return final_embeddings, categories
-
-def generate_embedding(text_or_texts: Union[str, List[str]]) -> Union[Tuple[np.ndarray, str], Tuple[List[np.ndarray], List[str]]]:
-    """Generate embedding(s) and category/categories for a single text or a list of texts.
-
-    Args:
-        text_or_texts: Either a single string or a list of strings.
-
-    Returns:
-        For single string input:
-        - Tuple of (embedding, category)
-        For list input:
-        - Tuple of (list of embeddings, list of categories)
+def generate_embedding(
+    text_or_list: Union[str, List[str]]
+) -> Union[Tuple[np.ndarray, str], Tuple[List[np.ndarray], List[str]]]:
     """
-    if isinstance(text_or_texts, str):
-        # Handle single string case
-        if not initialize_client():
-            LOGGER.error("Cannot generate embedding, client not initialized.")
+    Embed *one* string or a *list* of strings.
+
+    * **str →**  (*vector*, *category*)
+    * **list →** (*vectors*, *categories*)
+    """
+    if isinstance(text_or_list, str):
+        if not _init_genai():
             return np.zeros(EMBEDDING_DIMENSION, dtype=np.float32), "unknown"
 
-        text = text_or_texts.strip()
+        text = text_or_list.strip()
         if not text:
-            LOGGER.warning("Empty text provided for embedding, using zero vector.")
             return np.zeros(EMBEDDING_DIMENSION, dtype=np.float32), "unknown"
 
-        embedding = _generate_single_embedding(text)
-        category = _categorize_item(text)
-        
-        if embedding is None:
-            LOGGER.warning("Failed to generate embedding for single text, using zero vector.")
-            return np.zeros(EMBEDDING_DIMENSION, dtype=np.float32), category
-        return embedding, category
-    elif isinstance(text_or_texts, list):
-        # Handle list of strings case using the batch function
-        return generate_embeddings_batch(text_or_texts)
-    else:
-        raise TypeError("Input must be a string or a list of strings")
+        vec = _embed_single(text) or np.zeros(
+            EMBEDDING_DIMENSION, dtype=np.float32
+        )
+        cat = _categorise(text)
+        return vec, cat
 
-def save_embedding(embedding: Union[np.ndarray, List[float]], path: str) -> bool:
-    """Save an embedding vector (as list) to a JSON file.
+    if isinstance(text_or_list, list):
+        return generate_embeddings_batch(text_or_list)
 
-    Args:
-        embedding: The embedding vector (NumPy array or list) to save.
-        path: Path to save the JSON file.
+    raise TypeError("Input must be str or List[str]")
 
-    Returns:
-        True if save was successful, False otherwise.
+# ─────────────────────────── utilities ───────────────────────────────
+
+def save_embedding(emb: Union[np.ndarray, List[float]], path: str) -> bool:
     """
-    # Convert numpy array to list for JSON serialization
-    if isinstance(embedding, np.ndarray):
-        embedding_list = embedding.tolist()
-    elif isinstance(embedding, list):
-        embedding_list = embedding
+    Write *emb* to *path* as JSON. Accepts numpy arrays or plain lists.
+
+    Returns
+    -------
+    bool
+        *True* on success, *False* on failure.
+    """
+    vec: List[float]
+    if isinstance(emb, np.ndarray):
+        vec = emb.tolist()
+    elif isinstance(emb, list):
+        vec = emb
     else:
-        LOGGER.error("Invalid type for embedding, must be numpy array or list.")
+        LOGGER.error("Embedding must be ndarray or list, not %s", type(emb))
         return False
 
     try:
-        os.makedirs(os.path.dirname(path), exist_ok=True)  # Ensure directory exists
-        with open(path, 'w') as f:
-            json.dump(embedding_list, f)
-        LOGGER.debug(f"Embedding saved successfully to {path}")
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        Path(path).write_text(json.dumps(vec))
         return True
-    except Exception as e:
-        LOGGER.error(f"Failed to save embedding to {path}: {str(e)}")
+    except Exception as exc:
+        LOGGER.error("Failed to save embedding: %s", exc)
         return False
 
-# --- Twisted Integration (Example - requires running in Twisted reactor) ---
-def generate_embedding_deferred(text_or_texts: Union[str, List[str]]) -> defer.Deferred:
-    """Generate embedding(s) asynchronously using Twisted threads.
+# ───────────────────── Twisted-friendly wrapper ──────────────────────
 
-    Args:
-        text_or_texts: Either a single string or a list of strings.
-
-    Returns:
-        A Twisted Deferred that will fire with the embedding(s) (np.ndarray or list)
-        or errback with an Exception.
+def generate_embedding_deferred(
+    text_or_list: Union[str, List[str]]
+) -> defer.Deferred:
     """
-    # Run the synchronous generate_embedding function in a thread
-    d = threads.deferToThread(generate_embedding, text_or_texts)
-    return d
+    Run `generate_embedding` in a thread and return a Deferred.
 
+    Suitable for use inside a Twisted reactor.
+    """
+    return threads.deferToThread(generate_embedding, text_or_list)

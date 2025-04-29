@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- crawler-job.yaml
+- crawler-cronjob.yaml
+- crawler-pvc.yaml
+
+commonLabels:
+  app: discount-crawler
+  component: crawler
+
+namespace: coupon-core 

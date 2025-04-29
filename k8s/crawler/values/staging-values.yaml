@@ -1,0 +1,28 @@
+crawler:
+  enabled: true
+  image:
+    repository: fakay96/discount-crawler
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  cron:
+    enabled: false  # Disable scheduled runs in staging
+  logLevel: "DEBUG"
+
+operator:
+  enabled: true
+  image:
+    repository: fakay96/crawler-resource-operator
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "128Mi"
+      cpu: "100m" 

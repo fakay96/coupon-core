@@ -1,0 +1,39 @@
+FROM python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Create necessary directories
+RUN mkdir -p /app/discountcrawlers/agents
+RUN mkdir -p /app/discountcrawlers/config
+RUN mkdir -p /app/logs
+
+# Copy only the required files for inference
+COPY discountcrawlers/__init__.py /app/discountcrawlers/
+COPY discountcrawlers/settings.py /app/discountcrawlers/
+COPY discountcrawlers/config/__init__.py /app/discountcrawlers/config/
+COPY discountcrawlers/agents/__init__.py /app/discountcrawlers/agents/
+COPY discountcrawlers/agents/base.py /app/discountcrawlers/agents/
+COPY discountcrawlers/agents/coordinator_agent.py /app/discountcrawlers/agents/
+COPY discountcrawlers/agents/metadata_agent.py /app/discountcrawlers/agents/
+COPY discountcrawlers/agents/search_agent.py /app/discountcrawlers/agents/
+
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV DJANGO_SETTINGS_MODULE=discountcrawlers.settings
+ENV REDIS_HOST=redis
+ENV REDIS_PORT=6379
+ENV REDIS_DB=0
+
+# Command to run the inference service
+CMD ["python", "-m", "discountcrawlers.agents.coordinator_agent"] 

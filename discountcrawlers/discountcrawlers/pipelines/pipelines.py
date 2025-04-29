@@ -31,13 +31,13 @@ class DiscountPipeline(BasePipeline):
             Optional[Dict[str, Any]]: The processed item or None if processing failed
         """
         try:
-            # Validate required fields
+            # First clean and normalize data
+            item = self._clean_data(item)
+            
+            # Then validate required fields
             if not self._validate_required_fields(item):
                 raise DropItem("Missing required fields")
                 
-            # Clean and normalize data
-            item = self._clean_data(item)
-            
             # Calculate discount percentage if not provided
             if not item.get('discount_percentage') and item.get('original_price') and item.get('price'):
                 item['discount_percentage'] = self._calculate_discount_percentage(
@@ -61,7 +61,6 @@ class DiscountPipeline(BasePipeline):
         """Validate that all required fields are present."""
         required_fields = [
             'title',
-            'price',
             'product_url',
             'store_name',
             'source'
@@ -84,10 +83,35 @@ class DiscountPipeline(BasePipeline):
             item['description'] = item['description'].strip()
             
         # Clean prices
-        if item.get('price'):
-            item['price'] = float(item['price'])
-        if item.get('original_price'):
-            item['original_price'] = float(item['original_price'])
+        def clean_price(price):
+            if not price:
+                return None
+            try:
+                # Handle string prices
+                if isinstance(price, str):
+                    # Remove currency symbols and whitespace
+                    price = price.replace('€', '').replace('*', '').strip()
+                    # Remove all non-numeric characters except decimal point
+                    price = ''.join(c for c in price if c.isdigit() or c == '.')
+                    # Handle empty string after cleaning
+                    if not price:
+                        return None
+                return float(price)
+            except (ValueError, TypeError):
+                LOGGER.warning(f"Could not convert price to float: {price}")
+                return None
+            
+        # Clean price fields
+        if 'price' in item:
+            item['price'] = clean_price(item['price'])
+        if 'original_price' in item:
+            item['original_price'] = clean_price(item['original_price'])
+        if 'sale_price' in item:
+            item['sale_price'] = clean_price(item['sale_price'])
+            
+        # If price is None but sale_price exists, use sale_price
+        if item.get('price') is None and item.get('sale_price') is not None:
+            item['price'] = item['sale_price']
             
         # Clean URLs
         if item.get('product_url'):
@@ -122,6 +146,7 @@ class DealsAndEmbedPipeline(BatchProcessingPipeline):
             String containing concatenated text for embedding
         """
         parts = []
+        print(item)
         
         # Add title if available (most important field)
         if item.get('title'):
