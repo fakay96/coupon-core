@@ -16,13 +16,14 @@ from django.contrib.gis.geos import Point
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
 from django.contrib.auth import get_user_model
-from geodiscounts.models import Retailer, Discount, SharedDiscount
+from geodiscounts.models import Retailer, Discount, SharedDiscount, Location, MerchantDiscount
 from datetime import datetime, timedelta
 from django.utils import timezone
 from unittest.mock import patch, MagicMock
 import json
 from django.test.utils import override_settings
 from django.db.models.signals import post_save
+import pytest
 
 User = get_user_model()
 
@@ -304,4 +305,158 @@ class SharedDiscountViewTestCase(APITestCase):
         """Test shared discount deletion."""
         url = reverse('geodiscounts:shared-discount-detail', args=[self.shared_discount.id])
         response = self.client.delete(url)
-        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT) 
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+@pytest.mark.django_db
+class TestDiscountAPI:
+    @pytest.fixture
+    def api_client(self):
+        return APIClient()
+
+    @pytest.fixture
+    def merchant_user(self):
+        return User.objects.create_user(
+            email="merchant@example.com",
+            password="testpass123",
+            first_name="Test",
+            last_name="Merchant"
+        )
+
+    @pytest.fixture
+    def discount_data(self):
+        return {
+            "title": "Test Discount",
+            "description": "Test Description",
+            "discount_percentage": 10,
+            "start_date": timezone.now(),
+            "end_date": timezone.now() + timedelta(days=7),
+            "is_active": True
+        }
+
+    def test_create_discount(self, api_client, merchant_user, discount_data):
+        """Test discount creation by merchant."""
+        api_client.force_authenticate(user=merchant_user)
+        url = reverse('discount-list')
+        response = api_client.post(url, discount_data, format='json')
+        assert response.status_code == status.HTTP_201_CREATED
+        assert response.data['title'] == discount_data['title']
+
+    def test_list_discounts(self, api_client, merchant_user, discount_data):
+        """Test listing discounts."""
+        api_client.force_authenticate(user=merchant_user)
+        url = reverse('discount-list')
+        response = api_client.get(url)
+        assert response.status_code == status.HTTP_200_OK
+
+    def test_retrieve_discount(self, api_client, merchant_user, discount_data):
+        """Test retrieving a specific discount."""
+        api_client.force_authenticate(user=merchant_user)
+        discount = Discount.objects.create(**discount_data)
+        url = reverse('discount-detail', kwargs={'pk': discount.pk})
+        response = api_client.get(url)
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data['title'] == discount_data['title']
+
+    def test_update_discount(self, api_client, merchant_user, discount_data):
+        """Test updating a discount."""
+        api_client.force_authenticate(user=merchant_user)
+        discount = Discount.objects.create(**discount_data)
+        url = reverse('discount-detail', kwargs={'pk': discount.pk})
+        update_data = {'title': 'Updated Discount'}
+        response = api_client.patch(url, update_data, format='json')
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data['title'] == 'Updated Discount'
+
+    def test_delete_discount(self, api_client, merchant_user, discount_data):
+        """Test deleting a discount."""
+        api_client.force_authenticate(user=merchant_user)
+        discount = Discount.objects.create(**discount_data)
+        url = reverse('discount-detail', kwargs={'pk': discount.pk})
+        response = api_client.delete(url)
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+
+@pytest.mark.django_db
+class TestLocationAPI:
+    @pytest.fixture
+    def api_client(self):
+        return APIClient()
+
+    @pytest.fixture
+    def location_data(self):
+        return {
+            "name": "Test Location",
+            "latitude": 40.7128,
+            "longitude": -74.0060,
+            "radius": 1000
+        }
+
+    def test_create_location(self, api_client, location_data):
+        """Test location creation."""
+        url = reverse('location-list')
+        response = api_client.post(url, location_data, format='json')
+        assert response.status_code == status.HTTP_201_CREATED
+        assert response.data['name'] == location_data['name']
+
+    def test_list_locations(self, api_client):
+        """Test listing locations."""
+        url = reverse('location-list')
+        response = api_client.get(url)
+        assert response.status_code == status.HTTP_200_OK
+
+    def test_retrieve_location(self, api_client, location_data):
+        """Test retrieving a specific location."""
+        location = Location.objects.create(**location_data)
+        url = reverse('location-detail', kwargs={'pk': location.pk})
+        response = api_client.get(url)
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data['name'] == location_data['name']
+
+@pytest.mark.django_db
+class TestMerchantDiscountAPI:
+    @pytest.fixture
+    def api_client(self):
+        return APIClient()
+
+    @pytest.fixture
+    def merchant_user(self):
+        return User.objects.create_user(
+            email="merchant@example.com",
+            password="testpass123",
+            first_name="Test",
+            last_name="Merchant"
+        )
+
+    @pytest.fixture
+    def merchant_discount_data(self):
+        discount = Discount.objects.create(
+            title="Test Discount",
+            description="Test Description",
+            discount_percentage=10,
+            start_date=timezone.now(),
+            end_date=timezone.now() + timedelta(days=7)
+        )
+        location = Location.objects.create(
+            name="Test Location",
+            latitude=40.7128,
+            longitude=-74.0060,
+            radius=1000
+        )
+        return {
+            "discount": discount.id,
+            "location": location.id,
+            "merchant_id": 1
+        }
+
+    def test_create_merchant_discount(self, api_client, merchant_user, merchant_discount_data):
+        """Test merchant discount creation."""
+        api_client.force_authenticate(user=merchant_user)
+        url = reverse('merchant-discount-list')
+        response = api_client.post(url, merchant_discount_data, format='json')
+        assert response.status_code == status.HTTP_201_CREATED
+
+    def test_list_merchant_discounts(self, api_client, merchant_user):
+        """Test listing merchant discounts."""
+        api_client.force_authenticate(user=merchant_user)
+        url = reverse('merchant-discount-list')
+        response = api_client.get(url)
+        assert response.status_code == status.HTTP_200_OK 

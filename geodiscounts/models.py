@@ -317,8 +317,8 @@ class WebSocketDiscountRequest(models.Model):
     )
 
     def __str__(self) -> str:
-        """Returns a string representation of the request."""
-        return f"{self.user.username} - {self.request_id}"
+        """Returns a formatted string representing the request."""
+        return f"Request {self.request_id} ({self.status})"
 
     class Meta:
         indexes = [

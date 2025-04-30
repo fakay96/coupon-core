@@ -5,8 +5,10 @@ from django.test import TestCase
 from django.contrib.gis.geos import Point
 from django.utils import timezone
 from django.core.exceptions import ValidationError
+import pytest
+from datetime import timedelta
 
-from geodiscounts.models import Retailer, Discount, SharedDiscount
+from geodiscounts.models import Retailer, Discount, SharedDiscount, Location, MerchantDiscount
 
 class RetailerModelTest(TestCase):
     """Tests for the Retailer model."""
@@ -136,4 +138,115 @@ class SharedDiscountModelTest(TestCase):
             status="invalid"  # Invalid status
         )
         with self.assertRaises(ValidationError):
-            shared_discount.full_clean() 
+            shared_discount.full_clean()
+
+@pytest.mark.django_db
+class TestDiscountModel:
+    def test_create_discount(self):
+        """Test discount creation with valid data."""
+        discount = Discount.objects.create(
+            title="Test Discount",
+            description="Test Description",
+            discount_percentage=10,
+            start_date=timezone.now(),
+            end_date=timezone.now() + timedelta(days=7),
+            is_active=True
+        )
+        assert discount.title == "Test Discount"
+        assert discount.discount_percentage == 10
+        assert discount.is_active
+
+    def test_discount_validation(self):
+        """Test discount validation rules."""
+        with pytest.raises(ValidationError):
+            Discount.objects.create(
+                title="Test Discount",
+                description="Test Description",
+                discount_percentage=101,  # Invalid percentage
+                start_date=timezone.now(),
+                end_date=timezone.now() + timedelta(days=7)
+            )
+
+    def test_discount_date_validation(self):
+        """Test discount date validation."""
+        with pytest.raises(ValidationError):
+            Discount.objects.create(
+                title="Test Discount",
+                description="Test Description",
+                discount_percentage=10,
+                start_date=timezone.now() + timedelta(days=7),
+                end_date=timezone.now()  # End date before start date
+            )
+
+@pytest.mark.django_db
+class TestLocationModel:
+    def test_create_location(self):
+        """Test location creation with valid data."""
+        location = Location.objects.create(
+            name="Test Location",
+            latitude=40.7128,
+            longitude=-74.0060,
+            radius=1000  # meters
+        )
+        assert location.name == "Test Location"
+        assert location.latitude == 40.7128
+        assert location.longitude == -74.0060
+        assert location.radius == 1000
+
+    def test_location_coordinate_validation(self):
+        """Test location coordinate validation."""
+        with pytest.raises(ValidationError):
+            Location.objects.create(
+                name="Test Location",
+                latitude=91,  # Invalid latitude
+                longitude=-74.0060,
+                radius=1000
+            )
+
+@pytest.mark.django_db
+class TestMerchantDiscount:
+    def test_create_merchant_discount(self):
+        """Test merchant discount creation."""
+        discount = Discount.objects.create(
+            title="Test Discount",
+            description="Test Description",
+            discount_percentage=10,
+            start_date=timezone.now(),
+            end_date=timezone.now() + timedelta(days=7)
+        )
+        location = Location.objects.create(
+            name="Test Location",
+            latitude=40.7128,
+            longitude=-74.0060,
+            radius=1000
+        )
+        merchant_discount = MerchantDiscount.objects.create(
+            discount=discount,
+            location=location,
+            merchant_id=1
+        )
+        assert merchant_discount.discount == discount
+        assert merchant_discount.location == location
+        assert merchant_discount.merchant_id == 1
+
+    def test_merchant_discount_validation(self):
+        """Test merchant discount validation."""
+        discount = Discount.objects.create(
+            title="Test Discount",
+            description="Test Description",
+            discount_percentage=10,
+            start_date=timezone.now(),
+            end_date=timezone.now() + timedelta(days=7)
+        )
+        location = Location.objects.create(
+            name="Test Location",
+            latitude=40.7128,
+            longitude=-74.0060,
+            radius=1000
+        )
+        with pytest.raises(ValidationError):
+            MerchantDiscount.objects.create(
+                discount=discount,
+                location=location,
+                merchant_id=-1  # Invalid merchant ID
+            ) 

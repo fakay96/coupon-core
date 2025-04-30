@@ -11,9 +11,103 @@ This module tests:
 from django.contrib.gis.geos import Point
 from django.core.exceptions import ValidationError
 from django.test import TestCase
+import pytest
+from django.contrib.auth import get_user_model
 
-from authentication.models import CustomUser, UserProfile, Role
+from authentication.models import CustomUser, UserProfile, Role, UserRole
 
+User = get_user_model()
+
+@pytest.mark.django_db
+class TestUserModel:
+    def test_create_user(self):
+        """Test user creation with valid data."""
+        user = User.objects.create_user(
+            email="test@example.com",
+            password="testpass123",
+            first_name="Test",
+            last_name="User"
+        )
+        assert user.email == "test@example.com"
+        assert user.first_name == "Test"
+        assert user.last_name == "User"
+        assert user.check_password("testpass123")
+        assert not user.is_staff
+        assert not user.is_superuser
+
+    def test_create_superuser(self):
+        """Test superuser creation with valid data."""
+        user = User.objects.create_superuser(
+            email="admin@example.com",
+            password="adminpass123"
+        )
+        assert user.email == "admin@example.com"
+        assert user.is_staff
+        assert user.is_superuser
+
+    def test_user_email_validation(self):
+        """Test email validation for user creation."""
+        with pytest.raises(ValidationError):
+            User.objects.create_user(
+                email="invalid-email",
+                password="testpass123"
+            )
+
+    def test_user_password_validation(self):
+        """Test password validation for user creation."""
+        with pytest.raises(ValidationError):
+            User.objects.create_user(
+                email="test@example.com",
+                password="123"  # Too short
+            )
+
+@pytest.mark.django_db
+class TestUserProfile:
+    def test_profile_creation(self):
+        """Test user profile creation on user creation."""
+        user = User.objects.create_user(
+            email="test@example.com",
+            password="testpass123"
+        )
+        assert hasattr(user, 'profile')
+        assert isinstance(user.profile, UserProfile)
+
+    def test_profile_update(self):
+        """Test user profile update."""
+        user = User.objects.create_user(
+            email="test@example.com",
+            password="testpass123"
+        )
+        user.profile.phone_number = "+1234567890"
+        user.profile.save()
+        assert user.profile.phone_number == "+1234567890"
+
+@pytest.mark.django_db
+class TestUserRole:
+    def test_role_assignment(self):
+        """Test user role assignment."""
+        user = User.objects.create_user(
+            email="test@example.com",
+            password="testpass123"
+        )
+        role = UserRole.objects.create(
+            user=user,
+            role="MERCHANT"
+        )
+        assert role.user == user
+        assert role.role == "MERCHANT"
+
+    def test_role_validation(self):
+        """Test role validation."""
+        user = User.objects.create_user(
+            email="test@example.com",
+            password="testpass123"
+        )
+        with pytest.raises(ValidationError):
+            UserRole.objects.create(
+                user=user,
+                role="INVALID_ROLE"
+            )
 
 class CustomUserModelTestCase(TestCase):
     """Test suite for CustomUser model."""
