@@ -7,6 +7,8 @@ This module provides middleware components for:
 3. Request logging
 4. Error handling
 5. Cache control
+6. Location processing
+7. Authentication
 """
 
 from django.core.cache import cache
@@ -18,6 +20,9 @@ from django.db import connection
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from rest_framework.exceptions import ValidationError, NotFound
 from rest_framework import status
+from rest_framework.authentication import get_authorization_header
+from rest_framework_simplejwt.tokens import AccessToken
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 import logging
 import time
 from functools import wraps
@@ -205,28 +210,86 @@ class RequestLoggingMiddleware:
         return request.META.get('REMOTE_ADDR')
 
 
-class CacheControlMiddleware:
+class CacheMiddleware:
     """
-    Middleware for setting cache control headers.
+    Middleware for caching responses.
 
-    This middleware sets appropriate cache control headers to prevent
-    caching of dynamic content and ensure proper handling of responses.
+    This middleware handles:
+    1. Response caching
+    2. Cache invalidation
+    3. Cache bypass
+    4. Cache headers
     """
 
     def __init__(self, get_response):
         self.get_response = get_response
+        self.cache_timeout = getattr(settings, 'CACHE_TIMEOUT', 300)  # 5 minutes default
 
     def __call__(self, request):
-        """Process the request and set cache control headers."""
+        """Process the request and handle caching."""
+        if not self._should_cache(request):
+            return self.get_response(request)
+
+        # Try to get response from cache
+        cache_key = self._get_cache_key(request)
+        cached_response = cache.get(cache_key)
+
+        if cached_response is not None:
+            cached_response._from_cache = True
+            return cached_response
+
+        # Get fresh response
         response = self.get_response(request)
 
-        # Set cache control headers
-        response['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
-        response['Pragma'] = 'no-cache'
-        response['Expires'] = '0'
-        response['Vary'] = 'Accept, Accept-Encoding'
+        # Cache the response if it's cacheable
+        if self._should_cache_response(response):
+            cache.set(cache_key, response, self.cache_timeout)
 
         return response
+
+    def _should_cache(self, request):
+        """Determine if the request should be cached."""
+        # Don't cache POST, PUT, DELETE requests
+        if request.method not in ['GET', 'HEAD']:
+            return False
+
+        # Don't cache admin or static files
+        if request.path.startswith('/admin/') or request.path.startswith('/static/'):
+            return False
+
+        # Don't cache if nocache parameter is present
+        if request.GET.get('nocache'):
+            return False
+
+        return True
+
+    def _should_cache_response(self, response):
+        """Determine if the response should be cached."""
+        # Only cache successful responses
+        if response.status_code != 200:
+            return False
+
+        # Don't cache streaming responses
+        if getattr(response, 'streaming', False):
+            return False
+
+        return True
+
+    def _get_cache_key(self, request):
+        """Generate a cache key for the request."""
+        # Include query parameters in cache key
+        key_parts = [
+            request.path,
+            str(request.GET),
+            request.META.get('HTTP_ACCEPT'),
+            request.META.get('HTTP_ACCEPT_ENCODING')
+        ]
+
+        # Include user-specific data if authenticated
+        if hasattr(request, 'user') and request.user.is_authenticated:
+            key_parts.append(str(request.user.id))
+
+        return ':'.join(key_parts)
 
 
 class ErrorHandlingMiddleware:
@@ -257,4 +320,142 @@ class ErrorHandlingMiddleware:
             return JsonResponse(
                 {'error': 'Internal server error'},
                 status=500
-            ) 
+            )
+
+
+class LocationMiddleware:
+    """
+    Middleware for processing location headers in requests.
+
+    This middleware processes X-Latitude and X-Longitude headers to add
+    location data to the request object. It validates the coordinates
+    and handles missing or invalid headers appropriately.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        """Process the request and add location data from headers."""
+        if not self._should_process_location(request):
+            return self.get_response(request)
+
+        try:
+            latitude = request.headers.get('X-Latitude')
+            longitude = request.headers.get('X-Longitude')
+
+            if latitude is None or longitude is None:
+                return self.get_response(request)
+
+            # Convert to float and validate
+            latitude = float(latitude)
+            longitude = float(longitude)
+
+            if not (-90 <= latitude <= 90) or not (-180 <= longitude <= 180):
+                return JsonResponse(
+                    {'error': 'Invalid location format'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Add location to request
+            request.location = {
+                'latitude': latitude,
+                'longitude': longitude
+            }
+
+        except ValueError:
+            return JsonResponse(
+                {'error': 'Invalid location format'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            logger.error(f"Error processing location headers: {str(e)}")
+            return JsonResponse(
+                {'error': 'Internal server error'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        return self.get_response(request)
+
+    def _should_process_location(self, request):
+        """Determine if location headers should be processed."""
+        # Skip for admin and static files
+        if request.path.startswith('/admin/') or request.path.startswith('/static/'):
+            return False
+        return True
+
+
+class AuthenticationMiddleware:
+    """
+    Middleware for JWT token authentication.
+
+    This middleware:
+    1. Validates JWT tokens
+    2. Sets authenticated user on request
+    3. Handles token errors
+    4. Manages token expiry
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        """Process the request and handle authentication."""
+        if not self._should_authenticate(request):
+            return self.get_response(request)
+
+        try:
+            # Get token from header
+            auth = get_authorization_header(request).decode('utf-8')
+            if not auth:
+                return JsonResponse(
+                    {'error': 'Authentication credentials not provided'},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+
+            # Split auth header
+            auth_parts = auth.split()
+            if len(auth_parts) != 2 or auth_parts[0].lower() != 'bearer':
+                return JsonResponse(
+                    {'error': 'Invalid authentication header'},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+
+            token = auth_parts[1]
+
+            # Validate token and get user
+            try:
+                access_token = AccessToken(token)
+                request.user = access_token.user
+            except (InvalidToken, TokenError):
+                return JsonResponse(
+                    {'error': 'Invalid token'},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+
+        except Exception as e:
+            logger.error(f"Authentication error: {str(e)}")
+            return JsonResponse(
+                {'error': 'Authentication failed'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        return self.get_response(request)
+
+    def _should_authenticate(self, request):
+        """Determine if the request should be authenticated."""
+        # Skip authentication for admin and static files
+        if request.path.startswith('/admin/') or request.path.startswith('/static/'):
+            return False
+
+        # Skip authentication for public endpoints
+        public_paths = [
+            '/api/v1/auth/login/',
+            '/api/v1/auth/register/',
+            '/api/v1/auth/refresh/',
+            '/api/v1/auth/verify/'
+        ]
+        if request.path in public_paths:
+            return False
+
+        return True 

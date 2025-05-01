@@ -31,7 +31,7 @@ organized into categories.
 from typing import List, Optional, Dict, Any
 from django.contrib.gis.db import models
 from django.contrib.gis.measure import D
-from django.core.validators import FileExtensionValidator
+from django.core.validators import FileExtensionValidator, MinValueValidator, MaxValueValidator
 from django.conf import settings
 from storages.backends.s3boto3 import S3Boto3Storage
 from authentication.models import CustomUser
@@ -328,3 +328,123 @@ class WebSocketDiscountRequest(models.Model):
             models.Index(fields=['created_at']),
         ]
         ordering = ['-created_at']
+
+class Location(models.Model):
+    """
+    Represents a geographical location with a radius.
+
+    Attributes:
+        name (str): Name of the location.
+        latitude (float): Latitude coordinate.
+        longitude (float): Longitude coordinate.
+        radius (float): Radius in meters for the location.
+        is_valid (bool): Whether the location is valid.
+        last_updated (datetime): When the location was last updated.
+    """
+
+    name: str = models.CharField(
+        max_length=255,
+        help_text="Name of the location."
+    )
+    latitude: float = models.FloatField(
+        validators=[
+            MinValueValidator(-90.0),
+            MaxValueValidator(90.0)
+        ],
+        help_text="Latitude coordinate (-90 to 90)."
+    )
+    longitude: float = models.FloatField(
+        validators=[
+            MinValueValidator(-180.0),
+            MaxValueValidator(180.0)
+        ],
+        help_text="Longitude coordinate (-180 to 180)."
+    )
+    radius: float = models.FloatField(
+        validators=[MinValueValidator(0.0)],
+        help_text="Radius in meters for the location."
+    )
+    is_valid: bool = models.BooleanField(
+        default=True,
+        help_text="Whether the location is valid."
+    )
+    last_updated: models.DateTimeField = models.DateTimeField(
+        auto_now=True,
+        help_text="When the location was last updated."
+    )
+
+    def __str__(self) -> str:
+        """Returns a string representation of the location."""
+        return f"{self.name} ({self.latitude}, {self.longitude})"
+
+    def calculate_distance(self, other: 'Location') -> float:
+        """Calculate distance to another location in meters.
+        
+        Args:
+            other (Location): The other location to calculate distance to.
+            
+        Returns:
+            float: Distance in meters.
+        """
+        from django.contrib.gis.geos import Point
+        from django.contrib.gis.measure import D
+        
+        point1 = Point(self.longitude, self.latitude)
+        point2 = Point(other.longitude, other.latitude)
+        
+        return point1.distance(point2) * 100000  # Convert to meters
+
+    def overlaps_with(self, other: 'Location') -> bool:
+        """Check if this location overlaps with another location.
+        
+        Args:
+            other (Location): The other location to check.
+            
+        Returns:
+            bool: True if locations overlap, False otherwise.
+        """
+        distance = self.calculate_distance(other)
+        return distance < (self.radius + other.radius)
+
+    def get_bounding_box(self) -> tuple:
+        """Get the bounding box for this location.
+        
+        Returns:
+            tuple: (min_lat, min_lng, max_lat, max_lng)
+        """
+        # Convert radius from meters to degrees (approximate)
+        lat_radius = self.radius / 111000  # 111km per degree
+        lng_radius = self.radius / (111000 * abs(self.latitude))
+        
+        return (
+            self.latitude - lat_radius,
+            self.longitude - lng_radius,
+            self.latitude + lat_radius,
+            self.longitude + lng_radius
+        )
+
+    def to_geojson(self) -> Dict[str, Any]:
+        """Convert location to GeoJSON format.
+        
+        Returns:
+            Dict[str, Any]: GeoJSON representation of the location.
+        """
+        return {
+            'type': 'Feature',
+            'geometry': {
+                'type': 'Point',
+                'coordinates': [self.longitude, self.latitude]
+            },
+            'properties': {
+                'name': self.name,
+                'radius': self.radius
+            }
+        }
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['latitude', 'longitude']),
+            models.Index(fields=['is_valid']),
+            models.Index(fields=['last_updated']),
+        ]
+        ordering = ['-last_updated']

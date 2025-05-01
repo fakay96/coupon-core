@@ -1,11 +1,7 @@
 from coupon_core.celery import celery_app  as app
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
-from coupon_core.settings import (
-    BASE_DOMAIN,
-    DEFAULT_FROM_EMAIL,
-    FRONTEND_DOMAIN_NAME
-)
+from django.conf import settings
 import logging
 
 logger = logging.getLogger(__name__)
@@ -25,7 +21,7 @@ def send_verification_email_task(user_email: str, token: str, logo_url: str = No
     """
     try:
         subject: str = "Verify Your Account"
-        verification_link: str = f"{FRONTEND_DOMAIN_NAME}/auth?token={token}&email={user_email}"
+        verification_link: str = f"{settings.FRONTEND_DOMAIN_NAME}/auth?token={token}&email={user_email}"
 
         # Context for template rendering
         context = {
@@ -39,7 +35,7 @@ def send_verification_email_task(user_email: str, token: str, logo_url: str = No
         html_message: str = render_to_string("emails/verification_email.html", context)
         plain_message: str = render_to_string("emails/verification_email.txt", context)
 
-        from_email: str = DEFAULT_FROM_EMAIL
+        from_email: str = settings.DEFAULT_FROM_EMAIL
 
         # Create email with both HTML and plain-text content
         email = EmailMultiAlternatives(subject, plain_message, from_email, [user_email])
@@ -66,7 +62,7 @@ def send_password_reset_email_task(user_email: str, token: str, logo_url: str = 
     """
     try:
         subject: str = "Password Reset Request"
-        reset_link: str = f"{FRONTEND_DOMAIN_NAME}/reset-password?token={token}&email={user_email}"
+        reset_link: str = f"{settings.FRONTEND_DOMAIN_NAME}/reset-password?token={token}&email={user_email}"
 
         # Context for template rendering
         context = {
@@ -79,7 +75,7 @@ def send_password_reset_email_task(user_email: str, token: str, logo_url: str = 
         html_message: str = render_to_string("emails/password_reset_email.html", context)
         plain_message: str = render_to_string("emails/password_reset_email.txt", context)
 
-        from_email: str = DEFAULT_FROM_EMAIL
+        from_email: str = settings.DEFAULT_FROM_EMAIL
 
         # Create email with both HTML and plain-text content
         email = EmailMultiAlternatives(subject, plain_message, from_email, [user_email])

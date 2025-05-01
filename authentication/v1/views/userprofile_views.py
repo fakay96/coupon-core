@@ -3,13 +3,13 @@ Views for managing user profiles and user registration.
 
 This module provides the following endpoints:
 1. User Profile Management:
-    - GET /api/v1/user-profile/: Retrieve the authenticated user's profile details.
-    - PUT /api/v1/user-profile/: Update the authenticated user's profile details.
-    - PATCH /api/v1/user-profile/: Partially update the authenticated user's profile details.
-    - DELETE /api/v1/user-profile/image/: Delete the authenticated user's profile image.
+    - GET /authentication/api/v1/user-profile/: Retrieve the authenticated user's profile details.
+    - PUT /authentication/api/v1/user-profile/: Update the authenticated user's profile details.
+    - PATCH /authentication/api/v1/user-profile/: Partially update the authenticated user's profile details.
+    - DELETE /authentication/api/v1/user-profile/: Delete the authenticated user's profile image.
 
 2. User Registration:
-    - POST /api/v1/register/: Register a new user or upgrade a guest user to a regular user.
+    - POST /authentication/api/v1/register/: Register a new user or upgrade a guest user to a regular user.
 
 Error Handling:
     - Handles missing profiles with 404 responses.
@@ -20,30 +20,29 @@ Author: Your Name
 Date: YYYY-MM-DD
 """
 
-from typing import Any
+import json
 import logging
+from typing import Any
 
 from django.contrib.auth.hashers import make_password
-from django.core.exceptions import ObjectDoesNotExist, ValidationError
-from django.http import Http404
-from django.shortcuts import get_object_or_404
+from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
+from django.http import Http404
 
 from rest_framework import status
+from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
+from drf_yasg.utils import swagger_auto_schema
 
 from authentication.models import CustomUser, UserProfile, ProfileVerification
 from authentication.v1.serializers import RegisterSerializer, UserProfileSerializer
 
-# Configure a logger for this module.
 logger = logging.getLogger(__name__)
 
-# Define common response schema for error responses.
 error_response_schema = openapi.Schema(
     type=openapi.TYPE_OBJECT,
     properties={
@@ -60,22 +59,31 @@ error_response_schema = openapi.Schema(
     }
 )
 
-
 class UserProfileView(APIView):
     """
     API endpoint to manage user profiles.
 
     Permissions:
         - Requires the user to be authenticated.
-
-    Endpoints:
-        - GET /api/v1/user-profile/: Retrieve the authenticated user's profile details.
-        - PUT /api/v1/user-profile/: Update the authenticated user's profile details.
-        - PATCH /api/v1/user-profile/: Partially update the authenticated user's profile details.
-        - DELETE /api/v1/user-profile/image/: Delete the authenticated user's profile image.
     """
-
+    parser_classes = [JSONParser, MultiPartParser]
     permission_classes = [IsAuthenticated]
+
+    def _coerce_nested(self, data: dict) -> dict:
+        """
+        If preferences or location arrive as JSON-encoded strings (e.g. in multipart),
+        decode them back into Python objects.
+        """
+        out = {}
+        for k, v in data.items():
+            if k in ("preferences", "location") and isinstance(v, str):
+                try:
+                    out[k] = json.loads(v)
+                except json.JSONDecodeError:
+                    out[k] = v
+            else:
+                out[k] = v
+        return out
 
     @swagger_auto_schema(
         operation_description="Retrieve the profile of the authenticated user.",
@@ -95,23 +103,12 @@ class UserProfileView(APIView):
         },
     )
     def get(self, request: Any) -> Response:
-        """
-        Retrieve the profile of the authenticated user.
-
-        Returns:
-            - 200: Successfully retrieved profile details.
-            - 404: Profile not found.
-            - 500: Internal server error.
-        """
         try:
-            profile = request.user.profile  # Assuming a One-to-One relationship exists.
+            profile = request.user.profile
             serializer = UserProfileSerializer(profile)
             return Response(serializer.data, status=status.HTTP_200_OK)
         except UserProfile.DoesNotExist:
-            return Response(
-                {"error": "Profile not found."},
-                status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"error": "Profile not found."}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             logger.error("Error retrieving user profile: %s", str(e), exc_info=True)
             return Response(
@@ -142,28 +139,16 @@ class UserProfileView(APIView):
         },
     )
     def put(self, request: Any) -> Response:
-        """
-        Update the profile of the authenticated user.
-
-        Args:
-            request (Any): The HTTP request containing the updated profile data.
-
-        Returns:
-            - 200: Successfully updated profile details.
-            - 400: Validation errors.
-            - 404: Profile not found.
-            - 500: Internal server error.
-        """
         try:
             profile = request.user.profile
-            data = request.data.copy()
-            # Safely add location from middleware
-            print(request.client_latitude)
-            if hasattr(request, "client_latitude") and hasattr(request, "client_longitude"):
-                if request.client_latitude is not None and request.client_longitude is not None:
-                    data["location"] = [request.client_longitude, request.client_latitude]
-            print(data)
-            serializer = UserProfileSerializer(profile, data=data, partial=True)
+            raw = request.data.copy()
+            data = self._coerce_nested(raw)
+
+            # Add client geolocation if provided by middleware
+            if getattr(request, "client_latitude", None) is not None and getattr(request, "client_longitude", None) is not None:
+                data["location"] = [request.client_longitude, request.client_latitude]
+
+            serializer = UserProfileSerializer(profile, data=data, partial=False)
             if serializer.is_valid():
                 serializer.save()
                 return Response(serializer.data, status=status.HTTP_200_OK)
@@ -171,14 +156,12 @@ class UserProfileView(APIView):
 
         except UserProfile.DoesNotExist:
             return Response({"error": "Profile not found."}, status=status.HTTP_404_NOT_FOUND)
-
         except Exception as e:
             logger.error("Error updating user profile: %s", str(e), exc_info=True)
             return Response(
                 {"error": "An unexpected error occurred.", "details": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-
 
     @swagger_auto_schema(
         operation_description="Partially update the profile of the authenticated user.",
@@ -203,53 +186,36 @@ class UserProfileView(APIView):
         },
     )
     def patch(self, request: Any) -> Response:
-        """
-        Partially update the profile of the authenticated user.
-
-        Args:
-            request (Any): The HTTP request containing the partial profile data.
-
-        Returns:
-            - 200: Successfully updated profile details.
-            - 400: Validation errors.
-            - 404: Profile not found.
-            - 500: Internal server error.
-        """
         try:
             profile = request.user.profile
-            # Handle nested user data by including it in the request data
-            data = request.data.copy()
-            if 'first_name' in request.data or 'last_name' in request.data:
+            raw = request.data.copy()
+            data = self._coerce_nested(raw)
+
+            # Handle nested user fields
+            if 'first_name' in data or 'last_name' in data:
                 user_data = {}
-                if 'first_name' in request.data:
-                    user_data['first_name'] = request.data['first_name']
-                if 'last_name' in request.data:
-                    user_data['last_name'] = request.data['last_name']
+                if 'first_name' in data: user_data['first_name'] = data.pop('first_name')
+                if 'last_name' in data: user_data['last_name'] = data.pop('last_name')
                 data['user'] = user_data
 
-            # Handle preferences update
+            # Merge preferences
             if 'preferences' in data:
                 if not isinstance(data['preferences'], dict):
-                    return Response(
-                        {"error": "Preferences must be a JSON object."},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-                current_preferences = profile.preferences or {}
-                current_preferences.update(data['preferences'])
-                data['preferences'] = current_preferences
+                    return Response({"error": "Preferences must be a JSON object."}, status=status.HTTP_400_BAD_REQUEST)
+                current = profile.preferences or {}
+                current.update(data['preferences'])
+                data['preferences'] = current
 
             serializer = UserProfileSerializer(profile, data=data, partial=True)
             if serializer.is_valid():
                 serializer.save()
                 return Response(serializer.data, status=status.HTTP_200_OK)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
         except UserProfile.DoesNotExist:
-            return Response(
-                {"error": "Profile not found."},
-                status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"error": "Profile not found."}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            logger.error("Error updating user profile: %s", str(e), exc_info=True)
+            logger.error("Error patching user profile: %s", str(e), exc_info=True)
             return Response(
                 {"error": "An unexpected error occurred.", "details": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -258,28 +224,12 @@ class UserProfileView(APIView):
     @swagger_auto_schema(
         operation_description="Delete the profile image of the authenticated user.",
         responses={
-            204: openapi.Response(
-                description="Successfully deleted profile image.",
-            ),
-            404: openapi.Response(
-                description="Profile not found.",
-                schema=error_response_schema
-            ),
-            500: openapi.Response(
-                description="Internal server error.",
-                schema=error_response_schema
-            ),
+            204: openapi.Response(description="Successfully deleted profile image."),
+            404: openapi.Response(description="Profile not found.", schema=error_response_schema),
+            500: openapi.Response(description="Internal server error.", schema=error_response_schema),
         },
     )
     def delete(self, request: Any) -> Response:
-        """
-        Delete the profile image of the authenticated user.
-
-        Returns:
-            - 204: Successfully deleted profile image.
-            - 404: Profile not found.
-            - 500: Internal server error.
-        """
         try:
             profile = request.user.profile
             if profile.profile_image:
@@ -287,16 +237,14 @@ class UserProfileView(APIView):
                 profile.save()
             return Response(status=status.HTTP_204_NO_CONTENT)
         except UserProfile.DoesNotExist:
-            return Response(
-                {"error": "Profile not found."},
-                status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"error": "Profile not found."}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             logger.error("Error deleting profile image: %s", str(e), exc_info=True)
             return Response(
                 {"error": "An unexpected error occurred.", "details": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
 
 
 class UserRegistrationView(APIView):
@@ -310,20 +258,14 @@ class UserRegistrationView(APIView):
     Permissions:
         - Allows both authenticated (guest) and unauthenticated users.
     """
-
+    parser_classes = [JSONParser, MultiPartParser]
     permission_classes = [AllowAny]
 
-    # Define a response schema for successful registration.
     register_success_schema = openapi.Schema(
         type=openapi.TYPE_OBJECT,
         properties={
-            "message": openapi.Schema(
-                type=openapi.TYPE_STRING, example="User registered successfully."
-            ),
-            "user": openapi.Schema(
-                type=openapi.TYPE_OBJECT,
-                description="Registered user details."
-            ),
+            "message": openapi.Schema(type=openapi.TYPE_STRING, example="User registered successfully."),
+            "user": openapi.Schema(type=openapi.TYPE_OBJECT, description="Registered user details."),
         },
     )
 
@@ -332,103 +274,55 @@ class UserRegistrationView(APIView):
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             properties={
-                "email": openapi.Schema(
-                    type=openapi.TYPE_STRING, format="email", description="User email."
-                ),
-                "password": openapi.Schema(
-                    type=openapi.TYPE_STRING, format="password", description="User password."
-                ),
-                "confirm_password": openapi.Schema(
-                    type=openapi.TYPE_STRING, format="password", description="Password confirmation."
-                ),
+                "email": openapi.Schema(type=openapi.TYPE_STRING, format="email"),
+                "password": openapi.Schema(type=openapi.TYPE_STRING, format="password"),
+                "confirm_password": openapi.Schema(type=openapi.TYPE_STRING, format="password"),
             },
             required=["email", "password", "confirm_password"],
         ),
         responses={
-            201: openapi.Response(
-                description="User successfully registered or upgraded.",
-                schema=register_success_schema,
-            ),
-            400: openapi.Response(
-                description="Validation errors or missing fields.",
-                schema=error_response_schema,
-            ),
-            500: openapi.Response(
-                description="Internal server error.",
-                schema=error_response_schema,
-            ),
+            201: openapi.Response(description="User successfully registered or upgraded.", schema=register_success_schema),
+            400: openapi.Response(description="Validation errors or missing fields.", schema=error_response_schema),
+            500: openapi.Response(description="Internal server error.", schema=error_response_schema),
         },
     )
     def post(self, request: Any) -> Response:
-        """
-        Register a new user or upgrade a guest user to a regular user.
-
-        Args:
-            request (Any): The HTTP request containing registration data.
-
-        Returns:
-            - 201: User successfully registered or upgraded.
-            - 400: Validation errors or missing fields.
-            - 500: Internal server error.
-        """
         try:
-            # Validate required fields
-            email = request.data.get("email")
-            password = request.data.get("password")
-            confirm_password = request.data.get("confirm_password")
+            raw = request.data.copy()
+            data = self._coerce_nested(raw) if hasattr(self, '_coerce_nested') else raw
 
-            if not all([email, password, confirm_password]):
-                return Response(
-                    {"error": "All fields are required."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+            email = data.get("email")
+            password = data.get("password")
+            confirm = data.get("confirm_password")
 
-            # Validate email format
+            if not all([email, password, confirm]):
+                return Response({"error": "All fields are required."}, status=status.HTTP_400_BAD_REQUEST)
+
             try:
                 validate_email(email)
             except ValidationError:
-                return Response(
-                    {"error": "Invalid email format."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+                return Response({"error": "Invalid email format."}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Check if passwords match
-            if password != confirm_password:
-                return Response(
-                    {"error": "Passwords do not match."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+            if password != confirm:
+                return Response({"error": "Passwords do not match."}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Check if email is already registered
             if CustomUser.objects.filter(email=email).exists():
-                return Response(
-                    {"error": "Email is already registered."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+                return Response({"error": "Email is already registered."}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Create user and profile
             user = CustomUser.objects.create(
                 email=email,
                 password=make_password(password),
                 is_active=True,
             )
+            UserProfile.objects.create(user=user)
 
-            profile = UserProfile.objects.create(user=user)
-
-            # Create verification token
-            verification = ProfileVerification.objects.create(
-                user=user,
-                email=email,
-            )
+            verification = ProfileVerification.objects.create(user=user, email=email)
             verification.send_verification_email()
 
             serializer = RegisterSerializer(user)
             return Response(
-                {
-                    "message": "User registered successfully.",
-                    "user": serializer.data,
-                },
-                status=status.HTTP_201_CREATED,
+                {"message": "User registered successfully.", "user": serializer.data},
+                status=status.HTTP_201_CREATED
             )
 
         except Exception as e:
@@ -439,51 +333,27 @@ class UserRegistrationView(APIView):
             )
 
 
+
 class UserDeleteView(APIView):
     """
     API endpoint to allow users to delete their account.
 
     Permissions:
         - Requires the user to be authenticated.
-
-    Endpoints:
-        - DELETE /api/v1/user-profile/: Delete the authenticated user's account.
-    
-    Responses:
-        - 204: Successfully deleted user account.
-        - 403: User is not authorized to perform this action.
-        - 500: Internal server error.
     """
-
     permission_classes = [IsAuthenticated]
 
     @swagger_auto_schema(
         operation_description="Delete the authenticated user's account.",
         responses={
             204: openapi.Response(description="User account successfully deleted."),
-            403: openapi.Response(
-                description="User is not authorized to delete this account.",
-                schema=error_response_schema
-            ),
-            500: openapi.Response(
-                description="Internal server error.",
-                schema=error_response_schema
-            ),
+            403: openapi.Response(description="Not authorized.", schema=error_response_schema),
+            500: openapi.Response(description="Internal server error.", schema=error_response_schema),
         },
     )
     def delete(self, request: Any) -> Response:
-        """
-        Delete the authenticated user's account.
-
-        Returns:
-            - 204: Successfully deleted user account.
-            - 403: User is not authorized to perform this action.
-            - 500: Internal server error.
-        """
         try:
-            user = request.user  # Get authenticated user
-            CustomUser.objects.filter(id=user.id).delete()
-            # Return 204 No Content without a response body.
+            CustomUser.objects.filter(id=request.user.id).delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
         except Exception as e:
             logger.error("Error deleting user account: %s", str(e), exc_info=True)
@@ -493,153 +363,95 @@ class UserDeleteView(APIView):
             )
 
 
+
 class TokenVerificationView(APIView):
     """
     API endpoint to verify user tokens and resend new tokens.
-    
-    Methods:
-        - GET: Verify a user token using email and token parameters.
-        - PUT: Resend a new token if expired or forced.
     """
-    permission_classes: list[Any] = [AllowAny]
+    parser_classes = [JSONParser, MultiPartParser]
+    permission_classes = [AllowAny]
 
     @swagger_auto_schema(
         operation_summary="Verify a user token",
-        operation_description="Verify a token associated with a user's email.",
         manual_parameters=[
-            openapi.Parameter("email", openapi.IN_QUERY, description="User's email address", type=openapi.TYPE_STRING, required=True),
-            openapi.Parameter("token", openapi.IN_QUERY, description="Token to verify", type=openapi.TYPE_STRING, required=True),
+            openapi.Parameter("email", openapi.IN_QUERY, type=openapi.TYPE_STRING, required=True),
+            openapi.Parameter("token", openapi.IN_QUERY, type=openapi.TYPE_STRING, required=True),
         ],
         responses={
-            200: openapi.Response("Token verified successfully", examples={"application/json": {"message": "Token verified successfully."}}),
-            400: openapi.Response("Token expired or already used", examples={"application/json": {"error": "Token has expired."}}),
-            404: openapi.Response("Invalid email or token", examples={"application/json": {"error": "Invalid email or token."}}),
+            200: openapi.Response("Token verified successfully."),
+            400: openapi.Response("Token expired or used."),
+            404: openapi.Response("Invalid email or token."),
         },
     )
     def get(self, request: Any) -> Response:
-        """
-        Verify a user token.
-        """
         try:
-            email: str | None = request.query_params.get("email")
-            token: str | None = request.query_params.get("token")
-            
+            email = request.query_params.get("email")
+            token = request.query_params.get("token")
             if not email or not token:
-                return Response(
-                    {"error": "Email and token are required."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            # Fetch the verification instance; get_object_or_404 will raise Http404 if not found.
-            verification = get_object_or_404(ProfileVerification, user__email=email, token=token)
-            
+                return Response({"error":"Email and token are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+            verification = ProfileVerification.objects.filter(user__email=email, token=token).first()
+            if not verification:
+                return Response({"error":"Invalid email or token."}, status=status.HTTP_404_NOT_FOUND)
             if verification.used:
-                return Response(
-                    {"error": "Token has already been used."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
+                return Response({"error":"Token has already been used."}, status=status.HTTP_400_BAD_REQUEST)
             if verification.is_expired():
-                return Response(
-                    {"error": "Token has expired."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
+                return Response({"error":"Token has expired."}, status=status.HTTP_400_BAD_REQUEST)
+
             verification.mark_as_used()
             verification.user.activated_profile = True
             verification.user.save()
-            return Response(
-                {"message": "Token verified successfully."},
-                status=status.HTTP_200_OK
-            )
-        except Http404:
-            return Response(
-                {"error": "Invalid email or token."},
-                status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"message":"Token verified successfully."}, status=status.HTTP_200_OK)
+
         except Exception as e:
             logger.error("Error verifying token: %s", str(e), exc_info=True)
-            return Response(
-                {"error": "An unexpected error occurred.", "details": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"error":"An unexpected error occurred.","details":str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @swagger_auto_schema(
         operation_summary="Resend a new token",
-        operation_description="Resend a new token if expired or forced.",
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             properties={
-                "email": openapi.Schema(type=openapi.TYPE_STRING, description="User's email address"),
-                "force_resend": openapi.Schema(type=openapi.TYPE_BOOLEAN, description="Force resend a new token", default=False),
+                "email": openapi.Schema(type=openapi.TYPE_STRING),
+                "force_resend": openapi.Schema(type=openapi.TYPE_BOOLEAN, default=False),
             },
             required=["email"]
         ),
         responses={
-            200: openapi.Response("New token sent successfully", examples={"application/json": {"message": "New token sent successfully."}}),
-            400: openapi.Response("Invalid email format", examples={"application/json": {"error": "Invalid email format."}}),
-            404: openapi.Response("User not found", examples={"application/json": {"error": "User with the given email not found."}}),
+            200: openapi.Response("New token sent successfully."),
+            400: openapi.Response("Invalid email format."),
+            404: openapi.Response("User not found."),
         },
     )
     def put(self, request: Any) -> Response:
-        """
-        Resend a new token if expired or forced.
-
-        Args:
-            request (Request): The HTTP request containing the email and optional force_resend flag.
-
-        Returns:
-            Response: JSON response indicating success or failure.
-        """
         try:
-            email = request.data.get("email")
-            force_resend = request.data.get("force_resend", False)
+            raw = request.data.copy()
+            data = self._coerce_nested(raw) if hasattr(self, '_coerce_nested') else raw
+
+            email = data.get("email")
+            force = data.get("force_resend", False)
 
             if not email:
-                return Response(
-                    {"error": "Email is required."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                return Response({"error":"Email is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Convert force_resend to boolean (handles "true"/"false" strings)
-            force_resend = str(force_resend).lower() in ["true", "1"]
-
-            # Validate email format
             try:
                 validate_email(email)
             except ValidationError:
-                return Response(
-                    {"error": "Invalid email format."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                return Response({"error":"Invalid email format."}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Fetch verification instance
-            verification = get_object_or_404(ProfileVerification, user__email=email)
+            verification = ProfileVerification.objects.filter(user__email=email).first()
+            if not verification:
+                return Response({"error":"User with the given email not found."}, status=status.HTTP_404_NOT_FOUND)
 
-            # Resend token based on force_resend or expiration status
-            if force_resend or (verification.is_expired() and not verification.used):
-                verification.resend_new_token(force_resend=force_resend)  # ✅ Pass force_resend
-                return Response(
-                    {"message": "New token sent successfully."},
-                    status=status.HTTP_200_OK
-                )
+            if force or (verification.is_expired() and not verification.used):
+                verification.resend_new_token(force_resend=force)
+                return Response({"message":"New token sent successfully."}, status=status.HTTP_200_OK)
 
-            return Response(
-                {"message": "Current token is still valid."},
-                status=status.HTTP_200_OK
-            )
+            return Response({"message":"Current token is still valid."}, status=status.HTTP_200_OK)
 
-        except Http404:
-            return Response(
-                {"error": "User with the given email not found."},
-                status=status.HTTP_404_NOT_FOUND
-            )
         except Exception as e:
             logger.error("Unexpected error in token resend: %s", str(e), exc_info=True)
-            return Response(
-                {"error": "An unexpected error occurred.", "details": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"error":"An unexpected error occurred.","details":str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class UserProfileBulkView(APIView):

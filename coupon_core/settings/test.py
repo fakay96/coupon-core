@@ -43,42 +43,23 @@ DEBUG = False
 # Secret Key
 SECRET_KEY = "test-secret-key-for-testing-only"
 
-# Set GDAL library path
-GDAL_LIBRARY_PATH = '/usr/local/Cellar/gdal/3.10.2_3/lib/libgdal.dylib'
-
-# Use PostgreSQL with PostGIS for testing
+# Use Spatialite for testing
 DATABASES = {
     'default': {
-        'ENGINE': 'django.contrib.gis.db.backends.postgis',
-        'NAME': 'coupon_db',
-        'USER': os.getenv('DB_USER', 'coupon_admin'),
-        'PASSWORD': os.getenv('DB_PASSWORD', 'S3cureP@ssw0rd'),
-        'HOST': os.getenv('DB_HOST', 'localhost'),
-        'PORT': os.getenv('DB_PORT', '5432'),
+        'ENGINE': 'django.contrib.gis.db.backends.spatialite',
+        'NAME': ':memory:'
     },
     'authentication_shard': {
-        'ENGINE': 'django.contrib.gis.db.backends.postgis',
-        'NAME': 'authentication_shard',
-        'USER': os.getenv('DB_USER', 'coupon_admin'),
-        'PASSWORD': os.getenv('DB_PASSWORD', 'S3cureP@ssw0rd'),
-        'HOST': os.getenv('DB_HOST', 'localhost'),
-        'PORT': os.getenv('DB_PORT', '5432'),
+        'ENGINE': 'django.contrib.gis.db.backends.spatialite',
+        'NAME': ':memory:'
     },
     'geodiscounts_db': {
-        'ENGINE': 'django.contrib.gis.db.backends.postgis',
-        'NAME': 'geodiscounts_db',
-        'USER': os.getenv('DB_USER', 'coupon_admin'),
-        'PASSWORD': os.getenv('DB_PASSWORD', 'S3cureP@ssw0rd'),
-        'HOST': os.getenv('DB_HOST', 'localhost'),
-        'PORT': os.getenv('DB_PORT', '5432'),
+        'ENGINE': 'django.contrib.gis.db.backends.spatialite',
+        'NAME': ':memory:'
     },
     'vector_db': {
-        'ENGINE': 'django.contrib.gis.db.backends.postgis',
-        'NAME': 'vector_db',
-        'USER': os.getenv('DB_USER', 'coupon_admin'),
-        'PASSWORD': os.getenv('DB_PASSWORD', 'S3cureP@ssw0rd'),
-        'HOST': os.getenv('DB_HOST', 'localhost'),
-        'PORT': os.getenv('DB_PORT', '5432'),
+        'ENGINE': 'django.contrib.gis.db.backends.spatialite',
+        'NAME': ':memory:'
     }
 }
 
@@ -169,15 +150,20 @@ STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 # Allow all hosts during tests
 ALLOWED_HOSTS = ['*']
 
-# Test-specific settings
-TEST_RUNNER = 'django.test.runner.DiscoverRunner'
-TEST_OUTPUT_DIR = os.path.join(BASE_DIR, 'test_reports')
+# Add missing settings
+FRONTEND_DOMAIN_NAME = 'http://localhost:3000'
+BASE_DOMAIN = 'http://localhost:8000'
+AUTH_SERVICE_URL = 'http://localhost:8000'
 
-# Create test reports directory if it doesn't exist
-os.makedirs(TEST_OUTPUT_DIR, exist_ok=True)
+# Celery Configuration
+CELERY_BROKER_URL = 'memory://'
+CELERY_RESULT_BACKEND = 'cache+memory://'
+CELERY_TASK_ALWAYS_EAGER = True
+CELERY_TASK_EAGER_PROPAGATES = True
 
-# Required for spatialite
-SPATIALITE_LIBRARY_PATH = 'mod_spatialite'
+# Disable Celery task execution during tests
+CELERY_TASK_ALWAYS_EAGER = True
+CELERY_TASK_EAGER_PROPAGATES = True
 
-# CORS Configuration
-CORS_ALLOW_ALL_ORIGINS = True 
+# Mock email backend
+EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend' 

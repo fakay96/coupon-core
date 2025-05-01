@@ -2,25 +2,177 @@
 Test cases for authentication views.
 
 This module tests:
-1. User profile views
-2. Profile update operations
-3. Profile preferences
-4. Profile image handling
+1. View responses
+2. Authentication flows
+3. Error handling
+4. Edge cases
 """
 
-from django.test import TestCase
+from django.test import TestCase, Client
 from django.urls import reverse
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
 from django.contrib.auth import get_user_model
-from authentication.models import UserProfile
+from authentication.models import UserProfile, PasswordResetRequest
 import json
 import tempfile
 from PIL import Image
 import io
+from django.utils import timezone
 
 User = get_user_model()
+
+class AuthenticationViewsTestCase(TestCase):
+    """Test suite for authentication views."""
+
+    def setUp(self):
+        """Set up test data."""
+        self.client = APIClient()
+        self.user_data = {
+            'username': 'testuser',
+            'email': 'test@example.com',
+            'password': 'TestPass123!'
+        }
+        self.user = User.objects.create_user(**self.user_data)
+        self.client.force_authenticate(user=self.user)
+
+    def test_register_view(self):
+        """Test user registration."""
+        url = reverse('auth:register')
+        data = {
+            'username': 'newuser',
+            'email': 'new@example.com',
+            'password': 'NewPass123!'
+        }
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(User.objects.filter(username='newuser').exists())
+
+    def test_login_view(self):
+        """Test user login."""
+        url = reverse('auth:login')
+        data = {
+            'email': 'test@example.com',
+            'password': 'TestPass123!'
+        }
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('token', response.data)
+
+    def test_logout_view(self):
+        """Test user logout."""
+        url = reverse('auth:logout')
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_password_reset_request(self):
+        """Test password reset request."""
+        url = reverse('auth:password-reset-request')
+        data = {'email': 'test@example.com'}
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(PasswordResetRequest.objects.filter(user=self.user).exists())
+
+    def test_password_reset_confirm(self):
+        """Test password reset confirmation."""
+        # Create password reset request
+        reset_request = PasswordResetRequest.objects.create(user=self.user)
+        url = reverse('auth:password-reset-confirm', args=[reset_request.token])
+        data = {'password': 'NewPass123!'}
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password('NewPass123!'))
+
+    def test_guest_token_view(self):
+        """Test guest token generation."""
+        url = reverse('auth:guest-token')
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIn('token', response.data)
+        self.assertIn('user_id', response.data)
+
+    def test_invalid_login(self):
+        """Test login with invalid credentials."""
+        url = reverse('auth:login')
+        data = {
+            'email': 'test@example.com',
+            'password': 'WrongPass123!'
+        }
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_duplicate_registration(self):
+        """Test registration with existing email."""
+        url = reverse('auth:register')
+        data = {
+            'username': 'anotheruser',
+            'email': 'test@example.com',
+            'password': 'NewPass123!'
+        }
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_invalid_password_reset(self):
+        """Test password reset with invalid token."""
+        url = reverse('auth:password-reset-confirm', args=['invalid-token'])
+        data = {'password': 'NewPass123!'}
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_guest_token_limits(self):
+        """Test guest token usage limits."""
+        url = reverse('auth:guest-token')
+        # Create multiple guest tokens
+        for _ in range(5):
+            response = self.client.post(url)
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        # Verify only one guest user exists
+        self.assertEqual(User.objects.filter(is_guest=True).count(), 1)
+
+    def test_password_reset_request_rate_limit(self):
+        """Test rate limiting for password reset requests."""
+        url = reverse('auth:password-reset-request')
+        data = {'email': 'test@example.com'}
+        
+        # Make multiple requests in quick succession
+        for _ in range(5):
+            response = self.client.post(url, data, format='json')
+        
+        # Sixth request should be rate limited
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+    def test_password_reset_token_expiry(self):
+        """Test password reset token expiry."""
+        # Create password reset request
+        reset_request = PasswordResetRequest.objects.create(user=self.user)
+        
+        # Simulate token expiry
+        reset_request.created_at = timezone.now() - timezone.timedelta(hours=25)
+        reset_request.save()
+        
+        url = reverse('auth:password-reset-confirm', args=[reset_request.token])
+        data = {'password': 'NewPass123!'}
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_guest_token_expiry(self):
+        """Test guest token expiry."""
+        url = reverse('auth:guest-token')
+        response = self.client.post(url)
+        token = response.data['token']
+        
+        # Simulate token expiry
+        guest_user = User.objects.get(id=response.data['user_id'])
+        guest_user.date_joined = timezone.now() - timezone.timedelta(days=2)
+        guest_user.save()
+        
+        # Try to use expired token
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
+        response = self.client.get(reverse('auth:profile'))
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 class UserProfileViewTests(APITestCase):
     """Test cases for user profile views."""
@@ -145,6 +297,46 @@ class UserProfileViewTests(APITestCase):
         response = self.client.patch(self.profile_url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_profile_image_size_limit(self):
+        """Test profile image size limit."""
+        # Create a large image
+        file = io.BytesIO()
+        image = Image.new('RGB', (2000, 2000), 'white')
+        image.save(file, 'PNG')
+        file.seek(0)
+        large_image = SimpleUploadedFile('large.png', file.getvalue(), content_type='image/png')
+        
+        data = {'profile_image': large_image}
+        response = self.client.patch(self.profile_url, data, format='multipart')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_profile_preferences_validation(self):
+        """Test profile preferences validation."""
+        invalid_preferences = [
+            {'theme': 123},  # Invalid theme type
+            {'notifications': 'invalid'},  # Invalid notification type
+            {'language': ['en']}  # Invalid language type
+        ]
+        
+        for prefs in invalid_preferences:
+            data = {'preferences': prefs}
+            response = self.client.patch(self.profile_url, data, format='json')
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_profile_location_validation(self):
+        """Test profile location validation."""
+        invalid_locations = [
+            {'lat': 91, 'lng': 0},  # Invalid latitude
+            {'lat': 0, 'lng': 181},  # Invalid longitude
+            {'lat': 'invalid', 'lng': 0},  # Invalid type
+            {'lat': 0}  # Missing longitude
+        ]
+        
+        for loc in invalid_locations:
+            data = {'location': loc}
+            response = self.client.patch(self.profile_url, data, format='json')
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
 class UserProfileBulkOperationsTestCase(APITestCase):
     """Test suite for bulk profile operations."""
 
@@ -220,4 +412,36 @@ class UserProfileBulkOperationsTestCase(APITestCase):
         self.client.force_authenticate(user=regular_user)
         
         response = self.client.post(self.bulk_url, {'user_ids': []}, format='json')
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN) 
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_bulk_update_validation(self):
+        """Test validation in bulk updates."""
+        invalid_updates = [
+            {
+                'user_id': self.users[0].id,
+                'preferences': 'invalid'  # Invalid preferences format
+            },
+            {
+                'user_id': self.users[1].id,
+                'location': {'lat': 91, 'lng': 0}  # Invalid location
+            }
+        ]
+        response = self.client.patch(self.bulk_url, {'updates': invalid_updates}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_bulk_operation_partial_success(self):
+        """Test partial success in bulk operations."""
+        updates = [
+            {
+                'user_id': self.users[0].id,
+                'bio': 'Valid bio'
+            },
+            {
+                'user_id': 999999,  # Non-existent user
+                'bio': 'Invalid bio'
+            }
+        ]
+        response = self.client.patch(self.bulk_url, {'updates': updates}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_207_MULTI_STATUS)
+        self.assertTrue(any(r['status'] == 'error' for r in response.data))
+        self.assertTrue(any(r['status'] == 'success' for r in response.data)) 

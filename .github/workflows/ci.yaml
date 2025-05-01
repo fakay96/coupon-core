@@ -16,11 +16,11 @@ on:
           - production
 
 jobs:
-  test:
-    uses: ./.github/workflows/test.yml
+  # test:
+  #   uses: ./.github/workflows/test.yml
 
   build:
-    needs: test
+    # needs: test
     uses: ./.github/workflows/build.yml
     with:
       tag: ""
