@@ -144,7 +144,7 @@ jobs:
         run: |
           kubectl get endpoints coupon-service -n $NAMESPACE || echo "Backend service endpoint not found!"
           kubectl get endpoints frontend -n $NAMESPACE || echo "Frontend service endpoint not found!"
-          kubectl get endpoints inference -n $NAMESPACE || echo "Inference service endpoint not found!"
+          # kubectl get endpoints inference -n $NAMESPACE || echo "Inference service endpoint not found!"
           kubectl get endpoints crawler -n $NAMESPACE || echo "Crawler service endpoint not found!"
 
       - name: Debug pod logs on failure
@@ -153,7 +153,7 @@ jobs:
           echo "Fetching logs for failed pods..."
           kubectl logs -l app=backend -n $NAMESPACE || echo "No logs found for backend"
           kubectl logs -l app=frontend -n $NAMESPACE || echo "No logs found for frontend"
-          kubectl logs -l app=inference -n $NAMESPACE || echo "No logs found for inference"
+          # kubectl logs -l app=inference -n $NAMESPACE || echo "No logs found for inference"
           kubectl logs -l app=crawler -n $NAMESPACE || echo "No logs found for crawler"
 
       - name: Rollback on failure
@@ -162,10 +162,10 @@ jobs:
           echo "Rolling back deployments..."
           LAST_BACKEND_REVISION=$(helm history coupon-service -n $NAMESPACE | tail -n 2 | head -n 1 | awk '{print $1}')
           LAST_FRONTEND_REVISION=$(helm history frontend -n $NAMESPACE | tail -n 2 | head -n 1 | awk '{print $1}')
-          LAST_INFERENCE_REVISION=$(helm history inference -n $NAMESPACE | tail -n 2 | head -n 1 | awk '{print $1}')
+          # LAST_INFERENCE_REVISION=$(helm history inference -n $NAMESPACE | tail -n 2 | head -n 1 | awk '{print $1}')
           LAST_CRAWLER_REVISION=$(helm history crawler -n $NAMESPACE | tail -n 2 | head -n 1 | awk '{print $1}')
           
           helm rollback coupon-service $LAST_BACKEND_REVISION -n $NAMESPACE || echo "Failed to rollback backend"
           helm rollback frontend $LAST_FRONTEND_REVISION -n $NAMESPACE || echo "Failed to rollback frontend"
-          helm rollback inference $LAST_INFERENCE_REVISION -n $NAMESPACE || echo "Failed to rollback inference"
+          # helm rollback inference $LAST_INFERENCE_REVISION -n $NAMESPACE || echo "Failed to rollback inference"
           helm rollback crawler $LAST_CRAWLER_REVISION -n $NAMESPACE || echo "Failed to rollback crawler"
