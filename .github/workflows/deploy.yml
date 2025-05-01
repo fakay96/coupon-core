@@ -117,16 +117,16 @@ jobs:
             --atomic --force --cleanup-on-fail --history-max 5 \
             --timeout 5m0s
 
-      - name: Deploy Inference Service
-        run: |
-          helm upgrade --install inference ./k8s/backend \
-            --set inference.enabled=true \
-            --set inference.image.repository=fakay96/coupon-inference \
-            --set inference.image.tag=$VERSION_TAG \
-            --namespace $NAMESPACE --create-namespace \
-            -f ./k8s/backend/values/$NAMESPACE-values.yaml \
-            --atomic --force --cleanup-on-fail --history-max 5 \
-            --timeout 5m0s
+      # - name: Deploy Inference Service
+      #   run: |
+      #     helm upgrade --install inference ./k8s/backend \
+      #       --set inference.enabled=true \
+      #       --set inference.image.repository=fakay96/coupon-inference \
+      #       --set inference.image.tag=$VERSION_TAG \
+      #       --namespace $NAMESPACE --create-namespace \
+      #       -f ./k8s/backend/values/$NAMESPACE-values.yaml \
+      #       --atomic --force --cleanup-on-fail --history-max 5 \
+      #       --timeout 5m0s
 
       - name: Deploy Crawler
         run: |
