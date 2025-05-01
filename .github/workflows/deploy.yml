@@ -143,7 +143,6 @@ jobs:
           echo "Fetching logs for failed pods..."
           kubectl logs -l app=backend -n $NAMESPACE || echo "No logs found for backend"
           kubectl logs -l app=frontend -n $NAMESPACE || echo "No logs found for frontend"
-          # kubectl logs -l app=inference -n $NAMESPACE || echo "No logs found for inference"
           kubectl logs -l app=crawler -n $NAMESPACE || echo "No logs found for crawler"
 
       - name: Rollback on failure
