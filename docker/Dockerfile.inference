@@ -9,12 +9,8 @@ WORKDIR /app
 RUN mkdir -p /app/discountcrawlers/{agents,config} /app/logs
 COPY --from=builder /install /usr/local
 COPY discountcrawlers/discountcrawlers/__init__.py           /app/discountcrawlers/
-COPY discountcrawlers/discountcrawlers/settings.py            /app/discountcrawlers/
 COPY discountcrawlers/discountcrawlers/config/                /app/discountcrawlers/config/
 COPY discountcrawlers/discountcrawlers/agents/                /app/discountcrawlers/agents/
-ENV PYTHONPATH=/app
-ENV DJANGO_SETTINGS_MODULE=discountcrawlers.settings
-ENV REDIS_HOST=redis
-ENV REDIS_PORT=6379
-ENV REDIS_DB=0
+COPY discountcrawlers/discountcrawlers/services/               /app/discountcrawlers/services/
+COPY discountcrawlers/discountcrawlers/utils/                 /app/discountcrawlers/utils/
 CMD ["python", "-m", "discountcrawlers.agents.coordinator_agent"]
