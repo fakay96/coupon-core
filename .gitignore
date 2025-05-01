@@ -32,3 +32,4 @@ req.txt
 .txt
 .cache
 venv/
+.xm/
