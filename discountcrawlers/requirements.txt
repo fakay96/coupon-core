@@ -16,15 +16,5 @@ google-cloud-storage>=2.14.0  # For GCS operations
 google-auth>=2.27.0  # For authentication
 google-api-core>=2.18.0  # Core Google API client library
 
-# Vector search
-faiss-cpu>=1.7.4  # For vector similarity search
-scikit-learn>=1.4.0  # For text processing and clustering
-
-# Embedding and NLP
-sentence-transformers>=2.5.1
-torch>=2.2.0
-transformers>=4.38.0
-spacy>=3.7.2  # For text processing
-nltk>=3.8.1  # For text processing
 
 
