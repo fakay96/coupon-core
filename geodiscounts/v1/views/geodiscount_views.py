@@ -558,8 +558,8 @@ class SearchDiscountsView(APIView):
             
         # Validate location
         try:
-            latitude = float(request.data.get('latitude'))
-            longitude = float(request.data.get('longitude'))
+            latitude = float(request.client_latitude)
+            longitude = float(request.client_longitude)
             radius = float(request.data.get('radius', 5000))  # Default 5km
         except (TypeError, ValueError) as e:
             geo_structured_logger.error(
