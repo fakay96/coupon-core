@@ -21,6 +21,13 @@ frontend:
     apiUrl: "http://api.dev.example.com"
     environment: "development"
 
+ingress:
+  className: nginx
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  tls:
+    secretName: frontend-tls
 
 autoscaling:
   enabled: false
