@@ -22,7 +22,7 @@ class CategorySerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Category
-        fields = ['id', 'name', 'description', 'image', 'created_at', 'updated_at']
+        fields = ['id', 'name', 'image']
         read_only_fields = ['created_at', 'updated_at']
 
     def validate_name(self, value: str) -> str:
