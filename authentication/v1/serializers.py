@@ -485,113 +485,95 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
 class PasswordResetSerializer(serializers.Serializer):
     """
-    Serializer for password reset requests.
+    Serializer for handling password reset requests.
 
-    Handles validation of email and sending a password reset email.
+    This serializer validates the provided email address, enforces a rate limit
+    on how frequently a password reset can be requested for the same account,
+    and then creates a PasswordResetRequest record and enqueues a background task
+    to send the reset email.
+
+    Fields:
+        email (str): The user's email address.
+
+    Raises:
+        serializers.ValidationError: On invalid email format, account not activated,
+            or rate limit exceeded.
     """
+
     email = serializers.EmailField(
         required=True,
-        allow_blank=False,
         error_messages={
-            'required': 'Please enter your email address.',
-            'blank': 'Please enter your email address.',
-            'invalid': 'Please enter a valid email address.'
+            'required': _('Please enter your email address.'),
+            'blank': _('Please enter your email address.'),
+            'invalid': _('Please enter a valid email address.'),
         }
     )
-    RATE_LIMIT_MINUTES = 10  # Time window for rate limiting in minutes
+    RATE_LIMIT_MINUTES = 10
 
     def validate_email(self, value: str) -> str:
         """
-        Validate the email address and check rate limits.
+        Validate the email address and enforce rate limiting.
 
         Args:
-            value (str): Email to validate.
+            value (str): The email address to validate.
 
         Returns:
-            str: Validated email.
+            str: The normalized (lowercased) email address.
 
         Raises:
-            serializers.ValidationError: If email is invalid or rate limit is exceeded.
+            serializers.ValidationError: If the email format is invalid,
+                the user’s account is not activated, or a recent reset request
+                already exists within the rate limit window.
         """
-        try:
-            local_part, domain = value.split('@')
-            if not local_part or not domain:
-                raise serializers.ValidationError(_("Please enter a valid email address."))
-            
-            if '.' not in domain:
-                raise serializers.ValidationError(_("Please enter a valid email address."))
-        except ValueError:
-            raise serializers.ValidationError(_("Please enter a valid email address."))
-
         value = value.lower()
 
+        # Ensure user exists without revealing existence
         try:
             user = CustomUser.objects.get(email=value)
-            
-            # Check if there's a recent password reset request
-            recent_request = PasswordResetRequest.objects.filter(
-                user=user,
-                created_at__gte=timezone.now() - timezone.timedelta(minutes=self.RATE_LIMIT_MINUTES),
-                used=False
-            ).exists()
-
-            if recent_request:
-                raise serializers.ValidationError(_("Please wait before requesting another password reset."))
-
         except CustomUser.DoesNotExist:
-            # Don't reveal user existence
-            pass
+            return value
+
+        # Account activation check
+        if not user.activated_profile:
+            raise serializers.ValidationError(
+                _('Please activate your account before resetting your password.')
+            )
+
+        # Rate-limit check
+        cutoff = timezone.now() - timezone.timedelta(minutes=self.RATE_LIMIT_MINUTES)
+        if PasswordResetRequest.objects.filter(
+            user=user, created_at__gte=cutoff, used=False
+        ).exists():
+            raise serializers.ValidationError(
+                _('Please wait before requesting another password reset.')
+            )
 
         return value
 
-    def validate(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Validate the data and ensure email is present.
-
-        Args:
-            data (Dict[str, Any]): The data to validate.
-
-        Returns:
-            Dict[str, Any]: The validated data.
-
-        Raises:
-            serializers.ValidationError: If validation fails.
-        """
-        email = data.get('email')
-        if not email:
-            raise serializers.ValidationError({
-                'email': [_("Please enter your email address.")]
-            })
-
-        # Validate email format and rate limit
-        try:
-            email = self.validate_email(email)
-        except serializers.ValidationError as e:
-            raise serializers.ValidationError({
-                'email': e.detail
-            })
-
-        data['email'] = email
-        return data
-
     def save(self) -> None:
         """
-        Create a password reset request and send the reset email.
+        Create a password reset request and enqueue the email task.
+
+        Uses the validated email to look up the user, creates a new
+        PasswordResetRequest with a unique token and expiry, and dispatches
+        a background task to send the reset email.
+
+        Side Effects:
+            - Inserts a PasswordResetRequest record.
+            - Calls send_password_reset_email_task.delay().
         """
-        email = self.validated_data["email"]
+        email = self.validated_data['email']
+
         try:
             user = CustomUser.objects.get(email=email)
-            # Create a new password reset request with a fresh token and expiration
-            reset_request = PasswordResetRequest.objects.create(
-                user=user,
-                token=uuid.uuid4(),
-                created_at=timezone.now(),
-                expires_at=timezone.now() + timezone.timedelta(minutes=10),
-                used=False,
-            )
-            from authentication.v1.tasks.verification_task import send_password_reset_email_task
-            send_password_reset_email_task.delay(email, str(reset_request.token))
         except CustomUser.DoesNotExist:
-            # Don't reveal user existence
-            pass
+            # Do not reveal that the user does not exist
+            return
 
+        reset_request = PasswordResetRequest.objects.create(
+            user=user,
+            token=uuid.uuid4(),
+            expires_at=timezone.now() + timezone.timedelta(minutes=10),
+            used=False
+        )
+        user.send_password_reset_email()
