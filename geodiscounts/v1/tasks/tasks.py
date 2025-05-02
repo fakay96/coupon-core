@@ -7,6 +7,7 @@ This module defines background tasks for:
 3. Analytics updates
 4. Location processing
 5. Merchant synchronization
+6. WebSocket request handling
 """
 
 from celery import shared_task
@@ -15,13 +16,20 @@ from django.db import transaction
 from django.core.mail import send_mail
 from django.conf import settings
 import logging
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
+from django.contrib.gis.geos import Point
+import json
+from coupon_core.utils.logging import celery_logger, celery_structured_logger, log_execution
 
-from geodiscounts.models import Discount, Location, Retailer
+from geodiscounts.models import Discount, Location, Retailer, WebSocketDiscountRequest
+from geodiscounts.v1.services.discount_crawler_service import DiscountCrawlerService
+from geodiscounts.v1.utils.event_bus import EventBus
 
 logger = logging.getLogger(__name__)
+event_bus = EventBus()
 
 @shared_task(bind=True, max_retries=3)
+@log_execution(celery_logger, 'cleanup_expired_discounts')
 def cleanup_expired_discounts(self) -> None:
     """
     Clean up expired discounts by deactivating them.
@@ -39,10 +47,20 @@ def cleanup_expired_discounts(self) -> None:
             )
             
             count = expired_discounts.update(is_active=False)
-            logger.info(f"Deactivated {count} expired discounts")
+            celery_structured_logger.info(
+                celery_logger,
+                f"Deactivated {count} expired discounts",
+                "cleanup_expired_discounts",
+                {'count': count}
+            )
             
     except Exception as e:
-        logger.error(f"Error cleaning up expired discounts: {str(e)}")
+        celery_structured_logger.error(
+            celery_logger,
+            "Error cleaning up expired discounts",
+            "cleanup_expired_discounts",
+            e
+        )
         raise self.retry(exc=e)
 
 @shared_task(bind=True, max_retries=3)
@@ -265,4 +283,213 @@ def sync_with_merchant_api(merchant_id: int) -> List[Dict[str, Any]]:
     """
     # This is a placeholder for actual API integration
     # In a real implementation, this would make API calls to the merchant's system
-    return [] 
+    return []
+
+@shared_task(bind=True, max_retries=3)
+@log_execution(celery_logger, 'publish_discount_request')
+def publish_discount_request(
+    self,
+    request_id: str,
+    user_id: int,
+    latitude: float,
+    longitude: float,
+    radius: float,
+    category_id: Optional[int] = None,
+    conversation_history: Optional[list] = None
+) -> None:
+    """
+    Publish a discount request to the crawler service.
+    
+    Args:
+        request_id: UUID of the WebSocketDiscountRequest
+        user_id: ID of the user making the request
+        latitude: Latitude of the search location
+        longitude: Longitude of the search location
+        radius: Search radius in meters
+        category_id: Optional category ID to filter results
+        conversation_history: Optional list of conversation messages
+        
+    Raises:
+        WebSocketDiscountRequest.DoesNotExist: If request not found
+        Exception: For other errors during publishing
+    """
+    try:
+        # Create Point object for location
+        location = Point(longitude, latitude)
+        
+        # Get request object
+        request = WebSocketDiscountRequest.objects.get(request_id=request_id)
+        
+        # Update request status
+        request.status = "processing"
+        request.save()
+        
+        # Prepare event payload
+        event = {
+            "request_id": str(request_id),
+            "user_id": user_id,
+            "location": {
+                "latitude": latitude,
+                "longitude": longitude
+            },
+            "radius": radius,
+            "category_id": category_id,
+            "conversation_history": conversation_history or []
+        }
+        
+        # Publish event to crawler service
+        event_bus.publish("discount_requests", event)
+        celery_structured_logger.info(
+            celery_logger,
+            "Published discount request to crawler service",
+            "publish_discount_request",
+            {
+                'request_id': request_id,
+                'user_id': user_id,
+                'location': {'latitude': latitude, 'longitude': longitude},
+                'radius': radius
+            }
+        )
+        
+    except WebSocketDiscountRequest.DoesNotExist:
+        celery_structured_logger.error(
+            celery_logger,
+            "WebSocketDiscountRequest not found",
+            "publish_discount_request",
+            None,
+            {'request_id': request_id}
+        )
+        raise
+    except Exception as e:
+        celery_structured_logger.error(
+            celery_logger,
+            "Error publishing discount request",
+            "publish_discount_request",
+            e,
+            {
+                'request_id': request_id,
+                'user_id': user_id,
+                'location': {'latitude': latitude, 'longitude': longitude},
+                'radius': radius
+            }
+        )
+        raise self.retry(exc=e)
+
+@shared_task
+@log_execution(celery_logger, 'handle_websocket_url_callback')
+def handle_websocket_url_callback(request_id: str, websocket_url: str) -> None:
+    """
+    Handle callback from crawler service with WebSocket URL.
+    
+    Args:
+        request_id: UUID of the WebSocketDiscountRequest
+        websocket_url: URL for WebSocket connection
+        
+    Raises:
+        WebSocketDiscountRequest.DoesNotExist: If request not found
+    """
+    try:
+        request = WebSocketDiscountRequest.objects.get(request_id=request_id)
+        request.websocket_url = websocket_url
+        request.status = "ready"
+        request.save()
+        celery_structured_logger.info(
+            celery_logger,
+            "Updated WebSocket URL for request",
+            "handle_websocket_url_callback",
+            {
+                'request_id': request_id,
+                'status': 'ready'
+            }
+        )
+    except WebSocketDiscountRequest.DoesNotExist:
+        celery_structured_logger.error(
+            celery_logger,
+            "WebSocketDiscountRequest not found",
+            "handle_websocket_url_callback",
+            None,
+            {'request_id': request_id}
+        )
+        raise
+    except Exception as e:
+        celery_structured_logger.error(
+            celery_logger,
+            "Error updating WebSocket URL",
+            "handle_websocket_url_callback",
+            e,
+            {
+                'request_id': request_id,
+                'websocket_url': websocket_url
+            }
+        )
+        raise
+
+@shared_task
+@log_execution(celery_logger, 'handle_discount_results')
+def handle_discount_results(request_id: str, results: List[Dict[str, Any]]) -> None:
+    """
+    Handle discount results from the crawler service.
+    
+    Args:
+        request_id: UUID of the WebSocketDiscountRequest
+        results: List of discount results
+        
+    Raises:
+        WebSocketDiscountRequest.DoesNotExist: If request not found
+    """
+    try:
+        request = WebSocketDiscountRequest.objects.get(request_id=request_id)
+        request.results = results
+        request.status = "completed"
+        request.save()
+        celery_structured_logger.info(
+            celery_logger,
+            "Updated results for request",
+            "handle_discount_results",
+            {
+                'request_id': request_id,
+                'status': 'completed',
+                'result_count': len(results)
+            }
+        )
+    except WebSocketDiscountRequest.DoesNotExist:
+        celery_structured_logger.error(
+            celery_logger,
+            "WebSocketDiscountRequest not found",
+            "handle_discount_results",
+            None,
+            {'request_id': request_id}
+        )
+        raise
+    except Exception as e:
+        celery_structured_logger.error(
+            celery_logger,
+            "Error updating results",
+            "handle_discount_results",
+            e,
+            {
+                'request_id': request_id,
+                'result_count': len(results)
+            }
+        )
+        raise
+
+# Subscribe to websocket_url callbacks
+def websocket_url_callback(event: Dict[str, Any]) -> None:
+    """Handle websocket_url callback events."""
+    request_id = event.get("request_id")
+    websocket_url = event.get("websocket_url")
+    if request_id and websocket_url:
+        handle_websocket_url_callback.delay(request_id, websocket_url)
+
+# Subscribe to discount results
+def discount_results_callback(event: Dict[str, Any]) -> None:
+    """Handle discount results events."""
+    request_id = event.get("request_id")
+    results = event.get("results")
+    if request_id and results:
+        handle_discount_results.delay(request_id, results)
+
+# Subscribe to both callbacks
+event_bus.subscribe("websocket_url_callbacks", websocket_url_callback)
+event_bus.subscribe("discount_results", discount_results_callback) 

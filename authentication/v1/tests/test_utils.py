@@ -114,10 +114,11 @@ class TokenManagerTestCase(TestCase):
             self.token_manager.verify_token("invalid_token")
 
 
+
 class RedisClientTestCase(TestCase):
     """Test suite for RedisClient utility."""
 
-    databases = {'default', 'authentication_shard'}  # Specify required databases
+    databases = {'default', 'authentication_shard'} 
 
     def setUp(self) -> None:
         """Set up test data."""
@@ -125,127 +126,160 @@ class RedisClientTestCase(TestCase):
         self.test_value = "test_value"
         self.redis_client = RedisClient()
 
-    @patch('authentication.v1.utils.redis_client.redis.StrictRedis')
     @patch('authentication.v1.utils.redis_client.cache')
-    def test_set_token(self, mock_cache, mock_redis) -> None:
+    def test_set_token(self, mock_cache) -> None:
         """
-        Test setting a token in Redis.
+        Test setting a token in Redis and in the Django‐cache fallback.
 
         Validates:
-            - Token is set successfully
-            - Expiration time is set correctly
-            - Redis errors are handled properly
+            - Redis path returns True on success
+            - Cache path returns True on success
+            - On RedisError + cache.set=False, returns False
         """
-        # Test with Redis
-        mock_instance = mock_redis.return_value
-        mock_instance.setex.return_value = True
-        result = self.redis_client.set_token(
-            self.test_key,
-            self.test_value,
-            3600
-        )
-        self.assertTrue(result)
+        fake_redis = MagicMock()
 
-        # Test with Django cache
+        # --- Redis branch ---
+        self.redis_client.use_django_cache = False
+        self.redis_client.client = fake_redis
+        fake_redis.setex.return_value = True
+        self.assertTrue(
+            self.redis_client.set_token(self.test_key, self.test_value, 3600)
+        )
+
+        # --- Django cache branch ---
         self.redis_client.use_django_cache = True
+        self.redis_client.client = mock_cache
         mock_cache.set.return_value = True
-        result = self.redis_client.set_token(
-            self.test_key,
-            self.test_value,
-            3600
+        self.assertTrue(
+            self.redis_client.set_token(self.test_key, self.test_value, 3600)
         )
-        self.assertTrue(result)
 
-        # Test Redis error
+        # --- Redis error + cache fallback failure ---
         self.redis_client.use_django_cache = False
-        mock_instance.setex.side_effect = RedisError()
-        result = self.redis_client.set_token(
-            self.test_key,
-            self.test_value,
-            3600
-        )
-        self.assertFalse(result)
-
-    @patch('authentication.v1.utils.redis_client.redis.StrictRedis')
-    @patch('authentication.v1.utils.redis_client.cache')
-    def test_get_token(self, mock_cache, mock_redis) -> None:
-        """
-        Test retrieving a token from Redis.
-
-        Validates:
-            - Existing token is retrieved successfully
-            - Non-existent token returns None
-            - Redis errors are handled properly
-        """
-        # Test with Redis
-        mock_instance = mock_redis.return_value
-        mock_instance.get.return_value = self.test_value
-        result = self.redis_client.get_token(self.test_key)
-        self.assertEqual(result, self.test_value)
-
-        # Test with Django cache
-        self.redis_client.use_django_cache = True
-        mock_cache.get.return_value = self.test_value
-        result = self.redis_client.get_token(self.test_key)
-        self.assertEqual(result, self.test_value)
-
-        # Test non-existent key
-        mock_instance.get.return_value = None
-        result = self.redis_client.get_token("nonexistent_key")
-        self.assertIsNone(result)
-
-        # Test Redis error
-        mock_instance.get.side_effect = RedisError()
-        result = self.redis_client.get_token(self.test_key)
-        self.assertIsNone(result)
-
-    @patch('authentication.v1.utils.redis_client.redis.StrictRedis')
-    @patch('authentication.v1.utils.redis_client.cache')
-    def test_delete_token(self, mock_cache, mock_redis) -> None:
-        """
-        Test deleting a token from Redis.
-
-        Validates:
-            - Token is deleted successfully
-            - Redis errors are handled properly
-        """
-        # Test with Redis
-        mock_instance = mock_redis.return_value
-        mock_instance.delete.return_value = 1
-        result = self.redis_client.delete_token(self.test_key)
-        self.assertTrue(result)
-
-        # Test with Django cache
-        self.redis_client.use_django_cache = True
-        mock_cache.delete.return_value = True
-        result = self.redis_client.delete_token(self.test_key)
-        self.assertTrue(result)
-
-        # Test Redis error
-        self.redis_client.use_django_cache = False
-        mock_instance.delete.side_effect = RedisError()
-        result = self.redis_client.delete_token(self.test_key)
-        self.assertFalse(result)
-
-    @patch('authentication.v1.utils.redis_client.redis.StrictRedis')
-    @patch('authentication.v1.utils.redis_client.cache')
-    def test_connection_error(self, mock_cache, mock_redis) -> None:
-        """
-        Test Redis connection error handling.
-
-        Validates:
-            - Connection errors are handled gracefully
-            - Operations fail safely when Redis is unavailable
-        """
-        mock_redis.side_effect = RedisError()
-
-        # Test all operations with connection error
+        self.redis_client.client = fake_redis
+        fake_redis.setex.side_effect = RedisError()
+        mock_cache.set.return_value = False
         self.assertFalse(
             self.redis_client.set_token(self.test_key, self.test_value, 3600)
         )
-        self.assertIsNone(self.redis_client.get_token(self.test_key))
-        self.assertFalse(self.redis_client.delete_token(self.test_key))
 
+    @patch('authentication.v1.utils.redis_client.cache')
+    def test_get_token(self, mock_cache) -> None:
+        """
+        Test retrieving a token from Redis and from Django cache.
+
+        Validates:
+            - Redis path returns the stored value
+            - Cache path returns the stored value
+            - Non‐existent key returns None
+            - On RedisError + cache.get=None, returns None
+        """
+        fake_redis = MagicMock()
+
+        # --- Redis branch ---
+        self.redis_client.use_django_cache = False
+        self.redis_client.client = fake_redis
+        fake_redis.get.return_value = self.test_value
+        self.assertEqual(
+            self.redis_client.get_token(self.test_key),
+            self.test_value
+        )
+
+        # --- Django cache branch ---
+        self.redis_client.use_django_cache = True
+        self.redis_client.client = mock_cache
+        mock_cache.get.return_value = self.test_value
+        self.assertEqual(
+            self.redis_client.get_token(self.test_key),
+            self.test_value
+        )
+
+        # --- Non‐existent key in Redis ---
+        self.redis_client.use_django_cache = False
+        self.redis_client.client = fake_redis
+        fake_redis.get.return_value = None
+        self.assertIsNone(
+            self.redis_client.get_token("nonexistent_key")
+        )
+
+        # --- RedisError + cache fallback None ---
+        self.redis_client.use_django_cache = False
+        self.redis_client.client = fake_redis
+        fake_redis.get.side_effect = RedisError()
+        mock_cache.get.return_value = None
+        self.assertIsNone(
+            self.redis_client.get_token(self.test_key)
+        )
+
+    @patch('authentication.v1.utils.redis_client.cache')
+    def test_delete_token(self, mock_cache) -> None:
+        """
+        Test deleting a token from Redis and from Django cache.
+
+        Validates:
+            - Redis path returns True when delete count==1
+            - Cache path returns True on success
+            - On RedisError + cache.delete=False, returns False
+        """
+        fake_redis = MagicMock()
+
+        # --- Redis branch ---
+        self.redis_client.use_django_cache = False
+        self.redis_client.client = fake_redis
+        fake_redis.delete.return_value = 1
+        self.assertTrue(
+            self.redis_client.delete_token(self.test_key)
+        )
+
+        # --- Django cache branch ---
+        self.redis_client.use_django_cache = True
+        self.redis_client.client = mock_cache
+        mock_cache.delete.return_value = True
+        self.assertTrue(
+            self.redis_client.delete_token(self.test_key)
+        )
+
+        # --- RedisError + cache fallback failure ---
+        self.redis_client.use_django_cache = False
+        self.redis_client.client = fake_redis
+        fake_redis.delete.side_effect = RedisError()
+        mock_cache.delete.return_value = False
+        self.assertFalse(
+            self.redis_client.delete_token(self.test_key)
+        )
+
+    @patch('authentication.v1.utils.redis_client.cache')
+    def test_connection_error(self, mock_cache) -> None:
+        """
+        Test all three operations when Redis always errors and the cache fallback also fails.
+
+        Validates:
+            - set_token → False
+            - get_token → None
+            - delete_token → False
+        """
+        fake_redis = MagicMock()
+        fake_redis.setex.side_effect = RedisError()
+        fake_redis.get.side_effect = RedisError()
+        fake_redis.delete.side_effect = RedisError()
+
+        self.redis_client.use_django_cache = False
+        self.redis_client.client = fake_redis
+
+        # stub cache so fallback attempts also fail
+        mock_cache.set.return_value = False
+        mock_cache.get.return_value = None
+        mock_cache.delete.return_value = False
+
+        self.assertFalse(
+            self.redis_client.set_token(self.test_key, self.test_value, 3600)
+        )
+        self.assertIsNone(
+            self.redis_client.get_token(self.test_key)
+        )
+        self.assertFalse(
+            self.redis_client.delete_token(self.test_key)
+        )
 
 class TokenManagerRedisIntegrationTestCase(TestCase):
     """Test suite for integration between TokenManager and RedisClient."""

@@ -35,6 +35,13 @@ from django.core.validators import FileExtensionValidator, MinValueValidator, Ma
 from django.conf import settings
 from storages.backends.s3boto3 import S3Boto3Storage
 from authentication.models import CustomUser
+import uuid
+from django.utils import timezone
+from django.core.exceptions import ValidationError
+from django.utils.translation import gettext_lazy as _
+from coupon_core.utils.logging import geo_logger, geo_structured_logger
+
+User = settings.AUTH_USER_MODEL
 
 class Category(models.Model):
     """
@@ -64,6 +71,31 @@ class Category(models.Model):
     def __str__(self) -> str:
         """Returns the name of the category."""
         return self.name
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        """Save the category with logging."""
+        try:
+            super().save(*args, **kwargs)
+            geo_structured_logger.info(
+                geo_logger,
+                "Category saved successfully",
+                "category_save",
+                {
+                    'category_id': self.id,
+                    'name': self.name
+                }
+            )
+        except Exception as e:
+            geo_structured_logger.error(
+                geo_logger,
+                "Error saving category",
+                "category_save",
+                e,
+                {
+                    'name': self.name
+                }
+            )
+            raise
 
 
 class Retailer(models.Model):
@@ -112,6 +144,33 @@ class Retailer(models.Model):
     def __str__(self) -> str:
         """Returns a string representation of the retailer."""
         return self.name
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        """Save the retailer with logging."""
+        try:
+            super().save(*args, **kwargs)
+            geo_structured_logger.info(
+                geo_logger,
+                "Retailer saved successfully",
+                "retailer_save",
+                {
+                    'retailer_id': self.id,
+                    'name': self.name,
+                    'owner_id': self.owner_id
+                }
+            )
+        except Exception as e:
+            geo_structured_logger.error(
+                geo_logger,
+                "Error saving retailer",
+                "retailer_save",
+                e,
+                {
+                    'name': self.name,
+                    'owner_id': self.owner_id
+                }
+            )
+            raise
 
 
 class Discount(models.Model):
@@ -195,6 +254,61 @@ class Discount(models.Model):
         
         return list(nearby_users)
 
+    def clean(self) -> None:
+        """Validate the discount data."""
+        if self.expiration_date <= timezone.now():
+            geo_structured_logger.warning(
+                geo_logger,
+                "Discount expiration date is in the past",
+                "discount_clean",
+                {
+                    'discount_id': self.id,
+                    'expiration_date': self.expiration_date.isoformat()
+                }
+            )
+            raise ValidationError(_("Expiration date must be in the future"))
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        """Save the discount with logging."""
+        try:
+            self.full_clean()
+            super().save(*args, **kwargs)
+            geo_structured_logger.info(
+                geo_logger,
+                "Discount saved successfully",
+                "discount_save",
+                {
+                    'discount_id': self.id,
+                    'retailer_id': self.retailer.id,
+                    'category_id': self.category.id if self.category else None,
+                    'is_active': self.is_active
+                }
+            )
+        except ValidationError as ve:
+            geo_structured_logger.error(
+                geo_logger,
+                "Validation error saving discount",
+                "discount_save",
+                ve,
+                {
+                    'retailer_id': self.retailer.id,
+                    'category_id': self.category.id if self.category else None
+                }
+            )
+            raise
+        except Exception as e:
+            geo_structured_logger.error(
+                geo_logger,
+                "Error saving discount",
+                "discount_save",
+                e,
+                {
+                    'retailer_id': self.retailer.id,
+                    'category_id': self.category.id if self.category else None
+                }
+            )
+            raise
+
 
 class SharedDiscount(models.Model):
     """
@@ -248,6 +362,34 @@ class SharedDiscount(models.Model):
         """Returns a formatted string representing the shared discount."""
         return f"{self.group_name} - {self.discount.discount_code}"
 
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        """Save the shared discount with logging."""
+        try:
+            super().save(*args, **kwargs)
+            geo_structured_logger.info(
+                geo_logger,
+                "Shared discount saved successfully",
+                "shared_discount_save",
+                {
+                    'shared_discount_id': self.id,
+                    'discount_id': self.discount.id,
+                    'group_name': self.group_name,
+                    'status': self.status
+                }
+            )
+        except Exception as e:
+            geo_structured_logger.error(
+                geo_logger,
+                "Error saving shared discount",
+                "shared_discount_save",
+                e,
+                {
+                    'discount_id': self.discount.id,
+                    'group_name': self.group_name
+                }
+            )
+            raise
+
 
 class WebSocketDiscountRequest(models.Model):
     """
@@ -261,13 +403,16 @@ class WebSocketDiscountRequest(models.Model):
         category (Optional[Category]): The category to filter by
         status (str): Current status of the request
         results (Dict[str, Any]): The results of the request
+        conversation_history (List[Dict[str, Any]]): History of conversation messages
+        websocket_url (str): URL for WebSocket connection
         created_at (datetime): When the request was created
         updated_at (datetime): When the request was last updated
     """
     
-    request_id: str = models.CharField(
-        max_length=36,
-        unique=True,
+    request_id: str = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
         help_text="Unique identifier for the WebSocket request"
     )
     user: models.ForeignKey = models.ForeignKey(
@@ -307,6 +452,16 @@ class WebSocketDiscountRequest(models.Model):
         blank=True,
         help_text="Results of the request"
     )
+    conversation_history: List[Dict[str, Any]] = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="History of conversation messages"
+    )
+    websocket_url: str = models.URLField(
+        max_length=500,
+        blank=True,
+        help_text="URL for WebSocket connection"
+    )
     created_at: models.DateTimeField = models.DateTimeField(
         auto_now_add=True,
         help_text="When the request was created"
@@ -319,6 +474,33 @@ class WebSocketDiscountRequest(models.Model):
     def __str__(self) -> str:
         """Returns a formatted string representing the request."""
         return f"Request {self.request_id} ({self.status})"
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        """Save the WebSocket request with logging."""
+        try:
+            super().save(*args, **kwargs)
+            geo_structured_logger.info(
+                geo_logger,
+                "WebSocket request saved successfully",
+                "websocket_request_save",
+                {
+                    'request_id': str(self.request_id),
+                    'user_id': self.user.id,
+                    'status': self.status
+                }
+            )
+        except Exception as e:
+            geo_structured_logger.error(
+                geo_logger,
+                "Error saving WebSocket request",
+                "websocket_request_save",
+                e,
+                {
+                    'request_id': str(self.request_id),
+                    'user_id': self.user.id
+                }
+            )
+            raise
 
     class Meta:
         indexes = [
