@@ -3,7 +3,7 @@ frontend:
   replicaCount: 1
   image:
     repository: fakay96/coupon-frontend
-    tag: ""
+    tag: "latest"
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP

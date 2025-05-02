@@ -283,7 +283,7 @@ def sync_with_merchant_api(merchant_id: int) -> List[Dict[str, Any]]:
     """
     # This is a placeholder for actual API integration
     # In a real implementation, this would make API calls to the merchant's system
-    return []
+    return [] 
 
 @shared_task(bind=True, max_retries=3)
 @log_execution(celery_logger, 'publish_discount_request')
