@@ -7,6 +7,8 @@ metadata:
     app: {{ .Values.frontend.name | default "frontend" }}
     release: coupon-service
   annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "3600"
@@ -17,8 +19,6 @@ metadata:
     nginx.ingress.kubernetes.io/session-cookie-name: "route"
     nginx.ingress.kubernetes.io/session-cookie-expires: "172800"
     nginx.ingress.kubernetes.io/session-cookie-max-age: "172800"
-    nginx.ingress.kubernetes.io/configuration-snippet: |
-      try_files $uri $uri/ /index.html;
     {{- toYaml .Values.ingress.annotations | nindent 4 }}
 spec:
   ingressClassName: {{ .Values.ingress.className }}
@@ -30,8 +30,9 @@ spec:
     - host: {{ .Values.frontend.ingress.host }}
       http:
         paths:
-          - path: /
-            pathType: Prefix
+          - # catch EVERYTHING under /
+            path: "/(.*)"
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: frontend
