@@ -1,1 +1,1 @@
-from .verification_task import send_verification_email_task, send_password_reset_email_task
+from .verification_task import send_verification_email_task, send_password_reset_email_task,resend_verification_token_task

@@ -27,7 +27,7 @@ from django.utils import timezone
 from allauth.account.signals import user_signed_up
 
 from authentication.models import CustomUser, UserProfile, ProfileVerification
-from authentication.v1.tasks.verification_task import send_verification_email_task
+from authentication.v1.tasks import send_verification_email_task
 
 logger = logging.getLogger(__name__)
 

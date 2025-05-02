@@ -22,7 +22,7 @@ from rest_framework import serializers
 from django.utils import timezone
 
 from authentication.models import CustomUser, UserProfile, PasswordResetRequest
-
+from authentication.v1.tasks import resend_verification_token_task
 def raise_validation_error(message: str) -> None:
     """
     Helper function to raise a ValidationError.
@@ -533,11 +533,13 @@ class PasswordResetSerializer(serializers.Serializer):
         except CustomUser.DoesNotExist:
             return value
 
-        # Account activation check
         if not user.activated_profile:
-            raise serializers.ValidationError(
-                _('Please activate your account before resetting your password.')
-            )
+                # enqueue a fresh activation token resend
+                resend_verification_token_task.delay(user_email=user.email,logo_url=None)
+                # raise with updated message
+                raise serializers.ValidationError(
+                    _('Account not active; a verification email has been resent.')
+                )
 
         # Rate-limit check
         cutoff = timezone.now() - timezone.timedelta(minutes=self.RATE_LIMIT_MINUTES)
