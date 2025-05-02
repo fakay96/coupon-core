@@ -464,11 +464,8 @@ class SearchDiscountsView(APIView):
         operation_description="Search for discounts based on location and query",
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
-            required=['query', 'latitude', 'longitude'],
             properties={
                 'query': openapi.Schema(type=openapi.TYPE_STRING, description='Search query'),
-                'latitude': openapi.Schema(type=openapi.TYPE_NUMBER, description='Latitude coordinate'),
-                'longitude': openapi.Schema(type=openapi.TYPE_NUMBER, description='Longitude coordinate'),
                 'radius': openapi.Schema(type=openapi.TYPE_NUMBER, description='Search radius in meters (default: 5000)')
             }
         ),
