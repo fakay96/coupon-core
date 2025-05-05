@@ -24,7 +24,7 @@ from django.contrib import admin
 from django.utils.html import format_html
 import os
 
-from .models import Category, Retailer, Discount, SharedDiscount
+from .models import Category, Retailer, Discount, SharedDiscount, WebSocketDiscountRequest
 
 
 @admin.register(Category)
@@ -178,3 +178,102 @@ class SharedDiscountAdmin(admin.ModelAdmin):
     list_filter: tuple[str, ...] = ("status",)
     search_fields: tuple[str, ...] = ("group_name", "discount__discount_code")
     ordering: tuple[str, ...] = ("-created_at",)
+
+@admin.register(WebSocketDiscountRequest)
+class WebSocketDiscountRequestAdmin(admin.ModelAdmin):
+    """
+    Admin configuration for the WebSocketDiscountRequest model.
+    
+    Provides an interface for managing real-time discount requests through WebSocket connections.
+    """
+    
+    list_display = (
+        'request_id',
+        'user_id',
+        'user_email',
+        'location_display',
+        'radius',
+        'status',
+        'created_at',
+        'updated_at'
+    )
+    
+    list_filter = (
+        'status',
+        'created_at',
+        'updated_at'
+    )
+    
+    search_fields = (
+        'request_id',
+        'user_id',
+        'user_email',
+        'location',
+        'radius'
+    )
+    
+    readonly_fields = (
+        'request_id',
+        'created_at',
+        'updated_at',
+        'location_display',
+        'conversation_history_display'
+    )
+    
+    ordering = ('-created_at',)
+    
+    fieldsets = (
+        ('Request Information', {
+            'fields': (
+                'request_id',
+                'user_id',
+                'user_email',
+                'radius',
+                'status',
+                'websocket_url'
+            )
+        }),
+        ('Location', {
+            'fields': (
+                'location',
+                'location_display'
+            )
+        }),
+        ('Results', {
+            'fields': (
+                'results',
+                'conversation_history_display'
+            ),
+            'classes': ('collapse',)
+        }),
+        ('Timestamps', {
+            'fields': (
+                'created_at',
+                'updated_at'
+            ),
+            'classes': ('collapse',)
+        })
+    )
+    
+    def location_display(self, obj: WebSocketDiscountRequest) -> str:
+        """Display the location coordinates in a readable format."""
+        if obj.location:
+            return f"Lat: {obj.location.y:.6f}, Lon: {obj.location.x:.6f}"
+        return "No location"
+    location_display.short_description = "Location Coordinates"
+    
+    def conversation_history_display(self, obj: WebSocketDiscountRequest) -> str:
+        """Display the conversation history in a readable format."""
+        if not obj.conversation_history:
+            return "No conversation history"
+        
+        formatted_history = []
+        for msg in obj.conversation_history:
+            timestamp = msg.get('timestamp', '')
+            role = msg.get('role', '')
+            content = msg.get('content', '')
+            formatted_history.append(f"[{timestamp}] {role}: {content}")
+        
+        return "\n".join(formatted_history)
+    conversation_history_display.short_description = "Conversation History"
+    

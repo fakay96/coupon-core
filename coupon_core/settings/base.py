@@ -323,3 +323,16 @@ LOGS_DIR = os.path.join(BASE_DIR, 'logs')
 if not os.path.exists(LOGS_DIR):
     os.makedirs(LOGS_DIR)
 
+# WebSocket Settings
+WEBSOCKET_PROTOCOL = 'ws'  # Default to ws, will be overridden in prod/staging
+WEBSOCKET_DOMAIN = 'localhost'  # Default to localhost, will be overridden in prod/staging
+WEBSOCKET_PORT = 8000  # Default port, will be overridden in prod/staging
+WEBSOCKET_PATH = '/ws/discount-requests/'  # Default path for WebSocket connections
+
+# WebSocket Allowed Origins
+WEBSOCKET_ALLOWED_ORIGINS = []  # Will be overridden in prod/staging
+
+# WebSocket Connection Settings
+WEBSOCKET_HEARTBEAT_INTERVAL = 30  # Seconds between heartbeat messages
+WEBSOCKET_MAX_MESSAGE_SIZE = 1024 * 1024  # 1MB default max message size
+

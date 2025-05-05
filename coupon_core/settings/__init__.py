@@ -8,6 +8,7 @@ if os.getenv("DJANGO_SETTINGS_MODULE") != "coupon_core.settings.test":
     load_dotenv()
     # Determine environment
     ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
+    print(f"ENVIRONMENT: {ENVIRONMENT}")
     # Import environment-specific settings
     from .base import *
     if ENVIRONMENT == "production":

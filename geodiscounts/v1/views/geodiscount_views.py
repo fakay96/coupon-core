@@ -54,6 +54,11 @@ from drf_yasg import openapi
 
 from rest_framework.request import Request
 from django.utils import timezone
+import Levenshtein
+from typing import Tuple
+
+from django.conf import settings
+
 
 # Greeting patterns
 GREETING_PATTERNS = re.compile(r'^(hi|hello|hey|greetings)$', re.IGNORECASE)
@@ -443,8 +448,6 @@ class NearbyDiscountsView(APIView):
                 {"error": "An unexpected error occurred.", "details": str(e)},
                 status=HTTP_500_INTERNAL_SERVER_ERROR,
             )
-
-
 class SearchDiscountsView(APIView):
     """
     View for searching discounts based on location and query.
@@ -457,9 +460,61 @@ class SearchDiscountsView(APIView):
     
     The view supports both immediate results and real-time updates via WebSocket.
     """
-    
+
     permission_classes = [IsAuthenticated]
-    
+
+    def _is_greeting(self, query: str) -> bool:
+        """
+        Check if the query is a pure greeting.
+        """
+        clean_query = re.sub(r'[^\w\s]', '', query.lower()).strip()
+        greetings = {
+            'hi', 'hello', 'hey', 'greetings', 'good morning',
+            'good afternoon', 'good evening', 'morning', 'afternoon',
+            'evening', 'sup', 'whats up', 'yo', 'howdy', 'hiya', 'heya',
+            'hola', 'buenos dias', 'buenas tardes', 'buenas noches',
+            'bonjour', 'salut', 'bonsoir',
+            'hallo', 'guten tag', 'guten morgen', 'guten abend',
+            'gm', 'ga', 'ge'
+        }
+        time_greeting_pattern = (
+            r'^(good|buenas|buenos|guten)\s'
+            r'(morning|afternoon|evening|dia|dias|tarde|tardes|'
+            r'noche|noches|morgen|tag|abend)s?$'
+        )
+
+        if clean_query in greetings or re.match(time_greeting_pattern, clean_query):
+            return True
+
+        simple_with_name = r'^(hi|hey|hello|hola|salut|hallo)\s\w{1,15}$'
+        if re.match(simple_with_name, clean_query):
+            return True
+
+        if len(clean_query) <= 10:
+            for greeting in greetings:
+                min_sim = 0.8 if len(greeting) <= 3 else 0.7
+                max_dist = int((1 - min_sim) * max(len(greeting), len(clean_query)))
+                if Levenshtein.distance(greeting, clean_query) <= max_dist:
+                    return True
+
+        return False
+
+    def _extract_and_strip_greeting(self, query: str) -> Tuple[bool, str]:
+        """
+        If query starts with a greeting + punctuation/space, strip it off.
+        Returns (True, remainder) or (False, original).
+        """
+        # Don't lowercase the remainder, preserve user intent
+        match = re.match(
+            r'^(?P<greet>hi|hello|hey|hola|bonjour|hallo|'
+            r'good(?: morning| afternoon| evening)?)(?:[,\s]+)(?P<rest>.+)$',
+            query, re.IGNORECASE
+        )
+        if match:
+            rest = match.group('rest').strip()
+            return True, rest
+        return False, query
+
     @swagger_auto_schema(
         operation_description="Search for discounts based on location and query",
         request_body=openapi.Schema(
@@ -486,87 +541,72 @@ class SearchDiscountsView(APIView):
                 description="Invalid request parameters",
                 schema=openapi.Schema(
                     type=openapi.TYPE_OBJECT,
-                    properties={
-                        'error': openapi.Schema(type=openapi.TYPE_STRING)
-                    }
+                    properties={'error': openapi.Schema(type=openapi.TYPE_STRING)}
                 )
             ),
             HTTP_500_INTERNAL_SERVER_ERROR: openapi.Response(
                 description="Internal server error",
                 schema=openapi.Schema(
                     type=openapi.TYPE_OBJECT,
-                    properties={
-                        'error': openapi.Schema(type=openapi.TYPE_STRING)
-                    }
+                    properties={'error': openapi.Schema(type=openapi.TYPE_STRING)}
                 )
             ),
             HTTP_504_GATEWAY_TIMEOUT: openapi.Response(
                 description="Request timeout",
                 schema=openapi.Schema(
                     type=openapi.TYPE_OBJECT,
-                    properties={
-                        'error': openapi.Schema(type=openapi.TYPE_STRING)
-                    }
+                    properties={'error': openapi.Schema(type=openapi.TYPE_STRING)}
                 )
             )
         }
     )
     @log_execution(geo_logger, 'discount_search')
     def post(self, request: Request) -> Response:
-        """
-        Handle discount search request.
-        
-        Args:
-            request: The HTTP request containing search parameters
-            
-        Returns:
-            Response with either:
-            - WebSocket URL for real-time updates
-            - Immediate results if available
-            - Error message if request failed
-            
-        Raises:
-            None: All exceptions are caught and returned as error responses
-        """
-        # Validate query
-        query = request.data.get('query', '').strip()
-        if not query:
+        # 1) Validate non-empty query
+        raw_query = request.data.get('query', '')
+        if not raw_query or not raw_query.strip():
             geo_structured_logger.warning(
-                geo_logger,
-                "Empty search query",
-                "discount_search",
+                geo_logger, "Empty search query", "discount_search",
                 {'user_id': request.user.id}
             )
-            return Response(
-                {"error": "Search query is required"},
-                status=HTTP_400_BAD_REQUEST
-            )
-            
-        # Check for simple greetings
-        greeting_pattern = r'^(hi|hello|hey|greetings|good\s(morning|afternoon|evening))$'
-        if re.match(greeting_pattern, query.lower()):
+            return Response({"error": "Search query is required"}, status=HTTP_400_BAD_REQUEST)
+
+        query = raw_query.strip()
+
+        # 2) Pure greeting short-circuit
+        if self._is_greeting(query) and len(query.split()) <= 2:
             geo_structured_logger.info(
-                geo_logger,
-                "Greeting detected",
-                "discount_search",
+                geo_logger, "Greeting detected", "discount_search",
                 {'user_id': request.user.id, 'query': query}
             )
+            hour = timezone.now().hour
+            greeting_prefix = (
+                "Good morning" if 5 <= hour < 12 else
+                "Good afternoon" if 12 <= hour < 18 else
+                "Good evening"
+            )
             return Response({
-                "message": "Hello! How can I help you find discounts today?",
+                "message": f"{greeting_prefix}! How can I help you find discounts today?",
                 "type": "greeting"
             })
-            
-        # Validate location
+
+        # 3) Leading‐greeting + real intent: strip and continue
+        stripped, new_query = self._extract_and_strip_greeting(query)
+        if stripped and new_query:
+            geo_structured_logger.info(
+                geo_logger, "Greeting prefix stripped", "discount_search",
+                {'user_id': request.user.id, 'original_query': query}
+            )
+            query = new_query
+
+        # 4) Validate location params
         try:
             latitude = float(request.client_latitude)
             longitude = float(request.client_longitude)
-            radius = float(request.data.get('radius', 5000))  # Default 5km
+            radius = float(request.data.get('radius', 5000))
         except (TypeError, ValueError) as e:
             geo_structured_logger.error(
-                geo_logger,
-                "Invalid location parameters",
-                "discount_search",
-                e,
+                geo_logger, "Invalid location parameters", "discount_search", e,
                 {
                     'user_id': request.user.id,
                     'latitude': request.data.get('latitude'),
@@ -574,124 +614,81 @@ class SearchDiscountsView(APIView):
                     'radius': request.data.get('radius')
                 }
             )
-            return Response(
-                {"error": "Invalid location parameters"},
-                status=HTTP_400_BAD_REQUEST
-            )
-            
-        # Create conversation history
+            return Response({"error": "Invalid location parameters"}, status=HTTP_400_BAD_REQUEST)
+
+        # 5) Build conversation history
         conversation_history: List[Dict[str, Any]] = [{
             "role": "user",
             "content": query,
             "timestamp": timezone.now().isoformat()
         }]
-        
-        # Create request record and dispatch task
+
+        # 6) Create request record & dispatch
         try:
-            with transaction.atomic():
-                request_obj = WebSocketDiscountRequest.objects.create(
-                    user=request.user,
+                req_obj = WebSocketDiscountRequest.objects.create(
+                    user_id=request.user.id,
                     location=Point(longitude, latitude),
                     radius=radius,
                     status="pending",
-                    conversation_history=conversation_history
+                    conversation_history=conversation_history,
+                    user_email=request.user.email
                 )
                 
+                # Update the websocket_url after creation
+                req_obj.websocket_url = f"{settings.WEBSOCKET_PROTOCOL}://{settings.WEBSOCKET_DOMAIN}/ws/discount-requests/{req_obj.request_id}/"
+                req_obj.save()
+                
                 geo_structured_logger.info(
-                    geo_logger,
-                    "Created discount request",
-                    "discount_search",
+                    geo_logger, "Created discount request", "discount_search",
                     {
                         'user_id': request.user.id,
-                        'request_id': str(request_obj.request_id),
+                        'request_id': str(req_obj.request_id),
                         'query': query,
                         'location': {'latitude': latitude, 'longitude': longitude},
                         'radius': radius
                     }
                 )
-                
-                # Dispatch task
+
                 publish_discount_request.delay(
-                    request_id=str(request_obj.request_id),
+                    request_id=str(req_obj.request_id),
                     user_id=request.user.id,
                     latitude=latitude,
                     longitude=longitude,
                     radius=radius,
                     conversation_history=conversation_history
                 )
-                
-                # Poll for results or WebSocket URL
-                start_time = time.time()
-                while time.time() - start_time < 10:  # 10 second timeout
-                    request_obj.refresh_from_db()
-                    
-                    if request_obj.status == "completed":
-                        geo_structured_logger.info(
-                            geo_logger,
-                            "Search completed successfully",
-                            "discount_search",
-                            {
-                                'user_id': request.user.id,
-                                'request_id': str(request_obj.request_id),
-                                'result_count': len(request_obj.results) if request_obj.results else 0
-                            }
-                        )
+
+                # 7) Poll for up to 10s
+                start = time.time()
+                while time.time() - start < 10:
+                    req_obj.refresh_from_db()
+                    if req_obj.status == "completed":
                         return Response({
-                            "results": request_obj.results,
+                            "results": req_obj.results,
                             "type": "results"
                         })
-                    elif request_obj.status == "ready" and request_obj.websocket_url:
-                        geo_structured_logger.info(
-                            geo_logger,
-                            "WebSocket URL ready",
-                            "discount_search",
-                            {
-                                'user_id': request.user.id,
-                                'request_id': str(request_obj.request_id)
-                            }
-                        )
+                    if req_obj.status == "ready" and req_obj.websocket_url:
                         return Response({
-                            "websocket_url": request_obj.websocket_url,
+                            "websocket_url": req_obj.websocket_url,
                             "type": "websocket"
                         })
-                    elif request_obj.status == "failed":
-                        geo_structured_logger.error(
-                            geo_logger,
-                            "Search request failed",
-                            "discount_search",
-                            None,
-                            {
-                                'user_id': request.user.id,
-                                'request_id': str(request_obj.request_id)
-                            }
-                        )
+                    if req_obj.status == "failed":
                         return Response(
                             {"error": "Failed to process request"},
                             status=HTTP_500_INTERNAL_SERVER_ERROR
                         )
-                        
-                    time.sleep(0.5)  # Poll every 500ms
-                    
-                geo_structured_logger.warning(
-                    geo_logger,
-                    "Search request timeout",
-                    "discount_search",
-                    {
-                        'user_id': request.user.id,
-                        'request_id': str(request_obj.request_id)
-                    }
-                )
+                    time.sleep(0.5)
+
+                # Timeout
                 return Response(
                     {"error": "Request timeout"},
                     status=HTTP_504_GATEWAY_TIMEOUT
                 )
-                
+
         except Exception as e:
             geo_structured_logger.error(
-                geo_logger,
-                "Error processing discount request",
-                "discount_search",
-                e,
+                geo_logger, "Error processing discount request",
+                "discount_search", e,
                 {
                     'user_id': request.user.id,
                     'query': query,
@@ -703,7 +700,7 @@ class SearchDiscountsView(APIView):
                 {"error": "Internal server error"},
                 status=HTTP_500_INTERNAL_SERVER_ERROR
             )
-            
+
     @swagger_auto_schema(
         operation_description="Get results for a specific discount search request",
         responses={
@@ -713,7 +710,9 @@ class SearchDiscountsView(APIView):
                     type=openapi.TYPE_OBJECT,
                     properties={
                         'status': openapi.Schema(type=openapi.TYPE_STRING),
-                        'results': openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Schema(type=openapi.TYPE_OBJECT)),
+                        'results': openapi.Schema(
+                            type=openapi.TYPE_ARRAY, items=openapi.Schema(type=openapi.TYPE_OBJECT)
+                        ),
                         'websocket_url': openapi.Schema(type=openapi.TYPE_STRING)
                     }
                 )
@@ -722,84 +721,40 @@ class SearchDiscountsView(APIView):
                 description="Request not found",
                 schema=openapi.Schema(
                     type=openapi.TYPE_OBJECT,
-                    properties={
-                        'error': openapi.Schema(type=openapi.TYPE_STRING)
-                    }
+                    properties={'error': openapi.Schema(type=openapi.TYPE_STRING)}
                 )
             ),
             HTTP_500_INTERNAL_SERVER_ERROR: openapi.Response(
                 description="Internal server error",
                 schema=openapi.Schema(
                     type=openapi.TYPE_OBJECT,
-                    properties={
-                        'error': openapi.Schema(type=openapi.TYPE_STRING)
-                    }
+                    properties={'error': openapi.Schema(type=openapi.TYPE_STRING)}
                 )
             )
         }
     )
     @log_execution(geo_logger, 'discount_search_status')
     def get(self, request: Request, request_id: str) -> Response:
-        """
-        Get results for a specific request.
-        
-        Args:
-            request: The HTTP request
-            request_id: UUID of the WebSocketDiscountRequest
-            
-        Returns:
-            Response with request status and results if available
-            
-        Raises:
-            None: All exceptions are caught and returned as error responses
-        """
         try:
-            request_obj = WebSocketDiscountRequest.objects.get(
+            req_obj = WebSocketDiscountRequest.objects.get(
                 request_id=request_id,
                 user=request.user
             )
-            
-            geo_structured_logger.info(
-                geo_logger,
-                "Retrieved request status",
-                "discount_search_status",
-                {
-                    'user_id': request.user.id,
-                    'request_id': request_id,
-                    'status': request_obj.status
-                }
-            )
-            
             return Response({
-                "status": request_obj.status,
-                "results": request_obj.results if request_obj.status == "completed" else None,
-                "websocket_url": request_obj.websocket_url if request_obj.status == "ready" else None
+                "status": req_obj.status,
+                "results": req_obj.results if req_obj.status == "completed" else None,
+                "websocket_url": req_obj.websocket_url if req_obj.status == "ready" else None
             })
-            
         except WebSocketDiscountRequest.DoesNotExist:
-            geo_structured_logger.warning(
-                geo_logger,
-                "Request not found",
-                "discount_search_status",
-                {
-                    'user_id': request.user.id,
-                    'request_id': request_id
-                }
-            )
             return Response(
                 {"error": "Request not found"},
                 status=HTTP_404_NOT_FOUND
             )
         except Exception as e:
             geo_structured_logger.error(
-                geo_logger,
-                "Error retrieving request results",
-                "discount_search_status",
-                e,
-                {
-                    'user_id': request.user.id,
-                    'request_id': request_id
-                }
+                geo_logger, "Error retrieving request results",
+                "discount_search_status", e,
+                {'user_id': request.user.id, 'request_id': request_id}
             )
             return Response(
                 {"error": "Internal server error"},

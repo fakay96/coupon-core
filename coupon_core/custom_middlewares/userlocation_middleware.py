@@ -99,4 +99,4 @@ class UserLocationMiddleware:
         except Exception:
             pass
 
-        return None, None
+        return 0, 0

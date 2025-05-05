@@ -20,10 +20,12 @@ from authentication.v1.utils.token_manager import TokenManager
 # drf-yasg imports for OpenAPI documentation
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
-from authentication.models import CustomUser
+from authentication.models import CustomUser,PasswordResetRequest
 
 import traceback
 from rest_framework.exceptions import ValidationError
+import uuid
+
 logger = logging.getLogger(__name__)
 
 
@@ -291,8 +293,6 @@ class UserInfoView(APIView):
                 {"error": "An unexpected error occurred."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-        
-
 class PasswordResetView(APIView):
     """Handles password reset requests via email."""
 
@@ -338,11 +338,116 @@ class PasswordResetView(APIView):
                 status=status.HTTP_200_OK,
             )
         except serializers.ValidationError as ve:
-            # Return the serializer’s own error messages as a 400
+            # Return the serializer's own error messages as a 400
             return Response({"error": ve.detail}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             logger.error(f"Unexpected error during password reset: {e}", exc_info=True)
             return Response(
                 {"error": "An unexpected error occurred. Please try again later."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+    
+    @swagger_auto_schema(
+        operation_description="Reset password using token.",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=['token', 'email', 'new_password'],
+            properties={
+                'token': openapi.Schema(type=openapi.TYPE_STRING, description="Reset token from email"),
+                'email': openapi.Schema(type=openapi.TYPE_STRING, description="User email"),
+                'new_password': openapi.Schema(type=openapi.TYPE_STRING, description="New password"),
+            },
+        ),
+        responses={
+            200: openapi.Response("Password reset successful."),
+            400: openapi.Response("Validation error", schema=openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={'error': openapi.Schema(type=openapi.TYPE_STRING)}
+            )),
+            404: openapi.Response("Token not found or invalid"),
+            410: openapi.Response("Token expired or already used"),
+            500: openapi.Response("Internal server error"),
+        },
+    )
+    def put(self, request) -> Response:
+        """
+        Reset password using token.
+
+        Expects JSON body:
+            - token (str): the reset token from the email
+            - email (str): the user's email
+            - new_password (str): the new password
+        """
+        # Extract request data
+        token = request.data.get('token')
+        email = request.data.get('email')
+        new_password = request.data.get('new_password')
+        
+        # Validate required fields
+        if not all([token, email, new_password]):
+            return Response(
+                {"error": "Token, email, and new password are required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        try:
+            # Convert string token to UUID
+            token_uuid = uuid.UUID(token)
+            
+            # Find the reset request
+            try:
+                reset_request = PasswordResetRequest.objects.get(
+                    token=token_uuid,
+                    user__email=email
+                )
+            except PasswordResetRequest.DoesNotExist:
+                return Response(
+                    {"error": "Invalid token or email."},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+                
+            # Check if token is expired
+            if reset_request.is_expired():
+                return Response(
+                    {"error": "Reset token has expired."},
+                    status=status.HTTP_410_GONE
+                )
+                
+            # Check if token is already used
+            if reset_request.used:
+                return Response(
+                    {"error": "Reset token has already been used."},
+                    status=status.HTTP_410_GONE
+                )
+                
+            # Update user's password
+            user = reset_request.user
+            user.set_password(new_password)
+            user.save()
+            
+            # Mark token as used
+            reset_request.mark_as_used()
+            
+            # Invalidate all other reset tokens for this user
+            PasswordResetRequest.objects.filter(
+                user=user, 
+                used=False
+            ).update(used=True)
+            
+            return Response(
+                {"message": "Password has been reset successfully."},
+                status=status.HTTP_200_OK
+            )
+            
+        except ValueError:
+            # Invalid UUID format
+            return Response(
+                {"error": "Invalid token format."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error during password reset: {e}", exc_info=True)
+            return Response(
+                {"error": "An unexpected error occurred. Please try again later."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )

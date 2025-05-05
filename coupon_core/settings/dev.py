@@ -154,7 +154,7 @@ CHANNEL_LAYERS = {
 }
 
 CELERY_BROKER_URL = REDIS_URL
-CELERY_RESULT_BACKEND = REDIS_URL
+result_backend = REDIS_URL
 
 
 
@@ -185,5 +185,20 @@ SIMPLE_JWT = {
 # -----------------------------------------------
 CORS_ALLOW_ALL_ORIGINS = True
 
-CELERY_ALWAYS_EAGER=True
+task_always_eager=True
 FRONTEND_DOMAIN_NAME="https://localhost:1543"
+
+# WebSocket Settings for Development
+WEBSOCKET_PROTOCOL = 'ws'  # Non-secure WebSocket in development
+WEBSOCKET_DOMAIN = os.getenv('WEBSOCKET_DOMAIN', 'localhost')
+WEBSOCKET_PORT = int(os.getenv('WEBSOCKET_PORT', 8000))
+WEBSOCKET_PATH = '/ws/discount-requests/'
+
+# WebSocket Allowed Origins for Development
+WEBSOCKET_ALLOWED_ORIGINS = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
+]
+print(f"WEBSOCKET_ALLOWED_ORIGINS: {REDIS_URL}")

@@ -106,7 +106,7 @@ class Retailer(models.Model):
         name (str): The name of the retailer.
         contact_info (Optional[str]): Contact details for the retailer.
         location (Point): Geographical location of the retailer.
-        owner (User): The user who owns/manages this retailer.
+        owner_id (int): ID of the user who owns/manages this retailer (cross-shard reference).
         analytics_data (Dict[str, Any]): Analytics data for the retailer.
         created_at (datetime): Timestamp when the retailer was created.
         updated_at (datetime): Timestamp when the retailer was last updated.
@@ -121,14 +121,11 @@ class Retailer(models.Model):
     location: models.PointField = models.PointField(
         help_text="Geographic location of the retailer (latitude/longitude)."
     )
-    # owner = models.ForeignKey(
-    #     CustomUser,
-    #     on_delete=models.CASCADE,
-    #     related_name='+',
-    #     help_text="User who owns/manages this retailer.",
-    #     null=True,
-    #     blank=True
-    # )
+    owner_id = models.BigIntegerField(
+        null=True,
+        blank=True,
+        help_text="ID of the user who owns/manages this retailer (cross-shard reference)."
+    )
     analytics_data: Dict[str, Any] = models.JSONField(
         default=dict,
         blank=True,
@@ -172,10 +169,11 @@ class Retailer(models.Model):
             )
             raise
 
-
 class Discount(models.Model):
     """
     Represents a discount or offer provided by a retailer.
+
+    Using cross-shard references with the help of the GeoDiscountsRouter.
 
     Attributes:
         retailer (Retailer): The retailer offering the discount.
@@ -191,31 +189,31 @@ class Discount(models.Model):
         updated_at (datetime): Timestamp when the discount was last updated.
     """
 
-    retailer: models.ForeignKey = models.ForeignKey(
-        Retailer, on_delete=models.CASCADE, related_name="discounts"
+    retailer = models.ForeignKey(
+        'Retailer', on_delete=models.CASCADE, related_name="discounts"
     )
-    category: Optional[models.ForeignKey] = models.ForeignKey(
-        Category, on_delete=models.SET_NULL, null=True, blank=True, related_name="discounts"
+    category = models.ForeignKey(
+        'Category', on_delete=models.SET_NULL, null=True, blank=True, related_name="discounts"
     )
-    description: str = models.TextField()
-    discount_code: str = models.CharField(max_length=50, unique=True)
-    discount_value: float = models.DecimalField(
+    description = models.TextField()
+    discount_code = models.CharField(max_length=50, unique=True)
+    discount_value = models.DecimalField(
         max_digits=10,
         decimal_places=2,
         help_text="Value of the discount (e.g., amount or percentage).",
         default=0.0
     )
-    is_active: bool = models.BooleanField(
+    is_active = models.BooleanField(
         default=True,
         help_text="Whether the discount is currently active.",
     )
-    expiration_date: models.DateTimeField = models.DateTimeField(
+    expiration_date = models.DateTimeField(
         help_text="Expiration date of the discount."
     )
-    location: models.PointField = models.PointField(
+    location = models.PointField(
         help_text="Geographic location where the discount is valid (latitude/longitude)."
     )
-    image: Optional[models.FileField] = models.FileField(
+    image = models.FileField(
         upload_to="discounts/",
         storage=S3Boto3Storage(),
         validators=[FileExtensionValidator(["jpg", "jpeg", "png", "svg"])],
@@ -223,10 +221,10 @@ class Discount(models.Model):
         blank=True,
         help_text="Optional image representing the discount, stored in S3 (supports SVG).",
     )
-    created_at: models.DateTimeField = models.DateTimeField(
+    created_at = models.DateTimeField(
         auto_now_add=True, help_text="Timestamp when the discount was created."
     )
-    updated_at: models.DateTimeField = models.DateTimeField(
+    updated_at = models.DateTimeField(
         auto_now=True, help_text="Timestamp when the discount was last updated."
     )
 
@@ -234,19 +232,19 @@ class Discount(models.Model):
         """Returns a string representation of the discount."""
         return f"{self.retailer.name} - {self.description[:30]}"
 
-    def get_nearby_users(self, radius_km: float = 5.0) -> List[settings.AUTH_USER_MODEL]:
+    def get_nearby_users(self, radius_km: float = 5.0) -> List[CustomUser]:
         """Get users within a specified radius of the discount location.
+        
+        Uses the database router to query the User model in the authentication shard.
         
         Args:
             radius_km (float): Radius in kilometers to search for users.
             
         Returns:
-            List[User]: List of users within the specified radius.
+            List[CustomUser]: List of users within the specified radius.
         """
-        User = settings.AUTH_USER_MODEL
-        
-        # Get all users with a location within the radius
-        nearby_users = User.objects.filter(
+        # The router automatically directs this query to the authentication_shard
+        nearby_users = CustomUser.objects.using('authentication_shard').filter(
             location__distance_lte=(self.location, D(km=radius_km))
         ).exclude(
             id=self.retailer.owner_id  # Exclude the retailer owner
@@ -308,6 +306,7 @@ class Discount(models.Model):
                 }
             )
             raise
+
 
 
 class SharedDiscount(models.Model):
@@ -390,14 +389,16 @@ class SharedDiscount(models.Model):
             )
             raise
 
-
 class WebSocketDiscountRequest(models.Model):
     """
     Tracks WebSocket discount requests and their status.
 
+    In a sharded architecture where users are in a different database shard,
+    we store the user_id as a regular field instead of a direct foreign key.
+
     Attributes:
         request_id (str): Unique identifier for the request
-        user (User): The user who made the request
+        user_id (int): ID of the user who made the request (stored as value, not FK)
         location (Point): The location for the discount search
         radius (float): Search radius in kilometers
         category (Optional[Category]): The category to filter by
@@ -409,26 +410,24 @@ class WebSocketDiscountRequest(models.Model):
         updated_at (datetime): When the request was last updated
     """
     
-    request_id: str = models.UUIDField(
+    request_id = models.UUIDField(
         primary_key=True,
         default=uuid.uuid4,
         editable=False,
         help_text="Unique identifier for the WebSocket request"
     )
-    user: models.ForeignKey = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="websocket_requests",
-        help_text="User who made the request"
+    # Store user ID as integer instead of foreign key
+    user_id = models.BigIntegerField(
+        help_text="ID of the user who made the request"
     )
-    location: models.PointField = models.PointField(
+    location = models.PointField(
         help_text="Location for the discount search"
     )
-    radius: float = models.FloatField(
+    radius = models.FloatField(
         default=10.0,
         help_text="Search radius in kilometers"
     )
-    category: Optional[models.ForeignKey] = models.ForeignKey(
+    category = models.ForeignKey(
         Category,
         on_delete=models.SET_NULL,
         null=True,
@@ -436,7 +435,7 @@ class WebSocketDiscountRequest(models.Model):
         related_name="websocket_requests",
         help_text="Category to filter by"
     )
-    status: str = models.CharField(
+    status = models.CharField(
         max_length=20,
         choices=[
             ("pending", "Pending"),
@@ -447,28 +446,35 @@ class WebSocketDiscountRequest(models.Model):
         default="pending",
         help_text="Current status of the request"
     )
-    results: Dict[str, Any] = models.JSONField(
+    results = models.JSONField(
         default=dict,
         blank=True,
         help_text="Results of the request"
     )
-    conversation_history: List[Dict[str, Any]] = models.JSONField(
+    conversation_history = models.JSONField(
         default=list,
         blank=True,
         help_text="History of conversation messages"
     )
-    websocket_url: str = models.URLField(
+    websocket_url = models.URLField(
         max_length=500,
         blank=True,
         help_text="URL for WebSocket connection"
     )
-    created_at: models.DateTimeField = models.DateTimeField(
+    created_at = models.DateTimeField(
         auto_now_add=True,
         help_text="When the request was created"
     )
-    updated_at: models.DateTimeField = models.DateTimeField(
+    updated_at = models.DateTimeField(
         auto_now=True,
         help_text="When the request was last updated"
+    )
+    # Optional: Store additional user information for quick access
+    user_email = models.EmailField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="User email for quick reference without cross-shard query"
     )
 
     def __str__(self) -> str:
@@ -485,7 +491,7 @@ class WebSocketDiscountRequest(models.Model):
                 "websocket_request_save",
                 {
                     'request_id': str(self.request_id),
-                    'user_id': self.user.id,
+                    'user_id': self.user_id,
                     'status': self.status
                 }
             )
@@ -497,7 +503,7 @@ class WebSocketDiscountRequest(models.Model):
                 e,
                 {
                     'request_id': str(self.request_id),
-                    'user_id': self.user.id
+                    'user_id': self.user_id
                 }
             )
             raise
@@ -505,7 +511,7 @@ class WebSocketDiscountRequest(models.Model):
     class Meta:
         indexes = [
             models.Index(fields=['request_id']),
-            models.Index(fields=['user']),
+            models.Index(fields=['user_id']),  
             models.Index(fields=['status']),
             models.Index(fields=['created_at']),
         ]

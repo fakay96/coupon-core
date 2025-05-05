@@ -144,7 +144,7 @@ CHANNEL_LAYERS = {
 # Celery Configuration (RabbitMQ)
 # -----------------------------------------------
 CELERY_BROKER_URL = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:6379/0"
-CELERY_RESULT_BACKEND = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:6379/0"
+result_backend = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:6379/0"
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
 # -----------------------------------------------
@@ -167,9 +167,22 @@ SIMPLE_JWT = {
     "USER_ID_CLAIM": "user_id",
     "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
 }
-CELERY_ALWAYS_EAGER=True
+task_always_eager=True
 FRONTEND_DOMAIN_NAME="https://app.dishpal.ai"
 
 CORS_ALLOWED_ORIGINS=[
-    "https://app.dishpal.ai"
+    "https://app.dishpal.ai",
+    "https://admin.dishpal.ai"
+]
+
+# WebSocket Settings for Production
+WEBSOCKET_PROTOCOL = 'wss'  # Secure WebSocket in production
+WEBSOCKET_DOMAIN = os.getenv('WEBSOCKET_DOMAIN', 'api.dishpal.ai')
+WEBSOCKET_PORT = int(os.getenv('WEBSOCKET_PORT', 443))  # Standard HTTPS port
+WEBSOCKET_PATH = '/ws/discount-requests/'
+
+# WebSocket Allowed Origins for Production
+WEBSOCKET_ALLOWED_ORIGINS = [
+    'https://app.dishpal.ai',
+    'https://admin.dishpal.ai'
 ]
