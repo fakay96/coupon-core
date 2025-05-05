@@ -1,7 +1,6 @@
 import isEmpty from "lodash/isEmpty";
 import {
   discountFilters,
-  //  discountProducts
 } from "@/constants";
 import { FaHeart } from "react-icons/fa6";
 import { FaRegHeart } from "react-icons/fa";
@@ -25,9 +24,7 @@ const DiscountPage = () => {
   const pathname = useLocation().pathname;
   const { data: allDiscount } = discountApiQuery();
 
-  console.count("Discount Page");
   const [toggleHeart, setToggleHeart] = useState(true);
-  // const [discountItems, setDiscountItems] = useState(discountProducts);
 
   const filteredItems = useMemo(() => {
     if (!allDiscount) return [];
@@ -80,9 +77,11 @@ const DiscountPage = () => {
                 <div
                   onClick={() => {
                     navigate(
-                      `/dashboard/discount${discount ? "" : "?discount=All"}`
+                      `/dashboard`
                     );
-                    // navigate(`/dashboard/discount`);
+                    // navigate(
+                    //   `/dashboard/discount${discount ? "" : "?discount=All"}`
+                    // );
                   }}
                   className="absolute right-2 top-2 p-2 rounded-full hover:bg-slate-100 hover:cursor-pointer"
                 >
@@ -282,7 +281,8 @@ const SearchInputBox = ({ discount }: { discount: string | null }) => {
         <div
           onClick={() => {
             setValue("");
-            navigate(`/dashboard/discount${discount ? "" : "?discount=All"}`);
+            navigate(`/dashboard`);
+            // navigate(`/dashboard/discount${discount ? "" : "?discount=All"}`);
           }}
           className="absolute top-1/2 right-2 -translate-y-1/2 hover:bg-slate-200 p-1 rounded-full"
         >

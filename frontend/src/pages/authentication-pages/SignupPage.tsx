@@ -26,6 +26,7 @@ import AuthHeader from "@/components/auth-component/header";
 const SignUpPage = () => {
   const navigate = useNavigate();
   const [eyeToggle, setEyeToggle] = useState(true);
+  const [eyeToggleConfirm, setEyeToggleConfirm] = useState(true);
 
   // Mutation for registering the user
   const { isPending, mutateAsync: registerUser } = registerUserMutation();
@@ -34,6 +35,7 @@ const SignUpPage = () => {
     defaultValues: {
       email: "",
       password: "",
+      password_confirmation: "",
       terms: true,
     },
   });
@@ -42,6 +44,7 @@ const SignUpPage = () => {
   const onSubmit = async ({
     email,
     password,
+    password_confirmation
   }: z.infer<typeof signUpSchema>) => {
     const username = email?.split("@")[0];
 
@@ -50,6 +53,7 @@ const SignUpPage = () => {
       username: username,
       password,
       confirm_password: password,
+      password_confirmation,
     };
     toast.promise(
       registerUser(validatedUser).then(() => {
@@ -75,18 +79,7 @@ const SignUpPage = () => {
         alt=""
         className="hidden md:block place-self-center 2xl:ml-auto"
       />
-      {/* <div className="relative hidden 2xl:grid">
-        <img
-          src="/images/logo.svg"
-          alt=""
-          className="2xl:absolute 2xl:w-[150px] h-auto left-4 top-4 z-50"
-        />
-        <img
-          src="/images/coverSignupImg.png"
-          alt=""
-          className="2xl:absolute 2xl:h-full 2xl:w-full place-self-center justify-self-end "
-        />
-      </div> */}
+    
       <div className="flex items-center justify-center md:justify-start 2xl:mr-auto w-full max-w-lg mb-16">
         <div className="space-y-4 sm:space-y-6 w-full">
           <div className="space-y-3 mb-12 hidden md:block">
@@ -140,7 +133,7 @@ const SignUpPage = () => {
                             <Input
                               className="h-12 bg-white border-none rounded-none  placeholder:font-semibold  placeholder:font-syne  placeholder:!text-gray-300"
                               type={eyeToggle ? "password" : "text"}
-                              placeholder="Password"
+                              placeholder="••••••••••"
                               {...field}
                             />
                           </FormControl>
@@ -152,6 +145,36 @@ const SignUpPage = () => {
                           ) : (
                             <EyeOff
                               onClick={() => setEyeToggle(!eyeToggle)}
+                              className="size-5 hover:cursor-pointer absolute top-1/2 right-1 -translate-y-1/2 -translate-x-1/2"
+                            />
+                          )}
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="password_confirmation"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="relative">
+                          <FormControl>
+                            <Input
+                              className="h-12 bg-white border-none rounded-none  placeholder:font-semibold  placeholder:font-syne  placeholder:!text-gray-300"
+                              type={eyeToggleConfirm ? "password" : "text"}
+                              placeholder="••••••••••"
+                              {...field}
+                            />
+                          </FormControl>
+                          {eyeToggleConfirm ? (
+                            <EyeIcon
+                              onClick={() => setEyeToggleConfirm(!eyeToggleConfirm)}
+                              className="size-5 hover:cursor-pointer absolute top-1/2 right-1 -translate-y-1/2 -translate-x-1/2"
+                            />
+                          ) : (
+                            <EyeOff
+                              onClick={() => setEyeToggleConfirm(!eyeToggleConfirm)}
                               className="size-5 hover:cursor-pointer absolute top-1/2 right-1 -translate-y-1/2 -translate-x-1/2"
                             />
                           )}

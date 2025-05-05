@@ -1,101 +1,64 @@
-// Import the zod library for schema validation
 import * as z from "zod";
 
-// Define a schema for user settings validation
-export const SettingsSchema = z
-  .object({
-    name: z.optional(z.string()),
-    isTwoFactorEnabled: z.optional(z.boolean()),
-    role: z.enum(["ADMIN", "USER"]),
-    email: z.optional(z.string().email()),
-    password: z.optional(z.string().min(6)),
-    newPassword: z.optional(z.string().min(6)),
+const passwordSchema = z
+  .string({
+    required_error: "Password is required",
+    invalid_type_error: "Password must be a string",
+  })
+  .min(8, { message: "Password must be at least 8 characters long" })
+  .refine((password) => /[A-Z]/.test(password), {
+    message: "Password must contain at least one uppercase letter",
+  })
+  .refine((password) => /[a-z]/.test(password), {
+    message: "Password must contain at least one lowercase letter",
+  })
+  .refine((password) => /[0-9]/.test(password), {
+    message: "Password must contain at least one number",
   })
   .refine(
-    (data) => {
-      if (data.password && !data.newPassword) return false;
-
-      return true;
-    },
-    {
-      message: "New password is required!",
-      path: ["newPassword"],
-    }
-  )
-  .refine(
-    (data) => {
-      if (data.newPassword && !data.password) return false;
-
-      return true;
-    },
-    {
-      message: "Password is required!",
-      path: ["password"],
-    }
+    (password) => /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password),
+    { message: "Password must contain at least one special character" }
   );
 
-// Define a schema for new password validation
-export const NewPasswordSchema = z.object({
-  password: z.string().min(6, { message: "Minimum of 6 characters required" }),
-});
-
-// Define a schema for password reset validation
-export const ResetSchema = z.object({
-  email: z.string().email({ message: "Email is required." }),
-});
-
-// Define a schema for login validation
-export const LoginSchema = z.object({
-  email: z.string().email({ message: "Email is required." }),
-  password: z.string().min(1, { message: "Password is required" }),
-  code: z.optional(z.string()),
-});
-
-// Define a schema for user registration validation
-export const RegisterSchema = z.object({
-  name: z.string().min(1, {
-    message: "Name is required",
-  }),
-  email: z.string().email({ message: "Email is required." }),
-  password: z.string().min(6, { message: "Minimum 6 characters required" }),
-});
-
 // Define a schema for sign-up validation
-export const signUpSchema = z.object({
-  email: z.string().email({ message: "Enter a valid email" }),
-  password: z
-    .string()
-    .min(8, { message: "Enter minimum of 8 characters" })
-    .max(50),
-  terms: z.boolean().default(false).optional(),
-});
-
-// Define a schema for review validation
-export const reviewSchema = z.object({
-  name: z.string({ message: "Enter a valid email" }),
-  email: z.string().email({ message: "Enter a valid email" }),
-  review: z.string({ message: "Enter a valid values" }),
-});
+export const signUpSchema = z
+  .object({
+    email: z.string().email({ message: "Enter a valid email" }),
+    password: passwordSchema,
+    password_confirmation: z.string(),
+    terms: z.boolean().default(false).optional(),
+  })
+  .refine((data) => data.password === data.password_confirmation, {
+    message: "Passwords do not match",
+    path: ["password_confirmation"],
+  });
 
 // Define a schema for sign-in validation
 export const signInSchema = z.object({
   email: z.string().email({ message: "Enter a valid email" }),
-  password: z
-    .string()
-    .min(8, { message: "Enter minimum of 8 characters" })
-    .max(50),
+  password: passwordSchema,
   rememberMe: z.boolean().default(false).optional(),
 });
-
 
 export const forgotPasswordSchema = z.object({
   email: z.string().email({ message: "Enter a valid email" }),
 });
 
-
 export const verificationCodeSchema = z.object({
   code: z.string().min(4, {
     message: "Invalid verification code.",
   }),
-  userEmail: z.string().optional()
-})
+  userEmail: z.string().optional(),
+});
+
+export const profileUpdateSchema = z.object({
+  first_name: z.string().trim().min(1, { message: "Firstname is required" }),
+  last_name: z.string().trim().min(1, { message: "Lastname is required" }),
+  preferences: z.string().optional(),
+  phone_number: z
+    .string()
+    .trim()
+    .regex(/^\+?\d[\d\s\-()]{7,}$/, {
+      message: "Phone number must be in a valid international format",
+    }),
+});

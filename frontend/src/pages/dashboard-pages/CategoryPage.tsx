@@ -262,7 +262,8 @@ const SearchInputBox: FC<{
         <div
           onClick={() => {
             setValue("");
-            navigate(`/dashboard/category${category ? "" : "?category=All"}`);
+            navigate(`/dashboard`);
+            // navigate(`/dashboard/category${category ? "" : "?category=All"}`);
           }}
           className="absolute top-1/2 right-2 -translate-y-1/2 hover:bg-slate-200 p-1 rounded-full"
         >
