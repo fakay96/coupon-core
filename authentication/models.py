@@ -20,7 +20,7 @@ from django.utils.html import format_html
 from django import forms
 from django.contrib import admin
 from django.http import HttpRequest
-
+from django.conf import settings
 logger = logging.getLogger(__name__)
 
 class CustomUser(AbstractUser):
@@ -106,7 +106,10 @@ class CustomUser(AbstractUser):
             expires_at=timezone.now() + timezone.timedelta(minutes=10),
             used=False,
         )
-        send_password_reset_email_task.delay(self.email, str(reset_request.token))
+        if settings.CELERY_ALWAYS_EAGER:
+            send_password_reset_email_task(self.email, str(reset_request.token))
+        else:
+            send_password_reset_email_task.delay(self.email, str(reset_request.token))
         
 
 

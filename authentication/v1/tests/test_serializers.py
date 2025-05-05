@@ -12,25 +12,28 @@ This module tests:
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from rest_framework.exceptions import ValidationError
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
+from django.contrib.gis.geos import Point
 
 from authentication.models import UserProfile, Role
 from authentication.v1.serializers import (
-    UserSerializer,
-    UserProfileSerializer,
-    RegisterSerializer,
     LoginSerializer,
+    RegisterSerializer,
+    UserProfileSerializer,
     GuestTokenSerializer,
-    RoleSerializer,
-    TokenSerializer
+    PasswordResetSerializer
 )
 
 User = get_user_model()
 
-class UserSerializerTestCase(TestCase):
-    """Test suite for UserSerializer."""
+class LoginSerializerTestCase(TestCase):
+    """Test suite for LoginSerializer."""
+    
+    databases = {'default', 'authentication_shard'}
 
-    def setUp(self):
+    @patch('authentication.v1.tasks.verification_task.send_verification_email_task.delay')
+    @patch('authentication.v1.tasks.verification_task.send_password_reset_email_task.delay')
+    def setUp(self, mock_reset_email, mock_verification_email):
         """Set up test data."""
         self.user_data = {
             'username': 'testuser',
@@ -40,35 +43,18 @@ class UserSerializerTestCase(TestCase):
             'last_name': 'User'
         }
         self.user = User.objects.create_user(**self.user_data)
-        self.serializer = UserSerializer(instance=self.user)
+        self.serializer = LoginSerializer()
 
     def test_contains_expected_fields(self):
         """Test serializer contains all expected fields."""
-        data = self.serializer.data
-        expected_fields = {
-            'id', 'username', 'email', 'first_name', 
-            'last_name', 'is_active', 'date_joined'
-        }
+        data = self.serializer.get_fields()
+        expected_fields = {'email', 'password'}
         self.assertEqual(set(data.keys()), expected_fields)
 
     def test_password_write_only(self):
         """Test password field is write-only."""
-        data = self.serializer.data
-        self.assertNotIn('password', data)
-
-    def test_username_validation(self):
-        """Test username validation rules."""
-        invalid_usernames = [
-            'user@name',  # No special characters
-            'ab',         # Too short
-            'a' * 151,    # Too long
-            '',          # Empty
-            None         # None
-        ]
-        serializer = UserSerializer()
-        for username in invalid_usernames:
-            with self.assertRaises(ValidationError):
-                serializer.validate_username(username)
+        data = self.serializer.get_fields()
+        self.assertTrue(data['password'].write_only)
 
     def test_email_validation(self):
         """Test email validation rules."""
@@ -79,35 +65,117 @@ class UserSerializerTestCase(TestCase):
             'user@.com',
             ''
         ]
-        serializer = UserSerializer()
         for email in invalid_emails:
+            serializer = LoginSerializer(data={'email': email, 'password': 'TestPass123!'})
+            self.assertFalse(serializer.is_valid())
+            self.assertIn('email', serializer.errors)
+
+    @patch('authentication.v1.tasks.verification_task.send_verification_email_task.delay')
+    @patch('authentication.v1.tasks.verification_task.send_password_reset_email_task.delay')
+    def test_valid_credentials(self, mock_reset_email, mock_verification_email):
+        """Test valid login credentials."""
+        data = {
+            'email': 'test@example.com',
+            'password': 'TestPass123!'
+        }
+        serializer = LoginSerializer(data=data)
+        self.assertTrue(serializer.is_valid())
+        self.assertEqual(serializer.validated_data['user'], self.user)
+
+    @patch('authentication.v1.tasks.verification_task.send_verification_email_task.delay')
+    @patch('authentication.v1.tasks.verification_task.send_password_reset_email_task.delay')
+    def test_invalid_credentials(self, mock_reset_email, mock_verification_email):
+        invalid_cases = [
+            {'email': 'test@example.com', 'password': 'WrongPass123!'},
+            {'email': 'wrong@example.com', 'password': 'TestPass123!'},
+            {'email': '', 'password': 'TestPass123!'},
+            {'email': 'test@example.com', 'password': ''}
+        ]
+        for case in invalid_cases:
+            serializer = LoginSerializer(data=case)
+            self.assertFalse(serializer.is_valid())
+
+            if case.get('email') and case.get('password'):
+                self.assertIn('non_field_errors', serializer.errors)
+            else:
+                self.assertTrue(any(field in serializer.errors for field in ['email', 'password']))
+
+
+    def test_password_validation_rules(self):
+        """Test password validation rules."""
+        invalid_passwords = [
+            'short',  # Too short
+            'no_uppercase123!',  # No uppercase
+            'NO_LOWERCASE123!',  # No lowercase
+            'NoSpecialChar123',  # No special char
+            'NoNumbers!!',  # No numbers
+            ''  # Empty
+        ]
+        for password in invalid_passwords:
             with self.assertRaises(ValidationError):
-                serializer.validate_email(email)
+                self.serializer.validate_password(password)
+
+    @patch('authentication.v1.tasks.verification_task.send_verification_email_task.delay')
+    @patch('authentication.v1.tasks.verification_task.send_password_reset_email_task.delay')
+    def test_email_case_insensitivity(self, mock_reset_email, mock_verification_email):
+        """Test email case insensitivity."""
+        data = {
+            'email': 'TEST@example.com',
+            'password': 'TestPass123!'
+        }
+        serializer = LoginSerializer(data=data)
+        self.assertTrue(serializer.is_valid())
+        self.assertEqual(serializer.validated_data['email'].lower(), 'test@example.com')
+
+    @patch('authentication.v1.tasks.verification_task.send_verification_email_task.delay')
+    @patch('authentication.v1.tasks.verification_task.send_password_reset_email_task.delay')
+    def test_guest_user_login(self, mock_reset_email, mock_verification_email):
+        """Test guest users cannot log in."""
+        # Create a guest user
+        guest_user = User.objects.create_user(
+            username='guest',
+            email='guest@example.com',
+            password='TestPass123!',
+            is_guest=True
+        )
+        
+        data = {
+            'email': 'guest@example.com',
+            'password': 'TestPass123!'
+        }
+        serializer = LoginSerializer(data=data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('non_field_errors', serializer.errors)
 
 class UserProfileSerializerTestCase(TestCase):
     """Test suite for UserProfileSerializer."""
+    
+    databases = {'default', 'authentication_shard'}
 
-    def setUp(self):
+    @patch('authentication.v1.tasks.verification_task.send_verification_email_task.delay')
+    @patch('authentication.v1.tasks.verification_task.send_password_reset_email_task.delay')
+    def setUp(self, mock_reset_email, mock_verification_email):
         """Set up test data."""
         self.user = User.objects.create_user(
             username='testuser',
             email='test@example.com',
             password='TestPass123!'
         )
-        self.profile_data = {
-            'user': self.user,
-            'bio': 'Test bio',
-            'location': 'Test location',
-            'preferences': {'theme': 'dark'}
-        }
-        self.profile = UserProfile.objects.create(**self.profile_data)
+        # The UserProfile will be created by the signal
+        self.profile = self.user.profile
+        self.profile.preferences = {'theme': 'dark'}
+        self.profile.location = Point(0.0, 0.0)
+        self.profile.save()
         self.serializer = UserProfileSerializer(instance=self.profile)
 
-    def test_nested_user_serialization(self):
-        """Test nested user data serialization."""
+    def test_contains_expected_fields(self):
+        """Test serializer contains all expected fields."""
         data = self.serializer.data
-        self.assertIn('user', data)
-        self.assertEqual(data['user']['username'], 'testuser')
+        expected_fields = {
+            'first_name', 'last_name', 'phone_number',
+            'preferences', 'profile_image'
+        }
+        self.assertEqual(set(data.keys()), expected_fields)
 
     def test_preferences_validation(self):
         """Test preferences field validation."""
@@ -117,60 +185,87 @@ class UserProfileSerializerTestCase(TestCase):
             {'invalid_key': {'nested': 'not_allowed'}},
             {'theme': None}
         ]
-        serializer = UserProfileSerializer()
         for prefs in invalid_preferences:
-            with self.assertRaises(ValidationError):
-                serializer.validate_preferences(prefs)
+            serializer = UserProfileSerializer(data={'preferences': prefs})
+            self.assertFalse(serializer.is_valid())
+            self.assertIn('preferences', serializer.errors)
 
-    def test_read_only_fields(self):
-        """Test read-only fields cannot be modified."""
-        data = {
-            'user': {'id': 999},
-            'date_joined': '2024-01-01T00:00:00Z'
-        }
-        serializer = UserProfileSerializer(self.profile, data=data, partial=True)
-        serializer.is_valid()
-        updated_profile = serializer.save()
-        self.assertEqual(updated_profile.user.id, self.user.id)
+    def test_location_validation(self):
+        """Test location field validation."""
+        invalid_locations = [
+            [0.0],  # Missing latitude
+            [0.0, 0.0, 0.0],  # Extra coordinate
+            ['invalid', 'invalid'],  # Non-numeric values
+            [200.0, 100.0]  # Invalid coordinates
+        ]
+        for loc in invalid_locations:
+            serializer = UserProfileSerializer(data={'location': loc})
+            self.assertFalse(serializer.is_valid())
+            self.assertIn('location', serializer.errors)
+
+    def test_preferences_nested_validation(self):
+        """Test nested preferences validation."""
+        invalid_nested_prefs = [
+            {
+                'notifications': {
+                    'email': 'invalid',  # Should be boolean
+                    'push': 123  # Should be boolean
+                }
+            },
+            {
+                'theme': {
+                    'primary': '#invalid',  # Invalid color
+                    'secondary': 123  # Invalid type
+                }
+            }
+        ]
+        for prefs in invalid_nested_prefs:
+            serializer = UserProfileSerializer(data={'preferences': prefs})
+            self.assertFalse(serializer.is_valid())
+            self.assertIn('preferences', serializer.errors)
+
+    def test_location_coordinate_validation(self):
+        """Test location coordinate validation."""
+        invalid_coordinates = [
+            {'lat': 91, 'lng': 0},  # Invalid latitude
+            {'lat': -91, 'lng': 0},  # Invalid latitude
+            {'lat': 0, 'lng': 181},  # Invalid longitude
+            {'lat': 0, 'lng': -181},  # Invalid longitude
+            {'lat': 'invalid', 'lng': 0},  # Invalid type
+            {'lat': 0, 'lng': 'invalid'}  # Invalid type
+        ]
+        for coords in invalid_coordinates:
+            serializer = UserProfileSerializer(data={'location': [coords['lng'], coords['lat']]})
+            self.assertFalse(serializer.is_valid())
+            self.assertIn('location', serializer.errors)
 
 class RegisterSerializerTestCase(TestCase):
     """Test suite for RegisterSerializer."""
+    
+    databases = {'default', 'authentication_shard'}
 
     def setUp(self):
         """Set up test data."""
+        self.serializer = RegisterSerializer()
         self.valid_data = {
-            'username': 'newuser',
-            'email': 'new@example.com',
-            'password': 'NewPass123!',
-            'confirm_password': 'NewPass123!'
+            'username': 'testuser',
+            'email': 'test@example.com',
+            'password': 'TestPass123!',
+            'password_confirmation': 'TestPass123!'
         }
 
-    def test_passwords_match(self):
-        """Test password confirmation validation."""
-        data = self.valid_data.copy()
-        data['confirm_password'] = 'DifferentPass123!'
-        serializer = RegisterSerializer(data=data)
-        self.assertFalse(serializer.is_valid())
-        self.assertIn('confirm_password', serializer.errors)
+    @patch('authentication.v1.tasks.verification_task.send_verification_email_task.delay')
+    @patch('authentication.v1.tasks.verification_task.send_password_reset_email_task.delay')
+    def test_password_hashing(self, mock_reset_email, mock_verification_email):
+        """Test password is hashed during user creation."""
+        serializer = RegisterSerializer(data=self.valid_data)
+        self.assertTrue(serializer.is_valid())
+        user = serializer.save()
+        self.assertNotEqual(user.password, self.valid_data['password'])
 
-    def test_password_complexity(self):
-        """Test password complexity requirements."""
-        invalid_passwords = [
-            'short',           # Too short
-            'onlylowercase',   # No uppercase
-            'ONLYUPPERCASE',   # No lowercase
-            'NoNumbers',       # No numbers
-            'NoSpecial123'     # No special characters
-        ]
-        for password in invalid_passwords:
-            data = self.valid_data.copy()
-            data['password'] = password
-            data['confirm_password'] = password
-            serializer = RegisterSerializer(data=data)
-            self.assertFalse(serializer.is_valid())
-            self.assertIn('password', serializer.errors)
-
-    def test_unique_email(self):
+    @patch('authentication.v1.tasks.verification_task.send_verification_email_task.delay')
+    @patch('authentication.v1.tasks.verification_task.send_password_reset_email_task.delay')
+    def test_unique_email(self, mock_reset_email, mock_verification_email):
         """Test email uniqueness validation."""
         User.objects.create_user(
             username='existing',
@@ -181,115 +276,147 @@ class RegisterSerializerTestCase(TestCase):
         self.assertFalse(serializer.is_valid())
         self.assertIn('email', serializer.errors)
 
-class LoginSerializerTestCase(TestCase):
-    """Test suite for LoginSerializer."""
+    def test_username_validation(self):
+        """Test username validation rules."""
+        invalid_usernames = [
+            'invalid@username',  # Contains @
+            'ab',  # Too short
+            'a' * 31,  # Too long
+            'user name',  # Contains space
+            'user/name',  # Contains invalid char
+        ]
+        for username in invalid_usernames:
+            data = self.valid_data.copy()
+            data['username'] = username
+            serializer = RegisterSerializer(data=data)
+            self.assertFalse(serializer.is_valid())
+            self.assertIn('username', serializer.errors)
 
-    def setUp(self):
-        """Set up test data."""
-        self.user = User.objects.create_user(
-            username='testuser',
-            email='test@example.com',
-            password='TestPass123!'
-        )
-        self.valid_data = {
-            'username': 'testuser',
-            'password': 'TestPass123!'
-        }
-
-    def test_valid_credentials(self):
-        """Test valid login credentials."""
-        serializer = LoginSerializer(data=self.valid_data)
+    @patch('authentication.v1.tasks.verification_task.send_verification_email_task.delay')
+    @patch('authentication.v1.tasks.verification_task.send_password_reset_email_task.delay')
+    def test_password_confirmation(self, mock_reset_email, mock_verification_email):
+        """Test password confirmation validation."""
+        # Test matching passwords
+        data = self.valid_data.copy()
+        serializer = RegisterSerializer(data=data)
         self.assertTrue(serializer.is_valid())
 
-    def test_invalid_credentials(self):
-        """Test invalid login credentials."""
-        invalid_cases = [
-            {'username': 'testuser', 'password': 'WrongPass123!'},
-            {'username': 'wronguser', 'password': 'TestPass123!'},
-            {'username': '', 'password': 'TestPass123!'},
-            {'username': 'testuser', 'password': ''}
-        ]
-        for case in invalid_cases:
-            serializer = LoginSerializer(data=case)
-            self.assertFalse(serializer.is_valid())
-
-    @patch('authentication.v1.serializers.authenticate')
-    def test_inactive_user(self, mock_authenticate):
-        """Test login attempt with inactive user."""
-        self.user.is_active = False
-        self.user.save()
-        mock_authenticate.return_value = self.user
-        
-        serializer = LoginSerializer(data=self.valid_data)
+        # Test mismatched passwords
+        data['password_confirmation'] = 'DifferentPass123!'
+        serializer = RegisterSerializer(data=data)
         self.assertFalse(serializer.is_valid())
         self.assertIn('non_field_errors', serializer.errors)
 
-class TokenSerializerTestCase(TestCase):
-    """Test suite for TokenSerializer."""
+    @patch('authentication.v1.tasks.verification_task.send_verification_email_task.delay')
+    @patch('authentication.v1.tasks.verification_task.send_password_reset_email_task.delay')
+    def test_guest_user_limits(self, mock_reset_email, mock_verification_email):
+        """Test guest user creation limits."""
+        # Create maximum number of guest users
+        for i in range(5):
+            User.objects.create_user(
+                username=f'guest{i}',
+                email=f'guest{i}@example.com',
+                password='TestPass123!',
+                is_guest=True
+            )
+
+        # Try to create another guest user
+        data = self.valid_data.copy()
+        data['is_guest'] = True
+        serializer = RegisterSerializer(data=data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('non_field_errors', serializer.errors)
+
+class GuestTokenSerializerTestCase(TestCase):
+    """Test suite for GuestTokenSerializer."""
+    
+    databases = {'default', 'authentication_shard'}
+
+    @patch('authentication.v1.tasks.verification_task.send_verification_email_task.delay')
+    @patch('authentication.v1.tasks.verification_task.send_password_reset_email_task.delay')
+    def setUp(self, mock_reset_email, mock_verification_email):
+        """Set up test data."""
+        self.serializer = GuestTokenSerializer()
+        self.valid_data = {
+            'email': 'guest@example.com'
+        }
+
+    @patch('authentication.v1.tasks.verification_task.send_verification_email_task.delay')
+    @patch('authentication.v1.tasks.verification_task.send_password_reset_email_task.delay')
+    def test_guest_user_creation(self, mock_reset_email, mock_verification_email):
+        """Test guest user creation."""
+        serializer = GuestTokenSerializer(data=self.valid_data)
+        self.assertTrue(serializer.is_valid())
+        email = serializer.validated_data['email']
+        user = serializer.get_abstract_user(email)
+        self.assertTrue(user.is_guest)
+
+    @patch('authentication.v1.tasks.verification_task.send_verification_email_task.delay')
+    @patch('authentication.v1.tasks.verification_task.send_password_reset_email_task.delay')
+    def test_existing_user_retrieval(self, mock_reset_email, mock_verification_email):
+        """Test retrieval of existing guest user."""
+        User.objects.create_user(
+            username='guest',
+            email=self.valid_data['email'],
+            password='TestPass123!',
+            is_guest=True
+        )
+        serializer = GuestTokenSerializer(data=self.valid_data)
+        self.assertTrue(serializer.is_valid())
+        email = serializer.validated_data['email']
+        user = serializer.get_abstract_user(email)
+        self.assertTrue(user.is_guest)
+
+    @patch('authentication.v1.tasks.verification_task.send_verification_email_task.delay')
+    @patch('authentication.v1.tasks.verification_task.send_password_reset_email_task.delay')
+    def test_guest_user_limits(self, mock_reset_email, mock_verification_email):
+        """Test guest user creation limits."""
+        # Create maximum number of guest users
+        for i in range(5):
+            User.objects.create_user(
+                username=f'guest{i}',
+                email=f'guest{i}@example.com',
+                password='TestPass123!',
+                is_guest=True
+            )
+
+        # Try to create another guest user
+        serializer = GuestTokenSerializer(data={'email': 'guest6@example.com'})
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('email', serializer.errors)
+
+
+@patch('authentication.v1.tasks.verification_task.send_password_reset_email_task.delay')
+@patch('authentication.v1.serializers.PasswordResetRequest.objects.filter')
+class PasswordResetSerializerTestCase(TestCase):
+    databases = {'default', 'authentication_shard'}
 
     def setUp(self):
-        """Set up test data."""
-        self.token_data = {
-            'access': 'test_access_token',
-            'refresh': 'test_refresh_token'
-        }
+        self.email = 'test@example.com'
+        with patch('authentication.v1.signals.send_password_reset_email'):
+            self.user = User.objects.create_user(
+                username='testuser',
+                email=self.email,
+                password='TestPass123!'
+            )
 
-    def test_token_serialization(self):
-        """Test token serialization."""
-        serializer = TokenSerializer(data=self.token_data)
+    def test_valid_email(self, mock_filter, mock_send_task):
+        mock_filter.return_value.exists.return_value = False
+        serializer = PasswordResetSerializer(data={'email': self.email})
         self.assertTrue(serializer.is_valid())
-        self.assertEqual(serializer.data['access'], self.token_data['access'])
-        self.assertEqual(serializer.data['refresh'], self.token_data['refresh'])
 
-    def test_token_validation(self):
-        """Test token validation."""
-        invalid_tokens = [
-            {'access': '', 'refresh': 'test_refresh_token'},
-            {'access': 'test_access_token', 'refresh': ''},
-            {'access': None, 'refresh': 'test_refresh_token'},
-            {'refresh': 'test_refresh_token'}  # Missing access
-        ]
-        for token in invalid_tokens:
-            serializer = TokenSerializer(data=token)
-            self.assertFalse(serializer.is_valid())
+    def test_password_reset_email_sent(self, mock_filter, mock_send_task):
+        mock_filter.return_value.exists.return_value = False
+        mock_send_task.return_value = MagicMock()
 
-class RoleSerializerTestCase(TestCase):
-    """Test suite for RoleSerializer."""
-
-    def setUp(self):
-        """Set up test data."""
-        self.role_data = {
-            'name': 'test_role',
-            'description': 'Test role description'
-        }
-        self.role = Role.objects.create(**self.role_data)
-        self.serializer = RoleSerializer(instance=self.role)
-
-    def test_role_serialization(self):
-        """Test role serialization."""
-        data = self.serializer.data
-        self.assertEqual(data['name'], self.role_data['name'])
-        self.assertEqual(data['description'], self.role_data['description'])
-
-    def test_role_validation(self):
-        """Test role validation."""
-        invalid_roles = [
-            {'name': '', 'description': 'Test'},
-            {'name': 'a' * 151, 'description': 'Too long'},
-            {'name': 'test_role', 'description': ''}  # Duplicate name
-        ]
-        for role_data in invalid_roles:
-            serializer = RoleSerializer(data=role_data)
-            self.assertFalse(serializer.is_valid())
-
-    def test_role_update(self):
-        """Test role update serialization."""
-        update_data = {
-            'name': 'updated_role',
-            'description': 'Updated description'
-        }
-        serializer = RoleSerializer(self.role, data=update_data)
+        serializer = PasswordResetSerializer(data={'email': self.email})
         self.assertTrue(serializer.is_valid())
-        updated_role = serializer.save()
-        self.assertEqual(updated_role.name, update_data['name'])
-        self.assertEqual(updated_role.description, update_data['description']) 
+
+        with patch('authentication.v1.serializers.PasswordResetRequest.objects.create') as mock_create:
+            mock_create.return_value.token = 'mock-token'
+            serializer.save()
+
+        mock_send_task.assert_called_once()
+        self.assertEqual(mock_send_task.call_args[0][0], self.email)
+
+    

@@ -8,7 +8,7 @@ import logging
 from typing import Any, Dict
 
 from django.db import IntegrityError
-from rest_framework import status
+from rest_framework import status, serializers
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -293,65 +293,56 @@ class UserInfoView(APIView):
             )
         
 
-
-
 class PasswordResetView(APIView):
-    """Handles password reset requests."""
+    """Handles password reset requests via email."""
 
     permission_classes = [AllowAny]
 
     @swagger_auto_schema(
         operation_description="Handle POST requests for password reset.",
-        request_body=PasswordResetSerializer,
-        manual_parameters=[
-            openapi.Parameter(
-                "email",
-                openapi.IN_QUERY,
-                description="User's email address for password reset",
-                type=openapi.TYPE_STRING,
-                required=True,
-            ),
-            openapi.Parameter(
-                "force_resend",
-                openapi.IN_QUERY,
-                description="Force resend a new password reset token",
-                type=openapi.TYPE_BOOLEAN,
-                required=False,
-                default=False,
-            ),
-        ],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=['email'],
+            properties={
+                'email': openapi.Schema(type=openapi.TYPE_STRING, description="User email"),
+                'force_resend': openapi.Schema(
+                    type=openapi.TYPE_BOOLEAN,
+                    description="Force a new reset token even if one already exists",
+                    default=False
+                ),
+            },
+        ),
         responses={
-            200: openapi.Response(
-                description="Password reset email sent successfully."
-            ),
-            400: "Bad request due to validation errors.",
-            500: "An unexpected error occurred. Please try again later.",
+            200: openapi.Response("Password reset email sent successfully."),
+            400: openapi.Response("Validation error", schema=openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={'error': openapi.Schema(type=openapi.TYPE_STRING)}
+            )),
+            500: openapi.Response("Internal server error"),
         },
     )
-    def post(self, request: Any) -> Response:
+    def post(self, request) -> Response:
         """
         Handle POST requests for password reset.
 
-        Args:
-            request (Any): The HTTP request containing password reset data.
-
-        Returns:
-            Response: A DRF Response with a success message or an error message.
+        Expects JSON body:
+            - email (str): the user's email
+            - force_resend (bool, optional)
         """
+        serializer = PasswordResetSerializer(data=request.data)
         try:
-            serializer = PasswordResetSerializer(data=request.data)
             serializer.is_valid(raise_exception=True)
-
             serializer.save()
             return Response(
                 {"message": "Password reset email sent."},
                 status=status.HTTP_200_OK,
-            )   
-        
+            )
+        except serializers.ValidationError as ve:
+            # Return the serializer’s own error messages as a 400
+            return Response({"error": ve.detail}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            logger.error(f"Unexpected error during password reset: {str(e)}")
+            logger.error(f"Unexpected error during password reset: {e}", exc_info=True)
             return Response(
                 {"error": "An unexpected error occurred. Please try again later."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )       
-        
+            )
