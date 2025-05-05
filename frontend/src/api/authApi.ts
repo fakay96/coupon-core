@@ -1,5 +1,6 @@
 import axiosInstance from "@/api/axiosClient";
 import { loginCredentials, RegisterUserData } from "@/types";
+import { simplifyErrors } from "@/utils";
 import { TokenResponse } from "@react-oauth/google";
 import axios from "axios";
 
@@ -28,11 +29,20 @@ export const loginUserService = async (credentials: loginCredentials) => {
  * @throws {ApiError} If update fails or user is not authenticated
  */
 export const updateUserProfile = async (userProfile: any) => {
-  const response = await axiosInstance.put(
-    "/api/authentication/v1/user-profile/",
-    userProfile
-  );
-  return response.data;
+  try {
+    const response = await axiosInstance.put(
+      "/api/authentication/v1/user-profile/",
+      userProfile
+    );
+    return response.data;
+  } catch (error:any) {
+    console.error(error.data);
+    if(typeof error.data === "object"){
+       error = { message: simplifyErrors(error.data)}
+      throw error
+    }
+    throw error.data;
+  }
 };
 
 /**
@@ -140,12 +150,23 @@ export const userRegistration = async (data: {
   return response.data;
 };
 
-export const resendVerificationToken = async (data: {
+export const resendEmailVerificationToken = async (data: {
   email: string;
   force_resend: boolean;
 }) => {
   const response = await axiosInstance.put(
     "/api/authentication/v1/activate/",
+    data
+  );
+  return response.data;
+};
+
+export const resendPasswordVerificationToken = async (data: {
+  password: string;
+  force_resend: boolean;
+}) => {
+  const response = await axiosInstance.post(
+    "/api/authentication/v1/password-reset/",
     data
   );
   return response.data;

@@ -6,51 +6,74 @@ import { FaCheckSquare } from "react-icons/fa";
 import { MdCheckBoxOutlineBlank } from "react-icons/md";
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { updateUserProfileMutation } from "@/queries/auth-queries";
 
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { DeleteUserAccountService } from "@/api/authApi";
 import { useConfirm } from "@/hooks/use-confirm";
+import { z } from "zod";
+import { profileUpdateSchema } from "@/validation-schemas";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 
 const SettingsPage = () => {
   const { user, logout } = useAuth();
-  const { mutateAsync: updateUserProfile } = updateUserProfileMutation();
+  const [dialogOpen, setDialogOpen] = useState(false);
 
-  const [preferences, setPreferences] = useState("");
-  const [firstname, setFirstname] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [lastname, setLastname] = useState("");
+  const { mutateAsync: updateUserProfile } = updateUserProfileMutation();
   const [ConfirmDialog, confirm] = useConfirm(
     "Are you sure?",
     "You are about to delete this account"
   );
-  const handleSummit = async () => {
-    const user = {
-      first_name: firstname,
-      last_name: lastname,
-      phone_number: phoneNumber,
-      preferences: {},
-    };
-    toast.promise(updateUserProfile(user), {
-      loading: `${firstname}, Dishpal AI is updating your account details.`,
-      success: `${firstname}, Your profile info have been successfully updated!`,
-      error: (error) => error.message,
-    });
-  };
+
+  const form = useForm<z.infer<typeof profileUpdateSchema>>({
+    resolver: zodResolver(profileUpdateSchema),
+    defaultValues: {
+      first_name: "",
+      last_name: "",
+      preferences: "",
+      phone_number: "",
+    },
+  });
+
+  function onSubmit(values: z.infer<typeof profileUpdateSchema>) {
+    const { preferences, ...others } = values;
+    const newPreference = preferences === "" ? {} : preferences;
+    toast.promise(
+      updateUserProfile({ ...others, preferences: newPreference }),
+      {
+        loading: `${form.getValues(
+          "first_name"
+        )}, Dishpal AI is updating your account details.`,
+        success: () => {
+          setDialogOpen(false);
+          return `${form.getValues("first_name")}, Your profile info has been successfully updated!`;
+        },
+        error: (error) => JSON.stringify(error.message),
+      }
+    );
+  }
 
   useEffect(() => {
-    setFirstname(user?.first_name || "");
-    setLastname(user?.last_name || "");
+    form.setValue("first_name", user?.first_name || "");
+    form.setValue("last_name", user?.last_name || "");
+    form.setValue("phone_number", user?.phone_number || "");
   }, [user]);
 
   const handleDelete = async () => {
@@ -95,83 +118,94 @@ const SettingsPage = () => {
                     <span className="font-syne ">{user?.phone_number}</span>
                   </div>
                   <div className="absolute right-4 bottom-2 flex gap-2 font-syne font-bold">
-                    <Dialog>
+                    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                       <DialogTrigger asChild>
                         <div className="hover:cursor-pointer">Edit</div>
                       </DialogTrigger>
                       <DialogContent className="sm:max-w-[445px] w-[95svw] rounded-xl">
-                        <DialogHeader>
-                          <DialogTitle className="text-start">
-                            Edit profile
-                          </DialogTitle>
-                          <DialogDescription className="text-start">
-                            Hi{" "}
-                            <span className="text-vividOrange capitalize">
-                              {user?.first_name}
-                            </span>
-                            , Make changes to your profile here.
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                          <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="firstname" className="">
-                              Firstname
-                            </Label>
-                            <Input
-                              id="firstname"
-                              onChange={(e) => setFirstname(e.target.value)}
-                              placeholder="Matthew"
-                              value={firstname}
-                              className="col-span-3"
-                            />
-                          </div>
-                          <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="lastname" className="">
-                              Lastname
-                            </Label>
-                            <Input
-                              id="lastname"
-                              onChange={(e) => setLastname(e.target.value)}
-                              placeholder="Fred"
-                              value={lastname}
-                              className="col-span-3"
-                            />
-                          </div>
-                          <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="preferences" className="">
-                              Preferences
-                            </Label>
-                            <Input
-                              id="preferences"
-                              onChange={(e) => setPreferences(e.target.value)}
-                              placeholder="flight, travel, tourism"
-                              value={preferences}
-                              className="col-span-3"
-                            />
-                          </div>
-                          <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="phone" className="text-nowrap">
-                              Phone Number
-                            </Label>
-                            <Input
-                              id="phone"
-                              onChange={(e) => setPhoneNumber(e.target.value)}
-                              placeholder="+1 (583) 928-8372"
-                              value={phoneNumber}
-                              className="col-span-3"
-                            />
-                          </div>
-                        </div>
-                        <DialogClose asChild>
-                          <Button
-                            type="submit"
-                            variant={"vivid"}
-                            className="w-fit ml-auto"
-                            onClick={handleSummit}
-                          >
-                            Update Profile
-                          </Button>
-                        </DialogClose>
+                        <Form {...form}>
+                          <form onSubmit={form.handleSubmit(onSubmit)}>
+                            <DialogHeader>
+                              <DialogTitle className="text-start">
+                                Edit profile
+                              </DialogTitle>
+                              <DialogDescription className="text-start">
+                                Hi{" "}
+                                <span className="text-vividOrange capitalize">
+                                  {user?.first_name}
+                                </span>
+                                , Make changes to your profile here.
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="grid gap-4 py-4">
+                              <FormField
+                                control={form.control}
+                                name="first_name"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>First Name</FormLabel>
+                                    <FormControl>
+                                      <Input placeholder="Matthew" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={form.control}
+                                name="last_name"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Last Name</FormLabel>
+                                    <FormControl>
+                                      <Input placeholder="Mark" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={form.control}
+                                name="preferences"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Preferences</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        placeholder="flight, travel, tourism"
+                                        {...field}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={form.control}
+                                name="phone_number"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Phone Number</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        placeholder="+1 (583) 928-8372"
+                                        {...field}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                            <Button
+                              type="submit"
+                              variant={"vivid"}
+                              className="w-fit ml-auto"
+                            >
+                              Update Profile
+                            </Button>
+                          </form>
+                        </Form>
                       </DialogContent>
                     </Dialog>
                   </div>

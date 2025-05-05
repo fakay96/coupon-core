@@ -14,9 +14,13 @@ import { Link, useNavigate } from "react-router-dom";
 import { forgotPasswordSchema } from "@/validation-schemas";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { loginUserMutation } from "@/queries/auth-queries";
+import {
+  loginUserMutation,
+  retryEmailTokenMutation,
+} from "@/queries/auth-queries";
 
 const ForgotPasswordPage = () => {
+  const { mutateAsync } = retryEmailTokenMutation();
   const navigate = useNavigate();
 
   // Mutation for logging in the user
@@ -33,24 +37,18 @@ const ForgotPasswordPage = () => {
 
   // Form submit handler
   const onSubmit = ({ email }: z.infer<typeof forgotPasswordSchema>) => {
-    toast.success(email);
-    return navigate("/auth/verification", { replace: true });
-    // toast.promise(
-    //   loginUser(userInfo).then(() => {
-    //     navigate("/dashboard", { replace: true });
-    //   }),
-    //   {
-    //     loading: `${
-    //       firstname || userInfo?.username
-    //     }, Dishpal AI is logging you into your account now.`,
-    //     success: `${
-    //       firstname || userInfo?.username
-    //     }, Here is your dashboard! Explore!`,
-    //     error: `${
-    //       firstname || userInfo?.username
-    //     }, Check your email and password and try again!`,
-    //   }
-    // );
+    const name = email?.split("@")[0];
+    // toast.success(`Verification code sent to : ${email}`);
+
+    toast.promise(mutateAsync({ email, force_resend: true }), {
+      loading: `${name}, Dishpal AI is sending your verification email now`,
+      success: `${name}, Check your email now to get your verification code`,
+      error: (error) => error.message,
+    });
+    return navigate("/auth/verification", {
+      replace: true,
+      state: { passwordReset: true },
+    });
   };
 
   return (

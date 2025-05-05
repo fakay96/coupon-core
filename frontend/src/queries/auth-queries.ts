@@ -2,7 +2,8 @@ import {
   getUserInfo,
   loginUserService,
   registerUserService,
-  resendVerificationToken,
+  resendEmailVerificationToken,
+  resendPasswordVerificationToken,
   updateUserProfile,
   verifyEmailToken,
 } from "@/api/authApi";
@@ -70,7 +71,19 @@ export const retryEmailTokenMutation = () => {
   return useMutation({
     mutationKey: ["retryEmailTokenMutation"],
     mutationFn: async (value: { email: string; force_resend: boolean }) =>
-      await resendVerificationToken(value),
+      await resendEmailVerificationToken(value),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["userInfo"] });
+    },
+  });
+};
+
+export const retryPasswordTokenMutation = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: ["retryPasswordTokenMutation"],
+    mutationFn: async (value: { password: string; force_resend: boolean }) =>
+      await resendPasswordVerificationToken(value),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["userInfo"] });
     },
