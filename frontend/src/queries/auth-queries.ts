@@ -7,6 +7,7 @@ import {
   updateUserProfile,
   verifyEmailToken,
 } from "@/api/authApi";
+import { geodiscountApi } from "@/api/geoDiscountApi";
 import { loginCredentials, RegisterUserData } from "@/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -101,6 +102,8 @@ export const verifyEmailTokenMutation = () => {
     },
   });
 };
+
+
 export const updateUserProfileMutation = () => {
   const queryClient = useQueryClient();
   return useMutation({
@@ -109,5 +112,17 @@ export const updateUserProfileMutation = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["userInfo"] });
     },
+  });
+};
+
+
+export const geodiscountApiMutation = () => {
+  // const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: ["geodiscountApiMutation"],
+    mutationFn: async (value: any) => await geodiscountApi(value),
+    // onSuccess: () => {
+    //   queryClient.invalidateQueries({ queryKey: ["userInfo"] });
+    // },
   });
 };

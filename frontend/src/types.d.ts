@@ -50,3 +50,10 @@ export interface DiscountItemT {
   img: string;
   category: string;
 }
+
+export type Message = {
+  id: string;
+  content: string;
+  sender: "user" | "dishpal";
+  timestamp: Date;
+};

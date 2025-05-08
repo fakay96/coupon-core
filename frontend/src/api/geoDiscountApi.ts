@@ -19,6 +19,25 @@ export const discountApi = async () => {
   }
 };
 
+
+/**
+ * Fetches all available discounts from the system
+ * @returns Promise containing discount data
+ * @throws {ApiError} Backend API error response
+ */
+export const geodiscountApi = async (userMessage: string) => {
+  try {
+    const response = await axiosInstance.post("/api/geodiscounts/v1/discount/geodiscount/",userMessage);
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response?.data) {
+      console.error('Discount API Error:', error.response.data);
+      throw error.response.data;
+    }
+    throw error;
+  }
+};
+
 /**
  * Retrieves all discount categories available in the system
  * @returns Promise containing category data
