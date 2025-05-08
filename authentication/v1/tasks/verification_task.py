@@ -66,7 +66,7 @@ def send_password_reset_email_task(user_email: str, token: str, logo_url: str = 
     """
     try:
         subject: str = "Password Reset Request"
-        reset_link: str = f"{settings.FRONTEND_DOMAIN_NAME}/reset-password?token={token}&email={user_email}"
+        reset_link: str = f"{settings.FRONTEND_DOMAIN_NAME}/auth/reset-password?token={token}&email={user_email}"
 
         # Context for template rendering
         context = {
