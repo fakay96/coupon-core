@@ -25,7 +25,7 @@ def send_verification_email_task(user_email: str, token: str, logo_url: str = No
     """
     try:
         subject: str = "Verify Your Account"
-        verification_link: str = f"{settings.FRONTEND_DOMAIN_NAME}/auth?token={token}&email={user_email}"
+        verification_link: str = f"{settings.FRONTEND_DOMAIN_NAME}/auth/verification?token={token}&email={user_email}&mode=activation"
 
         # Context for template rendering
         context = {
@@ -66,7 +66,7 @@ def send_password_reset_email_task(user_email: str, token: str, logo_url: str = 
     """
     try:
         subject: str = "Password Reset Request"
-        reset_link: str = f"{settings.FRONTEND_DOMAIN_NAME}/auth/verification?token={token}&email={user_email}"
+        reset_link: str = f"{settings.FRONTEND_DOMAIN_NAME}/auth/verification?token={token}&email={user_email}&mode=reset"
 
         # Context for template rendering
         context = {
@@ -104,7 +104,7 @@ def resend_verification_token_task(user_email: str, logo_url: str = None) -> Non
       4. Send the verification email using the same templates as the initial send.
 
     Args:
-        user_email (str): The recipient’s email address.
+        user_email (str): The recipient's email address.
         logo_url (str, optional): URL of the company logo to include in the email.
 
     Returns:
@@ -130,7 +130,7 @@ def resend_verification_token_task(user_email: str, logo_url: str = None) -> Non
         )
 
         # 4. Send email
-        verification_link = f"{settings.FRONTEND_DOMAIN_NAME}/auth/verification?token={new_verification.token}&email={user_email}"
+        verification_link = f"{settings.FRONTEND_DOMAIN_NAME}/auth/verification?token={new_verification.token}&email={user_email}&mode=activation"
         context = {
             "token": new_verification.token,
             "verification_link": verification_link,
