@@ -451,3 +451,95 @@ class PasswordResetView(APIView):
                 {"error": "An unexpected error occurred. Please try again later."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+    @swagger_auto_schema(
+        operation_description="Update password for authenticated user.",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=['current_password', 'new_password'],
+            properties={
+                'current_password': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="User's current password"
+                ),
+                'new_password': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="New password to set"
+                ),
+            },
+        ),
+        responses={
+            200: openapi.Response("Password updated successfully."),
+            400: openapi.Response("Validation error", schema=openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={'error': openapi.Schema(type=openapi.TYPE_STRING)}
+            )),
+            401: openapi.Response("Authentication credentials were not provided."),
+            403: openapi.Response("Current password is incorrect."),
+            500: openapi.Response("Internal server error"),
+        },
+    )
+    def patch(self, request: Any) -> Response:
+        """
+        Update password for authenticated user.
+
+        This endpoint allows authenticated users to update their password by providing
+        their current password and the new password they want to set.
+
+        Args:
+            request (Any): The HTTP request containing current_password and new_password.
+
+        Returns:
+            Response: A DRF Response indicating success or failure of the password update.
+
+        Raises:
+            ValidationError: If the request data is invalid.
+            PermissionDenied: If the current password is incorrect.
+        """
+        # Check if user is authenticated
+        if not request.user.is_authenticated:
+            return Response(
+                {"error": "Authentication credentials were not provided."},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        # Extract request data
+        current_password = request.data.get('current_password')
+        new_password = request.data.get('new_password')
+
+        # Validate required fields
+        if not all([current_password, new_password]):
+            return Response(
+                {"error": "Current password and new password are required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            # Verify current password
+            if not request.user.check_password(current_password):
+                return Response(
+                    {"error": "Current password is incorrect."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            # Update password
+            request.user.set_password(new_password)
+            request.user.save()
+
+            # Invalidate all existing password reset tokens
+            PasswordResetRequest.objects.filter(
+                user=request.user,
+                used=False
+            ).update(used=True)
+
+            return Response(
+                {"message": "Password has been updated successfully."},
+                status=status.HTTP_200_OK
+            )
+
+        except Exception as e:
+            logger.error(f"Unexpected error during password update: {e}", exc_info=True)
+            return Response(
+                {"error": "An unexpected error occurred. Please try again later."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
