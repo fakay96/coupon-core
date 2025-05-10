@@ -19,6 +19,7 @@ import Homepage from "@/pages/HomePage";
 import ContinuePage from "@/pages/dashboard-pages/ContinuePage";
 import CategorySearchPage from "@/pages/dashboard-pages/CategorySearchPage";
 import EmailResendPage from "@/pages/authentication-pages/EmailResendPage";
+import ResetPasswordPage from "@/pages/authentication-pages/ResetPasswordPage";
 
 const AppRoutes = () => {
   return (
@@ -32,6 +33,7 @@ const AppRoutes = () => {
         <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/auth/verification" element={<CodeVerificationPage />} />
         <Route path="/auth/resend-email" element={<EmailResendPage />} />
+        <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
 
         <Route path="/dashboard" element={<DashboardLayout />}>
           <Route index element={<DashboardPage />} />
