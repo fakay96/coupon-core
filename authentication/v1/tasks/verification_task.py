@@ -66,7 +66,7 @@ def send_password_reset_email_task(user_email: str, token: str, logo_url: str = 
     """
     try:
         subject: str = "Password Reset Request"
-        reset_link: str = f"{settings.FRONTEND_DOMAIN_NAME}/auth/reset-password?token={token}&email={user_email}"
+        reset_link: str = f"{settings.FRONTEND_DOMAIN_NAME}/auth/verification?token={token}&email={user_email}"
 
         # Context for template rendering
         context = {
@@ -130,7 +130,7 @@ def resend_verification_token_task(user_email: str, logo_url: str = None) -> Non
         )
 
         # 4. Send email
-        verification_link = f"{settings.FRONTEND_DOMAIN_NAME}/auth?token={new_verification.token}&email={user_email}"
+        verification_link = f"{settings.FRONTEND_DOMAIN_NAME}/auth/verification?token={new_verification.token}&email={user_email}"
         context = {
             "token": new_verification.token,
             "verification_link": verification_link,
