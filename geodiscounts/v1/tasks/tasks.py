@@ -8,9 +8,10 @@ This module defines background tasks for:
 4. Location processing
 5. Merchant synchronization
 6. WebSocket request handling
+7. URL processing from scraper
 """
 
-from celery import shared_task
+from coupon_core.celery.celery import app
 from django.utils import timezone
 from django.db import transaction
 from django.core.mail import send_mail
@@ -20,15 +21,20 @@ from typing import Dict, Any, List, Optional
 from django.contrib.gis.geos import Point
 import json
 from coupon_core.utils.logging import celery_logger, celery_structured_logger, log_execution
+from datetime import datetime
+from celery.schedules import crontab
+import time
 
 from geodiscounts.models import Discount, Location, Retailer, WebSocketDiscountRequest
 from geodiscounts.v1.services.discount_crawler_service import DiscountCrawlerService
 from geodiscounts.v1.utils.event_bus import EventBus
+from geodiscounts.v1.utils.redis_utils import RedisUtils
 
 logger = logging.getLogger(__name__)
 event_bus = EventBus()
+redis_utils = RedisUtils()
 
-@shared_task(bind=True, max_retries=3)
+@app.task(bind=True, max_retries=3)
 @log_execution(celery_logger, 'cleanup_expired_discounts')
 def cleanup_expired_discounts(self) -> None:
     """
@@ -63,7 +69,7 @@ def cleanup_expired_discounts(self) -> None:
         )
         raise self.retry(exc=e)
 
-@shared_task(bind=True, max_retries=3)
+@app.task(bind=True, max_retries=3)
 def notify_discount_expiration(self) -> None:
     """
     Send notifications for expired discounts.
@@ -93,7 +99,7 @@ def notify_discount_expiration(self) -> None:
         logger.error(f"Error sending expiration notifications: {str(e)}")
         raise self.retry(exc=e)
 
-@shared_task(bind=True, max_retries=3)
+@app.task(bind=True, max_retries=3)
 def update_discount_status(self) -> None:
     """
     Update status of discounts based on expiration.
@@ -124,7 +130,7 @@ def update_discount_status(self) -> None:
         logger.error(f"Error updating discount status: {str(e)}")
         raise self.retry(exc=e)
 
-@shared_task(bind=True, max_retries=3)
+@app.task(bind=True, max_retries=3)
 def process_location_updates(self) -> None:
     """
     Process location updates and validations.
@@ -145,7 +151,7 @@ def process_location_updates(self) -> None:
         logger.error(f"Error processing location updates: {str(e)}")
         raise self.retry(exc=e)
 
-@shared_task(bind=True, max_retries=3)
+@app.task(bind=True, max_retries=3)
 def cleanup_invalid_locations(self) -> None:
     """
     Clean up invalid locations.
@@ -166,7 +172,7 @@ def cleanup_invalid_locations(self) -> None:
         logger.error(f"Error cleaning up invalid locations: {str(e)}")
         raise self.retry(exc=e)
 
-@shared_task(bind=True, max_retries=3)
+@app.task(bind=True, max_retries=3)
 def sync_merchant_discounts(self, merchant_id: int) -> None:
     """
     Synchronize discounts with merchant API.
@@ -200,7 +206,7 @@ def sync_merchant_discounts(self, merchant_id: int) -> None:
         logger.error(f"Error syncing merchant discounts: {str(e)}")
         raise self.retry(exc=e)
 
-@shared_task(bind=True, max_retries=3)
+@app.task(bind=True, max_retries=3)
 def cleanup_merchant_discounts(self, merchant_id: int) -> None:
     """
     Clean up merchant discounts.
@@ -225,7 +231,7 @@ def cleanup_merchant_discounts(self, merchant_id: int) -> None:
         logger.error(f"Error cleaning up merchant discounts: {str(e)}")
         raise self.retry(exc=e)
 
-@shared_task(bind=True, max_retries=3)
+@app.task(bind=True, max_retries=3)
 def process_discount_updates(self) -> None:
     """
     Process discount updates in a chain.
@@ -285,7 +291,7 @@ def sync_with_merchant_api(merchant_id: int) -> List[Dict[str, Any]]:
     # In a real implementation, this would make API calls to the merchant's system
     return [] 
 
-@shared_task(bind=True, max_retries=3)
+@app.task(bind=True, max_retries=3)
 @log_execution(celery_logger, 'publish_discount_request')
 def publish_discount_request(
     self,
@@ -375,8 +381,7 @@ def publish_discount_request(
         )
         raise self.retry(exc=e)
 
-@shared_task
-@log_execution(celery_logger, 'handle_websocket_url_callback')
+@app.task
 def handle_websocket_url_callback(request_id: str, websocket_url: str) -> None:
     """
     Handle callback from crawler service with WebSocket URL.
@@ -424,8 +429,7 @@ def handle_websocket_url_callback(request_id: str, websocket_url: str) -> None:
         )
         raise
 
-@shared_task
-@log_execution(celery_logger, 'handle_discount_results')
+@app.task
 def handle_discount_results(request_id: str, results: List[Dict[str, Any]]) -> None:
     """
     Handle discount results from the crawler service.
@@ -492,4 +496,123 @@ def discount_results_callback(event: Dict[str, Any]) -> None:
 
 # Subscribe to both callbacks
 event_bus.subscribe("websocket_url_callbacks", websocket_url_callback)
-event_bus.subscribe("discount_results", discount_results_callback) 
+event_bus.subscribe("discount_results", discount_results_callback)
+
+@app.task(bind=True, max_retries=3)
+def process_scraped_url(self, url: str, request_id: str, spider: str) -> None:
+    """
+    Process a URL scraped by the crawler and save the data to the database.
+    """
+    try:
+        # Fetch the batch data from Redis
+        batch_data = redis_utils.get_batch(url)
+        if not batch_data:
+            raise ValueError(f"No data found in Redis for URL: {url}")
+
+        # Start atomic transaction
+        with transaction.atomic():
+            # Create or get the retailer object
+            retailer, _ = Retailer.objects.get_or_create(
+                name=spider.capitalize(),
+                defaults={
+                    'website': f"https://www.{spider}.at",
+                    'description': f"Store from {spider.capitalize()}",
+                    'location': Point(0, 0)
+                }
+            )
+
+            for item in batch_data:
+                try:
+                    valid_from = None
+                    valid_until = None
+                    if item.get('valid_from'):
+                        valid_from = timezone.datetime.fromisoformat(item['valid_from'])
+                    if item.get('valid_until'):
+                        valid_until = timezone.datetime.fromisoformat(item['valid_until'])
+                    
+                    # Create Discount record
+                    discount = Discount.objects.create(
+                        retailer=retailer,
+                        description=item.get('description', ''),
+                        discount_code=item.get('product_id', ''),
+                        discount_value=item.get('discount_value', 0.0),
+                        is_active=True,
+                        expiration_date=valid_until or (timezone.now() + timezone.timedelta(days=30)),
+                        location=Point(0, 0),
+                        image=item.get('image_urls', [None])[0] if item.get('image_urls') else None
+                    )
+                    
+                    celery_structured_logger.info(
+                        f"Successfully created discount: {discount.id} from URL: {url}"
+                    )
+
+                except Exception as e:
+                    celery_structured_logger.error(
+                        f"Error processing batch item from URL {url}: {str(e)}"
+                    )
+                    continue
+
+            celery_structured_logger.info(
+                f"Processed all batch items from URL: {url}"
+            )
+            
+    except Exception as e:
+        celery_structured_logger.error(
+            f"Failed to process URL {url}: {str(e)}"
+        )
+        raise self.retry(exc=e, countdown=60 * 5)
+
+@app.task
+def process_redis_urls() -> Dict[str, Any]:
+    """
+    Periodic task to process URLs from Redis.
+    """
+    results = {
+        'processed': 0,
+        'failed': 0,
+        'skipped': 0
+    }
+
+    try:
+        # Infinite loop to continuously consume from the queue
+        while True:
+            # Fetch one URL from the queue
+            url_data = redis_utils.lpop_queue('pending_urls_queue')
+            if not url_data:
+                break  # Exit the loop if queue is empty
+            
+            try:
+                url = url_data.get('url')
+                metadata = url_data.get('metadata', {})
+                spider = metadata.get('spider', 'unknown')
+
+                if not url:
+                    results['skipped'] += 1
+                    continue
+
+                # Log before processing
+                celery_structured_logger.info(
+                    f"Processing URL: {url} from Redis queue"
+                )
+
+                # Start processing the URL
+                process_scraped_url.delay(
+                    url=url,
+                    request_id=metadata.get('request_id', ''),
+                    spider=spider
+                )
+                results['processed'] += 1
+
+            except Exception as e:
+                celery_structured_logger.error(
+                    f"Error processing URL from Redis queue: {str(e)}"
+                )
+                results['failed'] += 1
+
+        return results
+
+    except Exception as e:
+        celery_structured_logger.error(
+            f"Error in periodic task process_redis_urls: {str(e)}"
+        )
+        raise

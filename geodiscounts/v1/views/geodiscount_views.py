@@ -625,65 +625,46 @@ class SearchDiscountsView(APIView):
 
         # 6) Create request record & dispatch
         try:
-                req_obj = WebSocketDiscountRequest.objects.create(
-                    user_id=request.user.id,
-                    location=Point(longitude, latitude),
-                    radius=radius,
-                    status="pending",
-                    conversation_history=conversation_history,
-                    user_email=request.user.email
-                )
-                
-                # Update the websocket_url after creation
-                req_obj.websocket_url = f"{settings.WEBSOCKET_PROTOCOL}://{settings.WEBSOCKET_DOMAIN}/ws/discount-requests/{req_obj.request_id}/"
-                req_obj.save()
-                
-                geo_structured_logger.info(
-                    geo_logger, "Created discount request", "discount_search",
-                    {
-                        'user_id': request.user.id,
-                        'request_id': str(req_obj.request_id),
-                        'query': query,
-                        'location': {'latitude': latitude, 'longitude': longitude},
-                        'radius': radius
-                    }
-                )
+            req_obj = WebSocketDiscountRequest.objects.create(
+                user_id=request.user.id,
+                location=Point(longitude, latitude),
+                radius=radius,
+                status="pending",
+                conversation_history=conversation_history,
+                user_email=request.user.email
+            )
+            
+            # Update the websocket_url after creation
+            req_obj.websocket_url = f"{settings.WEBSOCKET_PROTOCOL}://{settings.WEBSOCKET_DOMAIN}/ws/discount-requests/{req_obj.request_id}/"
+            req_obj.save()
+            
+            geo_structured_logger.info(
+                geo_logger, "Created discount request", "discount_search",
+                {
+                    'user_id': request.user.id,
+                    'request_id': str(req_obj.request_id),
+                    'query': query,
+                    'location': {'latitude': latitude, 'longitude': longitude},
+                    'radius': radius
+                }
+            )
 
-                publish_discount_request.delay(
-                    request_id=str(req_obj.request_id),
-                    user_id=request.user.id,
-                    latitude=latitude,
-                    longitude=longitude,
-                    radius=radius,
-                    conversation_history=conversation_history
-                )
+            # Dispatch the request to the crawler service
+            publish_discount_request.delay(
+                request_id=str(req_obj.request_id),
+                user_id=request.user.id,
+                latitude=latitude,
+                longitude=longitude,
+                radius=radius,
+                conversation_history=conversation_history
+            )
 
-                # 7) Poll for up to 10s
-                start = time.time()
-                while time.time() - start < 10:
-                    req_obj.refresh_from_db()
-                    if req_obj.status == "completed":
-                        return Response({
-                            "results": req_obj.results,
-                            "type": "results"
-                        })
-                    if req_obj.status == "ready" and req_obj.websocket_url:
-                        return Response({
-                            "websocket_url": req_obj.websocket_url,
-                            "type": "websocket"
-                        })
-                    if req_obj.status == "failed":
-                        return Response(
-                            {"error": "Failed to process request"},
-                            status=HTTP_500_INTERNAL_SERVER_ERROR
-                        )
-                    time.sleep(0.5)
-
-                # Timeout
-                return Response(
-                    {"error": "Request timeout"},
-                    status=HTTP_504_GATEWAY_TIMEOUT
-                )
+            # Immediately return the WebSocket URL
+            return Response({
+                "websocket_url": req_obj.websocket_url,
+                "type": "websocket",
+                "request_id": str(req_obj.request_id)
+            })
 
         except Exception as e:
             geo_structured_logger.error(

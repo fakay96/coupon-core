@@ -133,6 +133,12 @@ if ! python manage.py migrate django_celery_results 2>&1 | tee -a "$LOG_FILE"; t
 fi
 log_and_print "✅ Django Celery Results migrations completed successfully!"
 
+log_and_print "🛠️ Running migrations for django_celery_beat..."
+if ! python manage.py migrate django_celery_beat 2>&1 | tee -a "$LOG_FILE"; then
+  log_and_print "❌ ERROR: Migration failed for django_celery_beat. Exiting..."
+  exit 1
+fi
+log_and_print "✅ Django Celery Results migrations completed successfully!"
 ################################
 # 9) Collect Static Files      #
 ################################

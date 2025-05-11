@@ -79,11 +79,8 @@ def create_profile_verification(sender, instance: CustomUser, created: bool, **k
             used=False
         )
 
-        # Send email via Celery or immediately if eager
-        if settings.CELERY_ALWAYS_EAGER:
-            send_verification_email_task(instance.email, verification.token)
-        else:
-            send_verification_email_task.delay(instance.email, verification.token)
+        
+        send_verification_email_task.delay(instance.email, verification.token)
 
     except Exception as e:
         logger.error(f"Error creating ProfileVerification for {instance.username}: {e}")

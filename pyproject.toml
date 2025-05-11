@@ -42,6 +42,8 @@ pillow = "^11.1.0"
 sentry-sdk = "^2.22.0"
 django-celery-results = "^2.5.1"
 python-levenshtein = "^0.27.1"
+django-redbeat = "^0.3"
+django-celery-beat = "^2.8.0"
 
 [[tool.poetry.source]]
 name = "pytorch"
