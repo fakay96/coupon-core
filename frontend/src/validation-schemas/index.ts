@@ -44,6 +44,23 @@ export const forgotPasswordSchema = z.object({
   email: z.string().email({ message: "Enter a valid email" }),
 });
 
+export const resetPasswordSchema = z.object({
+  new_password: passwordSchema,
+  confirm_password: z.string(),
+}).refine((data) => data.new_password === data.confirm_password, {
+  message: "Passwords do not match",
+  path: ["confirm_password"],
+});
+
+export const updatePasswordSchema = z.object({
+  current_password: z.string().min(1, { message: "Current password is required" }),
+  new_password: passwordSchema,
+  confirm_password: z.string(),
+}).refine((data) => data.new_password === data.confirm_password, {
+  message: "Passwords do not match",
+  path: ["confirm_password"],
+});
+
 export const verificationCodeSchema = z.object({
   code: z.string().min(4, {
     message: "Invalid verification code.",

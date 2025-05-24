@@ -18,13 +18,34 @@ from storages.backends.s3boto3 import S3Boto3Storage
 
 GDAL_LIBRARY_PATH = os.getenv("GDAL_LIBRARY_PATH", "/usr/lib/libgdal.so")
 
-
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Redis Configuration
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "")
+REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+REDIS_URL = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/0"
 
+# Caching (Redis)
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": REDIS_URL,
+    },
+    "results": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": REDIS_URL,
+    },
+}
 
-
-
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [REDIS_URL],
+        },
+    },
+}
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -52,7 +73,8 @@ INSTALLED_APPS = [
     "dj_rest_auth.registration",
     
     #celery apps
-    "django_celery_results"
+    "django_celery_results",
+    "django_celery_beat"
 ]
 
 MIDDLEWARE = [
@@ -322,4 +344,18 @@ LOGGING = {
 LOGS_DIR = os.path.join(BASE_DIR, 'logs')
 if not os.path.exists(LOGS_DIR):
     os.makedirs(LOGS_DIR)
+
+# WebSocket Settings
+WEBSOCKET_PROTOCOL = 'ws'  # Default to ws, will be overridden in prod/staging
+WEBSOCKET_DOMAIN = 'localhost'  # Default to localhost, will be overridden in prod/staging
+WEBSOCKET_PORT = 8000  # Default port, will be overridden in prod/staging
+WEBSOCKET_PATH = '/ws/discount-requests/'  # Default path for WebSocket connections
+
+# WebSocket Allowed Origins
+WEBSOCKET_ALLOWED_ORIGINS = []  # Will be overridden in prod/staging
+
+# WebSocket Connection Settings
+WEBSOCKET_HEARTBEAT_INTERVAL = 30  # Seconds between heartbeat messages
+WEBSOCKET_MAX_MESSAGE_SIZE = 1024 * 1024  # 1MB default max message size
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 

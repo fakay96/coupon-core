@@ -100,7 +100,8 @@ CORS_ALLOW_ALL_ORIGINS = True
 # Use test Redis settings
 REDIS_HOST = 'localhost'
 REDIS_PORT = 6379
-REDIS_DB = 15  # Use a separate DB for tests
+REDIS_PASSWORD = ''
+REDIS_URL = f'redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/0'  # Use DB 0 for consistency
 
 # URL Configuration
 ROOT_URLCONF = 'coupon_core.urls'
@@ -112,8 +113,12 @@ GEODISCOUNTS_API_PREFIX = f'{API_PREFIX}/geodiscounts'
 # Use test cache backend
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'unique-snowflake',
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': REDIS_URL,
+    },
+    'results': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': REDIS_URL,
     }
 }
 
@@ -155,9 +160,9 @@ FRONTEND_DOMAIN_NAME = 'http://localhost:3000'
 BASE_DOMAIN = 'http://localhost:8000'
 AUTH_SERVICE_URL = 'http://localhost:8000'
 
-# Celery Configuration
-CELERY_BROKER_URL = 'memory://'
-CELERY_RESULT_BACKEND = 'cache+memory://'
+# Celery Configuration for tests
+CELERY_BROKER_URL = REDIS_URL
+CELERY_RESULT_BACKEND = REDIS_URL
 CELERY_TASK_ALWAYS_EAGER = True
 CELERY_TASK_EAGER_PROPAGATES = True
 
@@ -166,4 +171,14 @@ CELERY_TASK_ALWAYS_EAGER = True
 CELERY_TASK_EAGER_PROPAGATES = True
 
 # Mock email backend
-EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend' 
+EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
+
+# Configure channel layers for tests
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            'hosts': [REDIS_URL],
+        },
+    },
+} 

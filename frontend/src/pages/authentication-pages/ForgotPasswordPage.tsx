@@ -14,20 +14,13 @@ import { Link, useNavigate } from "react-router-dom";
 import { forgotPasswordSchema } from "@/validation-schemas";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import {
-  loginUserMutation,
-  retryEmailTokenMutation,
-} from "@/queries/auth-queries";
+import { passwordReset } from "@/api/authApi";
+import { useState } from "react";
 
 const ForgotPasswordPage = () => {
-  const { mutateAsync } = retryEmailTokenMutation();
   const navigate = useNavigate();
+  const [isPending, setIsPending] = useState(false);
 
-  // Mutation for logging in the user
-  const {
-    isPending,
-    // mutateAsync: loginUser
-  } = loginUserMutation();
   const form = useForm<z.infer<typeof forgotPasswordSchema>>({
     resolver: zodResolver(forgotPasswordSchema),
     defaultValues: {
@@ -36,19 +29,20 @@ const ForgotPasswordPage = () => {
   });
 
   // Form submit handler
-  const onSubmit = ({ email }: z.infer<typeof forgotPasswordSchema>) => {
-    const name = email?.split("@")[0];
-    // toast.success(`Verification code sent to : ${email}`);
-
-    toast.promise(mutateAsync({ email, force_resend: true }), {
-      loading: `${name}, Dishpal AI is sending your verification email now`,
-      success: `${name}, Check your email now to get your verification code`,
-      error: (error) => error.message,
-    });
-    return navigate("/auth/verification", {
-      replace: true,
-      state: { passwordReset: true },
-    });
+  const onSubmit = async ({ email }: z.infer<typeof forgotPasswordSchema>) => {
+    try {
+      setIsPending(true);
+      await passwordReset({ email, force_resend: false });
+      
+      toast.success("Password reset link has been sent to your email");
+      navigate("/auth/login", {
+        replace: true,
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to send reset link");
+    } finally {
+      setIsPending(false);
+    }
   };
 
   return (
@@ -65,8 +59,7 @@ const ForgotPasswordPage = () => {
               </h1>
               <div className="">
                 <p className="text-md text-center text-gray-400">
-                  Please Enter Your Email Address To send The Verification Link
-                  To Reset Your Password.
+                  Enter your email address and we'll send you a link to reset your password.
                 </p>
               </div>
             </div>
@@ -90,7 +83,6 @@ const ForgotPasswordPage = () => {
                             {...field}
                           />
                         </FormControl>
-
                         <FormMessage />
                       </FormItem>
                     )}
@@ -103,9 +95,9 @@ const ForgotPasswordPage = () => {
                   disabled={isPending}
                 >
                   {isPending ? (
-                    <Loader className=" size-4 animate-spin" />
+                    <Loader className="size-4 animate-spin" />
                   ) : (
-                    <>Send</>
+                    "Send Reset Link"
                   )}
                 </Button>
               </form>

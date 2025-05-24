@@ -164,6 +164,31 @@ SIMPLE_JWT = {
     "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
 }
 
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOWED_ORIGINS = [
+    "https://app-staging.dishpal.ai",
+    "https://admin-staging.dishpal.ai"
+    "http://0.0.0.0:5173",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http:://192.210.55.154.5173"
+]
+
 CELERY_ALWAYS_EAGER=True
 FRONTEND_DOMAIN_NAME="https://app-staging.dishpal.ai"
+
+# WebSocket Settings for Staging
+WEBSOCKET_PROTOCOL = 'wss'  # Secure WebSocket in staging
+WEBSOCKET_DOMAIN = os.getenv('WEBSOCKET_DOMAIN', 'api-staging.dishpal.ai')
+WEBSOCKET_PORT = int(os.getenv('WEBSOCKET_PORT', 443))  # Standard HTTPS port
+WEBSOCKET_PATH = '/ws/discount-requests/'
+
+# WebSocket Allowed Origins for Staging
+WEBSOCKET_ALLOWED_ORIGINS = [
+    'https://app-staging.dishpal.ai',
+    'https://admin-staging.dishpal.ai',
+    'http://0.0.0.0:5173',
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'http://192.210.55.154:5173',
+]

@@ -200,3 +200,71 @@ export const axiosGoogleLogin = async (tokenResponse: TokenResponse) => {
   );
   return data;
 };
+
+export const updatePassword = async (data: {
+  current_password: string;
+  new_password: string;
+}) => {
+  const response = await axiosInstance.put(
+    "/api/authentication/v1/password-reset/",
+    data
+  );
+  return response.data;
+};
+
+export const resetPassword = async (data: {
+  token: string;
+  email: string;
+  new_password: string;
+}) => {
+  try {
+    console.log('Resetting password with data:', data);
+    const response = await axiosInstance.put(
+      "/api/authentication/v1/password-reset/",
+      data
+    );
+    console.log('Reset password response:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Reset password error:', error);
+    if (axios.isAxiosError(error)) {
+      if (error.response?.data?.error) {
+        throw new Error(error.response.data.error);
+      } else if (error.response?.data?.detail) {
+        throw new Error(error.response.data.detail);
+      } else if (typeof error.response?.data === 'string') {
+        throw new Error(error.response.data);
+      }
+    }
+    throw error;
+  }
+};
+
+/**
+ * Initiates a password reset request by sending an email.
+ * @param data - Object containing email and optional force_resend flag
+ * @returns Promise with the API response
+ */
+export const passwordReset = async (data: { email: string; force_resend?: boolean }) => {
+  try {
+    console.log('Requesting password reset link with data:', data);
+    const response = await axiosInstance.post(
+      "/api/authentication/v1/password-reset/",
+      data
+    );
+    console.log('Password reset link response:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Password reset link error:', error);
+    if (axios.isAxiosError(error)) {
+      if (error.response?.data?.error) {
+        throw new Error(error.response.data.error);
+      } else if (error.response?.data?.detail) {
+        throw new Error(error.response.data.detail);
+      } else if (typeof error.response?.data === 'string') {
+        throw new Error(error.response.data);
+      }
+    }
+    throw error;
+  }
+};

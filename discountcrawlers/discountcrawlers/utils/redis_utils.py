@@ -1,60 +1,59 @@
 """Redis utilities for asynchronous message processing.
 
 This module provides a RedisUtils class for interacting with Redis as a message broker
-for asynchronous processing of discount data.
+for asynchronous processing of discount data as well as URL-level jobs.
 """
 
 from __future__ import annotations
-import logging
+
 import json
-from typing import Optional, List, Dict, Any
-from datetime import datetime, timedelta
-import redis
-from dotenv import load_dotenv
+import logging
 import os
 import time
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+import redis
+from dotenv import load_dotenv
 
 load_dotenv()
 
 LOGGER: logging.Logger = logging.getLogger(__name__)
 
+
 class RedisUtils:
-    """A utility class for Redis operations."""
 
-    # Redis configuration
-    REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
-    REDIS_PORT = int(os.getenv('REDIS_PORT', 6379))
-    REDIS_DB = int(os.getenv('REDIS_DB', 0))
-    REDIS_PASSWORD = os.getenv('REDIS_PASSWORD')
+    REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")
+    REDIS_PORT: int = int(os.getenv("REDIS_PORT", 6379))
+    REDIS_DB: int = int(os.getenv("REDIS_DB", 0))
+    REDIS_PASSWORD: Optional[str] = os.getenv("REDIS_PASSWORD")
 
-    # Queue names
-    SEARCH_QUEUE = "discount_search_queue"
-    RESULTS_QUEUE = "discount_results_queue"
-    PROCESSED_URLS = "processed_urls_set"
+    SEARCH_QUEUE: str = "discount_search_queue"
+    RESULTS_QUEUE: str = "discount_results_queue"
 
-    def __init__(self):
-        """Initialize RedisUtils with a Redis client."""
-        self.client = self._get_redis_client()
+    PROCESSED_URLS: str = "processed_urls_set"
+    PENDING_URLS: str = "pending_urls_set"
+    PROCESSING_URLS: str = "processing_urls_set"
+    FAILED_URLS: str = "failed_urls_set"
+
+    PENDING_URL_QUEUE: str = "pending_urls_queue"
+
+    def __init__(self) -> None:
+        self.client: Optional[redis.Redis] = self._get_redis_client()
 
     def _get_redis_client(self) -> Optional[redis.Redis]:
-        """Initialize and return a Redis client.
-        
-        Returns:
-            Redis client instance or None if initialization fails
-        """
         try:
             client = redis.Redis(
                 host=self.REDIS_HOST,
                 port=self.REDIS_PORT,
                 db=self.REDIS_DB,
                 password=self.REDIS_PASSWORD,
-                decode_responses=True
+                decode_responses=True,
             )
-            # Test connection
             client.ping()
             return client
-        except Exception as e:
-            LOGGER.error(f"Failed to initialize Redis client: {str(e)}")
+        except Exception as exc:
+            LOGGER.error("Failed to initialise Redis client: %s", exc)
             return None
 
     def queue_search_request(
@@ -63,149 +62,168 @@ class RedisUtils:
         categories: List[str],
         price_range: Dict[str, Optional[float]],
         filters: List[str],
-        request_id: str
+        request_id: str,
     ) -> bool:
-        """Queue a search request for asynchronous processing.
-        
-        Args:
-            search_terms: List of search terms
-            categories: List of categories to search in
-            price_range: Dictionary with min and max price
-            filters: List of additional filters
-            request_id: Unique identifier for the request
-            
-        Returns:
-            True if queuing was successful, False otherwise
-        """
+        if not self.client:
+            return False
         try:
-            if not self.client:
-                return False
-                
-            # Prepare search request
-            request = {
-                'request_id': request_id,
-                'search_terms': search_terms,
-                'categories': categories,
-                'price_range': price_range,
-                'filters': filters,
-                'timestamp': datetime.now().isoformat()
+            payload = {
+                "request_id": request_id,
+                "search_terms": search_terms,
+                "categories": categories,
+                "price_range": price_range,
+                "filters": filters,
+                "timestamp": datetime.now().isoformat(),
             }
-            
-            # Add to search queue
-            self.client.lpush(self.SEARCH_QUEUE, json.dumps(request))
-            
-            LOGGER.info(f"Successfully queued search request: {request_id}")
+            self.client.lpush(self.SEARCH_QUEUE, json.dumps(payload))
+            LOGGER.info("Queued search request %s", request_id)
             return True
-            
-        except Exception as e:
-            LOGGER.error(f"Failed to queue search request: {str(e)}")
+        except Exception as exc:
+            LOGGER.error("Failed to queue search request: %s", exc)
             return False
 
     def get_search_result(self, request_id: str, timeout: int = 30) -> Optional[Dict[str, Any]]:
-        """Get the result of a search request.
-        
-        Args:
-            request_id: The request ID to get results for
-            timeout: Timeout in seconds to wait for results
-            
-        Returns:
-            Dictionary containing search results or None if not found
-        """
-        try:
-            if not self.client:
-                return None
-                
-            # Check results queue for matching request_id
-            start_time = datetime.now()
-            while (datetime.now() - start_time).seconds < timeout:
-                # Get all results
-                results = self.client.lrange(self.RESULTS_QUEUE, 0, -1)
-                
-                # Check each result for matching request_id
-                for result in results:
-                    data = json.loads(result)
-                    if data.get('request_id') == request_id:
-                        # Remove this result from the queue
-                        self.client.lrem(self.RESULTS_QUEUE, 1, result)
-                        return data
-                        
-                # Wait a bit before checking again
-                time.sleep(0.5)
-                
+        if not self.client:
             return None
-            
-        except Exception as e:
-            LOGGER.error(f"Failed to get search result: {str(e)}")
+        try:
+            start = time.monotonic()
+            while time.monotonic() - start < timeout:
+                for item in self.client.lrange(self.RESULTS_QUEUE, 0, -1):
+                    data: Dict[str, Any] = json.loads(item)
+                    if data.get("request_id") == request_id:
+                        self.client.lrem(self.RESULTS_QUEUE, 1, item)
+                        return data
+                time.sleep(0.5)
+            return None
+        except Exception as exc:
+            LOGGER.error("Failed to fetch search result: %s", exc)
             return None
 
     def store_search_result(self, request_id: str, results: Dict[str, Any]) -> bool:
-        """Store the results of a search request.
-        
-        Args:
-            request_id: The request ID these results are for
-            results: Dictionary containing search results
-            
-        Returns:
-            True if storage was successful, False otherwise
-        """
+        if not self.client:
+            return False
         try:
-            if not self.client:
-                return False
-                
-            # Prepare result data
-            data = {
-                'request_id': request_id,
-                'results': results,
-                'timestamp': datetime.now().isoformat()
+            envelope = {
+                "request_id": request_id,
+                "results": results,
+                "timestamp": datetime.now().isoformat(),
             }
-            
-            # Add to results queue
-            self.client.lpush(self.RESULTS_QUEUE, json.dumps(data))
-            
-            LOGGER.info(f"Successfully stored search results for request: {request_id}")
+            self.client.lpush(self.RESULTS_QUEUE, json.dumps(envelope))
+            LOGGER.info("Stored search results for %s", request_id)
             return True
-            
-        except Exception as e:
-            LOGGER.error(f"Failed to store search results: {str(e)}")
+        except Exception as exc:
+            LOGGER.error("Failed to store search results: %s", exc)
             return False
 
-    def store_processed_url(self, url: str) -> bool:
-        """Store a processed URL in Redis.
-        
-        Args:
-            url: The URL to store
-
-        Returns:
-            True if storage was successful, False otherwise
-        """
+    def store_processed_url(self, url: str, metadata: Dict[str, Any]) -> bool:
+        if not self.client:
+            return False
         try:
-            if not self.client:
-                return False
-                
-            # Add URL to set
-            self.client.sadd(self.PROCESSED_URLS, url)
-            
-            LOGGER.info(f"Successfully stored processed URL: {url}")
+            metadata = {**metadata, "status": "pending"}
+            self.client.setex(f"processed_url:{url}", 86_400, json.dumps(metadata))
+            self.client.sadd(self.PENDING_URLS, url)
+            queue_item = {
+                "url": url,
+                "metadata": metadata,
+                "queued_at": datetime.now().isoformat(),
+            }
+            self.client.lpush(self.PENDING_URL_QUEUE, json.dumps(queue_item))
+            LOGGER.info("Stored & queued URL for processing: %s", url)
             return True
-        except Exception as e:
-            LOGGER.error(f"Failed to store processed URL: {str(e)}")
+        except Exception as exc:
+            LOGGER.error("Failed to store & queue URL: %s", exc)
             return False
+
+    def dequeue_pending_url(self) -> Optional[Dict[str, Any]]:
+        if not self.client:
+            return None
+        try:
+            item = self.client.rpop(self.PENDING_URL_QUEUE)
+            return json.loads(item) if item else None
+        except Exception as exc:
+            LOGGER.error("Failed to dequeue pending URL: %s", exc)
+            return None
+
+    def get_pending_urls(self) -> List[Dict[str, Any]]:
+        if not self.client:
+            return []
+        try:
+            pending: List[Dict[str, Any]] = []
+            for url in self.client.smembers(self.PENDING_URLS):
+                raw = self.client.get(f"processed_url:{url}")
+                if raw:
+                    meta = json.loads(raw)
+                    if meta.get("status") == "pending":
+                        pending.append({"url": url, "metadata": meta})
+            return pending
+        except Exception as exc:
+            LOGGER.error("Failed to list pending URLs: %s", exc)
+            return []
+
+    def update_url_status(self, url: str, status: str) -> bool:
+        if not self.client:
+            return False
+        try:
+            raw = self.client.get(f"processed_url:{url}")
+            if not raw:
+                return False
+            meta: Dict[str, Any] = json.loads(raw)
+            meta["status"] = status
+            self.client.setex(f"processed_url:{url}", 86_400, json.dumps(meta))
+            self.client.srem(self.PENDING_URLS, url)
+            self.client.srem(self.PROCESSING_URLS, url)
+            self.client.srem(self.FAILED_URLS, url)
+            if status == "pending":
+                self.client.sadd(self.PENDING_URLS, url)
+            elif status == "processing":
+                self.client.sadd(self.PROCESSING_URLS, url)
+            elif status == "failed":
+                self.client.sadd(self.FAILED_URLS, url)
+            LOGGER.info("Updated URL %s → %s", url, status)
+            return True
+        except Exception as exc:
+            LOGGER.error("Failed to update URL status: %s", exc)
+            return False
+
+    def get_url_status(self, url: str) -> Optional[str]:
+        try:
+            raw = self.client.get(f"processed_url:{url}")
+            return json.loads(raw).get("status") if raw else None
+        except Exception as exc:
+            LOGGER.error("Failed to get URL status: %s", exc)
+            return None
 
     def is_url_processed(self, url: str) -> bool:
-        """Check if a URL has already been processed.
-        
-        Args:
-            url: The URL to check
-            
-        Returns:
-            True if the URL has been processed, False otherwise
-        """
         try:
-            if not self.client:
-                return False
-                
-            # Check if URL is in the set
-            return self.client.sismember(self.PROCESSED_URLS, url)
-        except Exception as e:
-            LOGGER.error(f"Failed to check if URL is processed: {str(e)}")
+            return bool(self.client.exists(f"processed_url:{url}"))
+        except Exception as exc:
+            LOGGER.error("Failed to check URL existence: %s", exc)
             return False
+
+    def get_url_metadata(self, url: str) -> Optional[Dict[str, Any]]:
+        try:
+            raw = self.client.get(f"processed_url:{url}")
+            return json.loads(raw) if raw else None
+        except Exception as exc:
+            LOGGER.error("Failed to get URL metadata: %s", exc)
+            return None
+
+    def store_batch(self, batch_id: str, items: List[Dict[str, Any]]) -> bool:
+        if not self.client:
+            return False
+        try:
+            self.client.setex(f"batch:{batch_id}", 86_400, json.dumps(items))
+            return True
+        except Exception as exc:
+            LOGGER.error("Failed to store batch: %s", exc)
+            return False
+
+    def get_batch(self, batch_id: str) -> Optional[List[Dict[str, Any]]]:
+        if not self.client:
+            return None
+        try:
+            raw = self.client.get(f"batch:{batch_id}")
+            return json.loads(raw) if raw else None
+        except Exception as exc:
+            LOGGER.error("Failed to fetch batch: %s", exc)
+            return None

@@ -13,3 +13,6 @@ celery -A "$CELERY_APP_NAME" worker \
     --loglevel="${CELERY_LOG_LEVEL:-info}" \
     --concurrency=2 \
     --logfile="$LOG_FILE" 2>&1 | tee -a "$LOG_FILE"
+
+
+celery -A ${CELERY_APP_NAME} beat -l info 

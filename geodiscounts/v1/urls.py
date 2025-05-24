@@ -18,7 +18,7 @@ Date: YYYY-MM-DD
 
 from django.urls import path
 
-from geodiscounts.v1.views.discount_views import (
+from geodiscounts.v1.views.discount_category_view import (
     
     CategoryView,
     
