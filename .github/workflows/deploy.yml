@@ -39,6 +39,33 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Fetch all history for all branches and tags
+
+      - name: Verify required directories
+        run: |
+          echo "Checking required directories..."
+          if [ ! -d "./k8s" ]; then
+            echo "Error: k8s directory not found"
+            exit 1
+          fi
+          if [ ! -d "./k8s/backend" ]; then
+            echo "Error: k8s/backend directory not found"
+            exit 1
+          fi
+          if [ ! -d "./k8s/backend/templates" ]; then
+            echo "Error: k8s/backend/templates directory not found"
+            exit 1
+          fi
+          if [ ! -d "./k8s/backend/values" ]; then
+            echo "Error: k8s/backend/values directory not found"
+            exit 1
+          fi
+          if [ ! -f "./k8s/backend/Chart.yaml" ]; then
+            echo "Error: k8s/backend/Chart.yaml not found"
+            exit 1
+          fi
+          echo "All required directories and files are present"
 
       - name: Download version artifact if version_tag not provided
         if: ${{ inputs.version_tag == null || inputs.version_tag == '' }}
@@ -62,6 +89,12 @@ jobs:
         run: |
           echo "NAMESPACE is: $NAMESPACE"
           echo "VERSION_TAG is: $VERSION_TAG"
+          echo "Current directory structure:"
+          ls -la
+          echo "k8s directory structure:"
+          ls -la k8s/
+          echo "k8s/backend directory structure:"
+          ls -la k8s/backend/
 
       - name: Configure kubectl for DigitalOcean
         run: |
@@ -95,8 +128,15 @@ jobs:
             echo "FRONTEND_REPO=fakay96/coupon-frontend" >> $GITHUB_ENV
           fi
 
+      - name: Clean up any stuck Helm releases
+        run: |
+          echo "Checking for stuck Helm releases..."
+          kubectl get secrets -n $NAMESPACE | grep -i "helm.sh/release" | grep -i "coupon-service" | awk '{print $1}' | xargs -r kubectl delete secret -n $NAMESPACE
+          echo "Cleaned up any stuck Helm releases"
+
       - name: Deploy Backend & Celery
         run: |
+          echo "Deploying backend and celery..."
           helm upgrade --install coupon-service ./k8s/backend \
             --set backend.image.repository=fakay96/coupon-core \
             --set backend.image.tag=$VERSION_TAG \
@@ -109,6 +149,7 @@ jobs:
 
       - name: Deploy Frontend
         run: |
+          echo "Deploying frontend..."
           helm upgrade --install frontend ./k8s/frontend \
             --set frontend.image.repository=$FRONTEND_REPO \
             --set frontend.image.tag=$VERSION_TAG \
@@ -117,12 +158,9 @@ jobs:
             --atomic --force --cleanup-on-fail --history-max 5 \
             --timeout 5m0s
 
-    
-
-     
-
       - name: Verify service endpoints
         run: |
+          echo "Verifying service endpoints..."
           kubectl get endpoints coupon-service -n $NAMESPACE || echo "Backend service endpoint not found!"
           kubectl get endpoints frontend -n $NAMESPACE || echo "Frontend service endpoint not found!"
           kubectl get endpoints crawler -n $NAMESPACE || echo "Crawler service endpoint not found!"
