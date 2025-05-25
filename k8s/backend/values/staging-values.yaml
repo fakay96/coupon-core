@@ -22,8 +22,8 @@ backend:
       memory: "512Mi"
       cpu:    "500m"
     limits:
-      memory: "1Gi"
-      cpu:    "1.5"
+      memory: "2.Gi"
+      cpu:    "1.2"
 
   replicas: 1
 
