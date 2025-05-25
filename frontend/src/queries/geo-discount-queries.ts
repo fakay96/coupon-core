@@ -1,5 +1,5 @@
-import { categoriesApi, discountApi, nearbyApi, specificRetailerApi } from "@/api/geoDiscountApi";
-import { useQuery } from "@tanstack/react-query";
+import { categoriesApi, discountApi, nearbyApi, specificRetailerApi, aiSearchApi } from "@/api/geoDiscountApi";
+import { useQuery, useMutation } from "@tanstack/react-query";
 
 /**
  * Custom hook to fetch all available discounts
@@ -55,5 +55,32 @@ export const specificRetailerQuery = (id: string) => {
   return useQuery({
     queryKey: ["specificRetailer", id],
     queryFn: async () => await specificRetailerApi(id),
+  });
+};
+
+/**
+ * Custom hook to perform AI-powered discount search
+ * @param {Object} params - Search parameters
+ * @param {string} params.query - The search query
+ * @param {number} params.latitude - User's latitude
+ * @param {number} params.longitude - User's longitude
+ * @param {number} params.radius - Initial search radius in kilometers
+ * @param {number} params.maxRadius - Maximum search radius in kilometers
+ * @param {number} params.maxRetries - Maximum number of retry attempts
+ * @returns {UseMutationResult} Mutation result containing search results
+ * @throws {Error} If search fails
+ * @example
+ * const { mutate: search, data: results } = useAiSearch();
+ */
+export const useAiSearch = () => {
+  return useMutation({
+    mutationFn: async (params: {
+      query: string;
+      latitude: number;
+      longitude: number;
+      radius?: number;
+      maxRadius?: number;
+      maxRetries?: number;
+    }) => await aiSearchApi(params),
   });
 };

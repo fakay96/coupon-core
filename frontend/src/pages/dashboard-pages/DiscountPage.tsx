@@ -16,235 +16,105 @@ import { XIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useDebounce } from "@/hooks/searchDebounce";
 import { DiscountItemT } from "@/types";
-const DiscountPage = () => {
-  const navigate = useNavigate();
 
+const DiscountPage = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const discount = searchParams.get("discount");
-  const pathname = useLocation().pathname;
-  const { data: allDiscount } = discountApiQuery();
+  const { data: allDiscounts } = discountApiQuery();
 
-  const [toggleHeart, setToggleHeart] = useState(true);
+  // Get search results from location state
+  const searchResults = location.state?.searchResults;
+  const searchError = location.state?.error;
+  const searchQuery = location.state?.query;
+  const searchRadius = location.state?.searchRadius;
+  const searchAttempts = location.state?.attempts;
 
-  const filteredItems = useMemo(() => {
-    if (!allDiscount) return [];
-
-    if (discount && discount !== "All") {
-      return allDiscount.filter((item: DiscountItemT) =>
+  // Filter discounts based on search results or all discounts
+  const filteredDiscounts = useMemo(() => {
+    if (searchResults) {
+      // If we have AI search results, use those
+      return searchResults.results || [];
+    } else if (discount) {
+      // If we have a specific discount query, filter all discounts
+      return allDiscounts?.filter((item: DiscountItemT) =>
         item.title.toLowerCase().includes(discount.toLowerCase())
-      );
+      ) || [];
     }
-
-    return allDiscount;
-  }, [discount, pathname, allDiscount]);
-
-  // useEffect(() => {
-  //   if (discount === "All") {
-  //     setDiscountItems(discountProducts);
-  //   } else if (discount) {
-  //     const filtered = discountProducts.filter((item) => {
-  //       return item?.title?.toLowerCase().includes(discount?.toLowerCase());
-  //     });
-
-  //     setDiscountItems(filtered);
-  //   } else {
-  //     setDiscountItems(discountProducts);
-  //   }
-  // }, [discount, pathname]);
+    // Otherwise show all discounts
+    return allDiscounts || [];
+  }, [searchResults, discount, allDiscounts]);
 
   return (
     <div className="">
       <div className="bg-bg3xl bg-cover">
-        <div className="flex flex-col max-w-screen-xl mx-auto min-h-screen px-4 sm:px-8">
-          <SearchInputNavbar />
-          <div className="sm:flex sm:gap-8">
-            <div className="w-[300px] hidden sm:flex flex-col">
-              <div className="space-y-6 py-6">
-                {discountFilters.map((item, index) => (
-                  <div className="" key={index}>
-                    <div className="bg-[#FCE9DB] p-2 px-4">{item.title}</div>
-                    <div className="p-2 px-4">{item.item1}</div>
-                    <div className="p-2 px-4">{item.item2}</div>
-                    <div className="p-2 px-4">{item.item3}</div>
-                    <div className="p-2 px-4">{item.item4}</div>
-                  </div>
-                ))}
+        <div className="flex flex-col h-full min-h-screen max-w-screen-xl mx-auto px-4 sm:px-8">
+          <SearchInputNavbar link={"/"} />
+          <div className="flex-1 flex-col flex items-center justify-center py-12">
+            <div className="max-w-xl text-center mx-auto flex flex-col space-y-4 mb-8">
+              <div className="">
+                <h1 className="font-syne capitalize font-bold text-2xl sm:text-4xl text-vividOrange max-sm:max-w-sm mx-auto">
+                  {searchQuery ? `Results for "${searchQuery}"` : "Available Deals"}
+                </h1>
+                {searchError && (
+                  <p className="text-red-500 mt-2">{searchError}</p>
+                )}
+                {searchRadius && (
+                  <p className="text-gray-600 mt-2">
+                    Found {filteredDiscounts.length} deals within {searchRadius}km radius
+                    {searchAttempts > 1 && ` (after ${searchAttempts} attempts)`}
+                  </p>
+                )}
               </div>
             </div>
-
-            {isEmpty(filteredItems) ? (
-              <div className="flex flex-col justify-center items-center w-full relative">
+            <SearchInputBox discount={discount} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full max-w-screen-xl">
+              {filteredDiscounts.map((item: DiscountItemT) => (
                 <div
-                  onClick={() => {
-                    navigate(
-                      `/dashboard`
-                    );
-                    // navigate(
-                    //   `/dashboard/discount${discount ? "" : "?discount=All"}`
-                    // );
-                  }}
-                  className="absolute right-2 top-2 p-2 rounded-full hover:bg-slate-100 hover:cursor-pointer"
+                  key={item.id}
+                  className="bg-white rounded-lg shadow-md overflow-hidden"
                 >
-                  <XIcon className="size-8" />
-                </div>
-                <img
-                  src="/images/404.png"
-                  alt=""
-                  className="h-[50svh] w-auto"
-                />
-                <p className="font-medium font-syne text-vividOrange">
-                  No Result Found.
-                </p>
-              </div>
-            ) : (
-              <div className="w-full">
-                <div className="flex mx-auto mt-6 mb-12 w-full">
-                  <div className="grid grid-cols-1 xxx:grid-cols-2  xl:grid-cols-4  gap-4 justify-center w-full">
-                    {filteredItems.map(
-                      ({ title, img }: DiscountItemT, index: number) => (
-                        <div
-                          key={index}
-                          className="bg-white shadow-xl relative w-full"
-                        >
-                          <div className="p-4 pb-20 flex flex-col h-full space-y-4">
-                            <div className="flex justify-between">
-                              <img src="/images/messageicon.svg" alt="" />
-                              <div
-                                className="w-fit "
-                                onClick={() => setToggleHeart(!toggleHeart)}
-                              >
-                                {toggleHeart ? (
-                                  <FaRegHeart className="text-gray-500" />
-                                ) : (
-                                  <FaHeart className="text-red-500" />
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex-1 justify-center items-center flex">
-                              <img src={img} alt="" />
-                            </div>
-                            <div className="space-y-2.5 capitalize font-syne">
-                              <h1 className=" sm:text-xl text-center font-bold">
-                                {title}
-                              </h1>
-                              <p className="text-center max-sm:text-[12px]">
-                                {" "}
-                                Lorem ipsum dolor sit amet consectetur.{" "}
-                              </p>
-                              <p className="text-cartGreen text-center max-sm:text-[12px]">
-                                2 hours left on deal
-                              </p>
-                              <div className="flex items-center justify-center gap-2">
-                                <IoLocationSharp className="text-vividOrange size-4 shrink-0" />
-                                <p className="text-[11px] ">
-                                  shopping store name (2 miles away)
-                                </p>
-                              </div>
-                              <div className="flex items-center justify-center gap-1 md:gap-4">
-                                {[1, 2, 3, 4].map((_, key) => (
-                                  <div key={key} className="flex">
-                                    <MdOutlineStar className="text-buttonGreen max-sm:size-3 size-5" />
-                                  </div>
-                                ))}
-                                <MdOutlineStar className="text-gray-200 max-sm:size-3 size-5" />
-                              </div>
-                              <p className="text-cartGreen text-center max-sm:text-[12px]">
-                                {formatCurrency(1.04)}
-                              </p>
-                            </div>
-                          </div>
-                          <Button
-                            onClick={() => {
-                              navigate(`/dashboard/continue`);
-                            }}
-                            className="bg-buttonGreen font-bold font-syne w-full rounded-none h-12 absolute bottom-0"
-                          >
-                            {index % 2 === 0 ? "BUY ONLINE" : "GET DIRECTION"}
-                          </Button>
-                        </div>
-                      )
-                    )}
+                  <div className="relative">
+                    <img
+                      src={item.image}
+                      alt={item.title}
+                      className="w-full h-48 object-cover"
+                    />
+                    <div className="absolute top-2 right-2">
+                      <FaRegHeart className="text-white text-xl" />
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <IoLocationSharp className="text-vividOrange" />
+                      <span className="text-sm text-gray-600">
+                        {item.location}
+                      </span>
+                    </div>
+                    <h3 className="font-semibold text-lg mb-2">{item.title}</h3>
+                    <p className="text-gray-600 text-sm mb-4">{item.description}</p>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1">
+                        <MdOutlineStar className="text-yellow-400" />
+                        <span className="text-sm">{item.rating}</span>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-vividOrange font-semibold">
+                          {formatCurrency(item.price)}
+                        </p>
+                        <p className="text-sm text-gray-500 line-through">
+                          {formatCurrency(item.originalPrice)}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div className="w-full mb-8 flex justify-center">
-                  <Button
-                    variant={"ghost"}
-                    className="font-syne text-xl px-16 rounded-none h-12"
-                  >
-                    See More...
-                  </Button>
-                </div>
-                <div className="">
-                  <p className="font-medium font-syne">Recommendations</p>
-                  <img src="/images/progress.svg" alt="" />
-                </div>
-
-                <div className="flex mx-auto my-12 w-full">
-                  <div className="grid grid-cols-1 xxx:grid-cols-2  xl:grid-cols-4  gap-4 justify-center w-full">
-                    {filteredItems.map(
-                      ({ title, img }: DiscountItemT, index: number) => (
-                        <div
-                          key={index}
-                          className="bg-white shadow-xl relative w-full"
-                        >
-                          <div className="p-4 pb-20 flex flex-col h-full space-y-4">
-                            <div
-                              className="w-fit ml-auto"
-                              onClick={() => setToggleHeart(!toggleHeart)}
-                            >
-                              {toggleHeart ? (
-                                <FaRegHeart className="text-gray-500" />
-                              ) : (
-                                <FaHeart className="text-red-500" />
-                              )}
-                            </div>
-                            <div className="flex-1 justify-center items-center flex">
-                              <img src={img} alt="" />
-                            </div>
-                            <div className="space-y-2.5 capitalize font-syne">
-                              <h1 className=" sm:text-xl text-center font-bold">
-                                {title}
-                              </h1>
-                              <p className="text-center max-sm:text-[12px]">
-                                {" "}
-                                Lorem ipsum dolor sit amet consectetur.{" "}
-                              </p>
-                              <p className="text-cartGreen text-center max-sm:text-[12px]">
-                                2 hours left on deal
-                              </p>
-                              <div className="flex items-center justify-center gap-2">
-                                <IoLocationSharp className="text-vividOrange size-4 shrink-0" />
-                                <p className="text-[11px] ">
-                                  shopping store name (2 miles away)
-                                </p>
-                              </div>
-                              <div className="flex items-center justify-center gap-1 md:gap-4">
-                                {[1, 2, 3, 4].map((_, key) => (
-                                  <div key={key} className="flex">
-                                    <MdOutlineStar className="text-buttonGreen max-sm:size-3 size-5" />
-                                  </div>
-                                ))}
-                                <MdOutlineStar className="text-gray-200 max-sm:size-3 size-5" />
-                              </div>
-                            </div>
-                          </div>
-                          <Button
-                            className="bg-buttonGreen font-bold font-syne w-full rounded-none h-12 absolute bottom-0"
-                            onClick={() => {
-                              navigate(`/dashboard/continue`);
-                            }}
-                          >
-                            {index % 2 === 0 ? "BUY ONLINE" : "GET DIRECTION"}
-                          </Button>
-                        </div>
-                      )
-                    )}
-                  </div>
-                </div>
-                <SearchInputBox
-                  discount={discount}
-                  // discountItems={filteredItems}
-                />
+              ))}
+            </div>
+            {isEmpty(filteredDiscounts) && !searchError && (
+              <div className="text-center mt-8">
+                <p className="text-gray-600">No deals found. Try a different search term.</p>
               </div>
             )}
           </div>
@@ -253,8 +123,6 @@ const DiscountPage = () => {
     </div>
   );
 };
-
-export default DiscountPage;
 
 const SearchInputBox = ({ discount }: { discount: string | null }) => {
   const [value, setValue] = useState("");
@@ -282,7 +150,6 @@ const SearchInputBox = ({ discount }: { discount: string | null }) => {
           onClick={() => {
             setValue("");
             navigate(`/dashboard`);
-            // navigate(`/dashboard/discount${discount ? "" : "?discount=All"}`);
           }}
           className="absolute top-1/2 right-2 -translate-y-1/2 hover:bg-slate-200 p-1 rounded-full"
         >
@@ -292,3 +159,5 @@ const SearchInputBox = ({ discount }: { discount: string | null }) => {
     </div>
   );
 };
+
+export default DiscountPage;

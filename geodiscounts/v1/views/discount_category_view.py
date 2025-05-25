@@ -23,10 +23,9 @@ import numpy as np
 import logging
 import json
 
-from geodiscounts.models import Discount, Category, Retailer, WebSocketDiscountRequest
+from geodiscounts.models import Discount, Category, Retailer
 from geodiscounts.v1.serializers import DiscountSerializer
 from geodiscounts.v1.serializers.discount_serializers import CategorySerializer
-from geodiscounts.v1.permissions import IsDiscountOwner, IsOwnerOrReadOnly
 from geodiscounts.v1.services.geo_services import GeoService
 from geodiscounts.v1.utils.redis_utils import DISCOUNT_CHANNEL, redis_client
 

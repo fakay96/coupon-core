@@ -12,11 +12,12 @@ from scrapy.exceptions import DropItem
 from .base import BasePipeline, BatchProcessingPipeline
 from discountcrawlers.utils.embedding import generate_embedding,generate_embeddings_batch
 from discountcrawlers.utils.storage import upload_to_spaces
-from discountcrawlers.utils.redis_utils import RedisUtils
 from discountcrawlers.items import DiscountItem
-
+from discountcrawlers.config import settings as settings
 LOGGER = logging.getLogger(__name__)
-redis_utils = RedisUtils()
+from twisted.internet import defer
+from twisted.internet import threads
+import requests
 class DiscountPipeline(BasePipeline):
     """Pipeline for processing discount items."""
     
@@ -136,6 +137,22 @@ class DiscountPipeline(BasePipeline):
 class DealsAndEmbedPipeline(BatchProcessingPipeline):
     """Pipeline for generating embeddings and storing batched items."""
     
+      
+    def __init__(self, crawler=None):
+        super().__init__(crawler)  # Pass crawler to parent class
+        # Get settings
+      
+        self.api_endpoint = settings.DISCOUNT_IMPORT_API_ENDPOINT
+        self.api_key = settings.DISCOUNT_IMPORT_API_KEY
+        self.api_timeout = settings.DISCOUNT_IMPORT_API_TIMEOUT 
+        
+        if not self.api_endpoint:
+            raise ValueError("DISCOUNT_IMPORT_API_ENDPOINT setting is required")
+        if not self.api_key:
+            raise ValueError("DISCOUNT_IMPORT_API_KEY setting is required")
+            
+        LOGGER.info(f"Initialized DealsAndEmbedPipeline with endpoint: {self.api_endpoint}")
+    
     def _generate_text_for_embedding(self, item: Dict[str, Any]) -> str:
         """Generate text for embedding from item data"""
         # Extract relevant fields
@@ -171,80 +188,102 @@ class DealsAndEmbedPipeline(BatchProcessingPipeline):
         
         return text
     
-    def _process_batch(self, items: List[Dict[str, Any]], spider: Spider) -> List[Dict[str, Any]]:
-        """Process a batch of items"""
-        # Generate texts for embedding
-        texts = [self._generate_text_for_embedding(item) for item in items]
+    def _send_to_import_api(self, file_url: str, metadata: Dict[str, Any]) -> bool:
+        """Send file URL to the import API endpoint.
         
-        # Log sample of texts for debugging
-        LOGGER.debug(f"Processing batch of {len(texts)} items")
-        if texts:
-            LOGGER.debug(f"Sample text: {texts[0][:200]}...")
-        
-        # Get embeddings and categories
-        embeddings, categories = generate_embeddings_batch(texts)
-        
-        # Log results for debugging
-        LOGGER.debug(f"Generated {len(embeddings)} embeddings and {len(categories)} categories")
-        if embeddings:
-            LOGGER.debug(f"First embedding shape: {embeddings[0].shape}")
-            LOGGER.debug(f"First category: {categories[0]}")
-        
-        # Update items with embeddings and categories
-        for item, embedding, category in zip(items, embeddings, categories):
-            item['embedding'] = embedding.tolist()
-            item['category'] = category
+        Args:
+            file_url: The URL of the uploaded file
+            metadata: Additional metadata about the batch
             
-        # Store batch data in S3
-        timestamp = int(time.time())
-        storage_key = f"batches/batch_{timestamp}.json"
-        batch_data = {
-            'timestamp': timestamp,
-            'spider': spider.name,
-            'items': items
-        }
-        
+        Returns:
+            bool: True if successful, False otherwise
+        """
         try:
-            # Convert batch_data to JSON string before uploading
+            payload = {
+                'file_url': file_url,
+                'metadata': metadata  # Optional: include metadata if your API supports it
+            }
+            
+            headers = {
+                'X-API-KEY': self.api_key,
+                'Content-Type': 'application/json'
+            }
+            
+            LOGGER.info(f"Sending import request to {self.api_endpoint} for file: {file_url}")
+            
+            response = requests.post(
+                self.api_endpoint,
+                json=payload,
+                headers=headers,
+                timeout=self.api_timeout
+            )
+            
+            if response.status_code == 202:  # HTTP_202_ACCEPTED
+                response_data = response.json()
+                task_id = response_data.get('task_id', 'unknown')
+                LOGGER.info(f"Import task scheduled successfully. Task ID: {task_id}, File: {file_url}")
+                return True
+            else:
+                LOGGER.error(f"API request failed with status {response.status_code}: {response.text}")
+                return False
+                
+        except requests.exceptions.Timeout:
+            LOGGER.error(f"Timeout when calling import API for file: {file_url}")
+            return False
+        except requests.exceptions.RequestException as e:
+            LOGGER.error(f"Request exception when calling import API: {e}")
+            return False
+        except Exception as e:
+            LOGGER.error(f"Unexpected error when calling import API: {e}")
+            return False
+    
+    def _send_to_import_api_async(self, file_url: str, metadata: Dict[str, Any]):
+        """Async wrapper for sending to import API."""
+        return threads.deferToThread(self._send_to_import_api, file_url, metadata)
+    
+    @defer.inlineCallbacks
+    def _process_batch(self, items: List[Dict[str, Any]], spider: Spider):
+        """Process a batch of items and return a Deferred firing with items."""
+        try:
+            # Embedding generation
+            texts = [self._generate_text_for_embedding(item) for item in items]
+            embeddings, categories = generate_embeddings_batch(texts)
+            for item, emb, cat in zip(items, embeddings, categories):
+                item['embedding'] = emb.tolist()
+                item['category'] = cat
+
+            # Prepare batch upload
+            timestamp = int(time.time())
+            storage_key = f"batches/batch_{timestamp}.json"
+            batch_data = {
+                'timestamp': timestamp,
+                'spider': spider.name,
+                'items': items,
+                'item_count': len(items),
+                'batch_id': f"batch_{timestamp}"
+            }
             json_data = json.dumps(batch_data, ensure_ascii=False)
-            # Use defer.maybeDeferred to handle the upload properly
-            from twisted.internet import defer
-            d = defer.maybeDeferred(upload_to_spaces, json_data, storage_key)
-            
-            def on_upload_success(url):
-                """Handle successful upload by publishing to Redis"""
-                LOGGER.info(f"Successfully uploaded batch of {len(items)} items to {url}")
-                
-                # Store batch in Redis with 24-hour expiration
-                batch_id = f"batch_{timestamp}"
-                if redis_utils.store_batch(batch_id, items):
-                    LOGGER.info(f"Stored batch {batch_id} in Redis")
-                    
-                    # Store URL metadata
-                    metadata = {
-                        'url': url,
-                        'key': storage_key,
-                        'timestamp': timestamp,
-                        'spider': spider.name,
-                        'type': 'json',
-                        'item_count': len(items),
-                        'batch_id': batch_id
-                    }
-                    
-                    if redis_utils.store_processed_url(url, metadata):
-                        LOGGER.info(f"Stored URL metadata in Redis: {url}")
-                    else:
-                        LOGGER.error(f"Failed to store URL metadata in Redis: {url}")
-                else:
-                    LOGGER.error(f"Failed to store batch {batch_id} in Redis")
-                
-                return url
-            
-            d.addCallback(on_upload_success)
-            d.addErrback(lambda failure: LOGGER.error(f"Failed to upload batch data: {failure.value}"))
-            
+
+            # Upload to spaces and await URL
+            url = yield defer.maybeDeferred(upload_to_spaces, json_data, storage_key)
+            LOGGER.info(f"Successfully uploaded batch of {len(items)} items to {url}")
+
+            # Send to import API
+            metadata = {
+                'storage_key': storage_key,
+                'timestamp': timestamp,
+                'spider': spider.name,
+                'item_count': len(items),
+                'batch_id': f"batch_{timestamp}",
+                'type': 'json'
+            }
+            success = yield self._send_to_import_api_async(url, metadata)
+            if success:
+                LOGGER.info(f"Successfully sent import request for batch: {url}")
+            else:
+                LOGGER.error(f"Failed to send import request for batch: {url}")
+
         except Exception as e:
             LOGGER.error(f"Failed to process batch: {e}")
-            raise
-        
-        return items
+        # Always return items, even on error
+        defer.returnValue(items)

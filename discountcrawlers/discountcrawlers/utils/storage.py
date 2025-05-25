@@ -65,16 +65,7 @@ class StorageService:
                     "CacheControl": "max-age=86400",
                 },
             )
-            
-            # Store metadata in Redis
-            metadata = {
-                'url': url,
-                'key': key,
-                'timestamp': int(time.time()),
-                'spider': self.spider.name if self.spider else None,
-                'type': 'file'
-            }
-            self.redis_utils.store_processed_url(url=url, metadata=metadata)
+         
             
             return url
         except Exception as e:
@@ -98,8 +89,7 @@ class StorageService:
                 },
             )
             
-            # Store metadata in Redis for Celery task processing
-            self._store_metadata(url=url, key=key, data=data)
+         
             
             return url
         except Exception as e:

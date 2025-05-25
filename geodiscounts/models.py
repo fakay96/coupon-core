@@ -1,217 +1,194 @@
 """
-Discount Discovery System - Models
+Discount Discovery System – Models
+==================================
 
-This module defines the core database models for the Discount Discovery System.
-The system allows retailers to create and share location-based discounts, 
-organized into categories.
+A geospatial, S3-backed platform where retailers publish location-aware
+discounts and users can share group codes.  All user records live in a **separate
+database shard**, so every FK to the user model disables the database-level
+constraint with ``db_constraint=False``.
 
-### Key Features:
-- **Retailers**: Businesses offering location-based discounts.
-- **Discounts**: Offers that can be redeemed by users.
-- **Categories**: Discounts are categorized, and categories have images stored in S3.
-- **Shared Discounts**: Enables group discounts where multiple users can share codes.
-- **Geospatial Support**: Uses `PointField` for precise location tracking.
-- **S3 Integration**: Media files (category images & optional discount images) are stored in DigitalOcean Spaces.
-
-### File Storage:
-- Uses `storages.backends.s3boto3.S3Boto3Storage` to store images in **DigitalOcean Spaces (S3)**.
-- **Automatic folder structure:**
-  - **Staging**: `staging/media/categories/` and `staging/media/discounts/`
-  - **Production**: `production/media/categories/` and `production/media/discounts/`
-- Image fields support `null` and `blank`, making them optional.
-
-### Technologies Used:
-- **Django ORM**
-- **Django GIS (`PointField`)**
-- **Django Storages (`django-storages`)**
-- **PostGIS for geospatial data**
-- **DigitalOcean Spaces (S3-compatible object storage)**
+Main entities
+-------------
+* **Category**         – Thematic bucket (Pizza, Shoes…) with an S3 image.
+* **Retailer**         – Business with a geo-point and optional owner account.
+* **Discount**         – Single offer; supports semantic-search embeddings.
+* **SharedDiscount**   – Group-purchase wrapper around a Discount.
+* **Conversation …**   – Chat/logging layer that extracts user preferences.
 """
 
-from typing import List, Optional, Dict, Any
-from django.contrib.gis.db import models
-from django.contrib.gis.measure import D
-from django.core.validators import FileExtensionValidator, MinValueValidator, MaxValueValidator
-from django.conf import settings
-from storages.backends.s3boto3 import S3Boto3Storage
-from authentication.models import CustomUser
+from __future__ import annotations
+
 import uuid
-from django.utils import timezone
+from typing import Any, Dict, List, Optional
+
+from django.conf import settings
+from django.contrib.gis.db import models as gis_models
+from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import ValidationError
+from django.core.validators import FileExtensionValidator
+from django.db import models
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from storages.backends.s3boto3 import S3Boto3Storage
+
 from coupon_core.utils.logging import geo_logger, geo_structured_logger
 
-User = settings.AUTH_USER_MODEL
 
+# --------------------------------------------------------------------------- #
+#  Category                                                                   #
+# --------------------------------------------------------------------------- #
 class Category(models.Model):
     """
-    Represents a discount category.
+    A thematic bucket used to group discounts (e.g. *Pizza*, *Shoes*).
 
-    Attributes:
-        name (str): The name of the category.
-        image (Optional[FileField]): Image representing the category, stored in S3 (supports SVG).
-        created_at (datetime): Timestamp when the category was created.
-        updated_at (datetime): Timestamp when the category was last updated.
+    An optional image is uploaded to DigitalOcean Spaces via ``django-storages``.
     """
 
-    name: str = models.CharField(
-        max_length=255, unique=True, help_text="Name of the discount category."
+    name = models.CharField(
+        max_length=255, unique=True, help_text="Human-friendly category name."
     )
-    image: Optional[models.FileField] = models.FileField(
+    image = models.FileField(
         upload_to="categories/",
         storage=S3Boto3Storage(),
         validators=[FileExtensionValidator(["jpg", "jpeg", "png", "svg"])],
         null=True,
         blank=True,
-        help_text="Image representing the category, stored in S3 (supports SVG).",
+        help_text="Optional SVG/PNG/JPEG stored in Spaces.",
     )
-    created_at: models.DateTimeField = models.DateTimeField(auto_now_add=True)
-    updated_at: models.DateTimeField = models.DateTimeField(auto_now=True)
 
-    def __str__(self) -> str:
-        """Returns the name of the category."""
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "categories"
+        ordering = ["name"]
+
+    # --------------------------------------------------------------------- #
+    def __str__(self) -> str:  # pragma: no cover
         return self.name
 
     def save(self, *args: Any, **kwargs: Any) -> None:
-        """Save the category with logging."""
+        """Wrap default save in structured logging."""
         try:
             super().save(*args, **kwargs)
             geo_structured_logger.info(
                 geo_logger,
-                "Category saved successfully",
+                "Category saved",
                 "category_save",
-                {
-                    'category_id': self.id,
-                    'name': self.name
-                }
+                {"category_id": self.id, "name": self.name},
             )
-        except Exception as e:
+        except Exception as exc:  # pragma: no cover
             geo_structured_logger.error(
                 geo_logger,
                 "Error saving category",
                 "category_save",
-                e,
-                {
-                    'name': self.name
-                }
+                exc,
+                {"name": self.name},
             )
             raise
 
 
+# --------------------------------------------------------------------------- #
+#  Retailer                                                                   #
+# --------------------------------------------------------------------------- #
 class Retailer(models.Model):
     """
-    Represents a retailer offering discounts.
+    A business that can attach one or more :class:`Discount` objects.
 
-    Attributes:
-        name (str): The name of the retailer.
-        contact_info (Optional[str]): Contact details for the retailer.
-        location (Point): Geographical location of the retailer.
-        owner_id (int): ID of the user who owns/manages this retailer (cross-shard reference).
-        analytics_data (Dict[str, Any]): Analytics data for the retailer.
-        created_at (datetime): Timestamp when the retailer was created.
-        updated_at (datetime): Timestamp when the retailer was last updated.
+    The ``location`` field is a :class:`PointField`` so geo-searches run on PostGIS.
     """
 
-    name: str = models.CharField(
-        max_length=255, unique=True, help_text="Name of the retailer."
+    name = models.CharField(
+        max_length=255, unique=True, help_text="Public-facing retailer name."
     )
-    contact_info: str = models.TextField(
-        blank=True, null=True, help_text="Contact details of the retailer."
+    contact_info = models.TextField(
+        null=True, blank=True, help_text="Address / phone / email."
     )
-    location: models.PointField = models.PointField(
-        help_text="Geographic location of the retailer (latitude/longitude)."
+    location = gis_models.PointField(
+        help_text="WGS-84 lon/lat of the store HQ or flagship.",
+        null=True,
+        blank=True
     )
-    owner_id = models.BigIntegerField(
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
         null=True,
         blank=True,
-        help_text="ID of the user who owns/manages this retailer (cross-shard reference)."
+        on_delete=models.CASCADE,
+        related_name="+",
+        db_constraint=False,  # user lives on another DB
+        help_text="Account that manages this retailer.",
     )
     analytics_data: Dict[str, Any] = models.JSONField(
         default=dict,
         blank=True,
-        help_text="Analytics data for the retailer."
-    )
-    created_at: models.DateTimeField = models.DateTimeField(
-        auto_now_add=True, help_text="Timestamp when the retailer was created."
-    )
-    updated_at: models.DateTimeField = models.DateTimeField(
-        auto_now=True, help_text="Timestamp when the retailer was last updated."
+        help_text="Arbitrary stats (sales, clicks…) collected downstream.",
     )
 
-    def __str__(self) -> str:
-        """Returns a string representation of the retailer."""
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "retailers"
+        ordering = ["name"]
+
+    # --------------------------------------------------------------------- #
+    def __str__(self) -> str:  # pragma: no cover
         return self.name
 
     def save(self, *args: Any, **kwargs: Any) -> None:
-        """Save the retailer with logging."""
         try:
             super().save(*args, **kwargs)
             geo_structured_logger.info(
                 geo_logger,
-                "Retailer saved successfully",
+                "Retailer saved",
                 "retailer_save",
-                {
-                    'retailer_id': self.id,
-                    'name': self.name,
-                    'owner_id': self.owner_id
-                }
+                {"retailer_id": self.id, "name": self.name, "owner_id": self.owner_id},
             )
-        except Exception as e:
+        except Exception as exc:  # pragma: no cover
             geo_structured_logger.error(
                 geo_logger,
                 "Error saving retailer",
                 "retailer_save",
-                e,
-                {
-                    'name': self.name,
-                    'owner_id': self.owner_id
-                }
+                exc,
+                {"name": self.name, "owner_id": self.owner_id},
             )
             raise
 
+
+# --------------------------------------------------------------------------- #
+#  Discount                                                                   #
+# --------------------------------------------------------------------------- #
 class Discount(models.Model):
     """
-    Represents a discount or offer provided by a retailer.
+    A single price promotion, optionally tied to a geo-fence.
 
-    Using cross-shard references with the help of the GeoDiscountsRouter.
-
-    Attributes:
-        retailer (Retailer): The retailer offering the discount.
-        category (Optional[Category]): The category this discount belongs to.
-        description (str): A detailed description of the discount.
-        discount_code (str): Unique code for redeeming the discount.
-        discount_value (float): The value of the discount (e.g., percentage or fixed amount).
-        is_active (bool): Whether the discount is currently active.
-        expiration_date (datetime): Expiration date of the discount.
-        location (Point): Geographical location where the discount is valid.
-        image (Optional[FileField]): An optional image representing the discount (supports SVG).
-        created_at (datetime): Timestamp when the discount was created.
-        updated_at (datetime): Timestamp when the discount was last updated.
+    Vector embeddings (``embedding``) let us rank results semantically.
     """
 
+
     retailer = models.ForeignKey(
-        'Retailer', on_delete=models.CASCADE, related_name="discounts"
+        Retailer,
+        on_delete=models.CASCADE,
+        related_name="discounts",
+        help_text="Publisher of the discount.",
     )
     category = models.ForeignKey(
-        'Category', on_delete=models.SET_NULL, null=True, blank=True, related_name="discounts"
+        Category,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="discounts",
+        help_text="Optional thematic category.",
     )
-    description = models.TextField()
+
+    description = models.TextField(null=True, blank=True)
     discount_code = models.CharField(max_length=50, unique=True)
-    discount_value = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        help_text="Value of the discount (e.g., amount or percentage).",
-        default=0.0
-    )
-    is_active = models.BooleanField(
-        default=True,
-        help_text="Whether the discount is currently active.",
-    )
-    expiration_date = models.DateTimeField(
-        help_text="Expiration date of the discount."
-    )
-    location = models.PointField(
-        help_text="Geographic location where the discount is valid (latitude/longitude)."
+    discount_value = models.DecimalField(max_digits=10, decimal_places=2, default=0.0)
+    is_active = models.BooleanField(default=True)
+    expiration_date = models.DateTimeField()
+
+    location = gis_models.PointField(
+        null=True, blank=True, help_text="Where the offer can be redeemed."
     )
     image = models.FileField(
         upload_to="discounts/",
@@ -219,420 +196,524 @@ class Discount(models.Model):
         validators=[FileExtensionValidator(["jpg", "jpeg", "png", "svg"])],
         null=True,
         blank=True,
-        help_text="Optional image representing the discount, stored in S3 (supports SVG).",
-    )
-    created_at = models.DateTimeField(
-        auto_now_add=True, help_text="Timestamp when the discount was created."
-    )
-    updated_at = models.DateTimeField(
-        auto_now=True, help_text="Timestamp when the discount was last updated."
     )
 
-    def __str__(self) -> str:
-        """Returns a string representation of the discount."""
-        return f"{self.retailer.name} - {self.description[:30]}"
+    # --- Optional commerce metadata --- #
+    currency = models.CharField(max_length=3, null=True, blank=True)
+    country = models.CharField(max_length=100, null=True, blank=True)
+    discount_percentage = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True
+    )
+    brand = models.CharField(max_length=255, null=True, blank=True)
 
-    def get_nearby_users(self, radius_km: float = 5.0) -> List[CustomUser]:
-        """Get users within a specified radius of the discount location.
-        
-        Uses the database router to query the User model in the authentication shard.
-        
-        Args:
-            radius_km (float): Radius in kilometers to search for users.
-            
-        Returns:
-            List[CustomUser]: List of users within the specified radius.
-        """
-        # The router automatically directs this query to the authentication_shard
-        nearby_users = CustomUser.objects.using('authentication_shard').filter(
-            location__distance_lte=(self.location, D(km=radius_km))
-        ).exclude(
-            id=self.retailer.owner_id  # Exclude the retailer owner
-        )
-        
-        return list(nearby_users)
+    valid_from = models.DateTimeField(null=True, blank=True)
+    valid_until = models.DateTimeField(null=True, blank=True)
+    validity_dates = models.CharField(max_length=255, null=True, blank=True)
 
+    address = models.CharField(max_length=255, null=True, blank=True)
+    city = models.CharField(max_length=100, null=True, blank=True)
+    state = models.CharField(max_length=100, null=True, blank=True)
+    postal_code = models.CharField(max_length=20, null=True, blank=True)
+
+    # --- Source provenance --- #
+    source = models.CharField(max_length=255, null=True, blank=True)
+    source_id = models.CharField(max_length=255, null=True, blank=True)
+    source_url = models.URLField(null=True, blank=True)
+
+    # --- Product / store refs --- #
+    product_id = models.CharField(max_length=255, null=True, blank=True)
+    product_url = models.URLField(null=True, blank=True)
+    store_name = models.CharField(max_length=255, null=True, blank=True)
+    store_id = models.CharField(max_length=255, null=True, blank=True)
+    store_url = models.URLField(null=True, blank=True)
+
+    price_per_unit = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True
+    )
+    stock_info = models.TextField(null=True, blank=True)
+
+    # --- ML search bits --- #
+    embedding = ArrayField(
+        base_field=models.FloatField(), size=768, null=True, blank=True
+    )
+
+    # --- Misc --- #
+    error_message = models.TextField(null=True, blank=True)
+    url = models.URLField(null=True, blank=True)
+    title = models.CharField(max_length=255, null=True, blank=True)
+    name = models.CharField(max_length=255, null=True, blank=True)
+    size = models.CharField(max_length=100, null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "discounts"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["is_active", "expiration_date"]),
+            models.Index(fields=["location"]),
+        ]
+
+    # --------------------------------------------------------------------- #
+    def __str__(self) -> str:  # pragma: no cover
+        return f"{self.retailer.name} — {self.discount_code}"
+
+    # --------------------------------------------------------------------- #
+    # Validation & save guards                                              #
+    # --------------------------------------------------------------------- #
     def clean(self) -> None:
-        """Validate the discount data."""
+        """Ensure ``expiration_date`` is in the future."""
+        if self.expiration_date is None:
+            # No expiry provided → skip this check (or raise your own error if you prefer)
+            return
         if self.expiration_date <= timezone.now():
             geo_structured_logger.warning(
                 geo_logger,
-                "Discount expiration date is in the past",
+                "Past expiry",
                 "discount_clean",
-                {
-                    'discount_id': self.id,
-                    'expiration_date': self.expiration_date.isoformat()
-                }
+                {"discount_id": self.id, "expiry": self.expiration_date.isoformat()},
             )
-            raise ValidationError(_("Expiration date must be in the future"))
+            raise ValidationError(_("Expiration date must be in the future."))
 
     def save(self, *args: Any, **kwargs: Any) -> None:
-        """Save the discount with logging."""
         try:
             self.full_clean()
             super().save(*args, **kwargs)
             geo_structured_logger.info(
                 geo_logger,
-                "Discount saved successfully",
+                "Discount saved",
                 "discount_save",
                 {
-                    'discount_id': self.id,
-                    'retailer_id': self.retailer.id,
-                    'category_id': self.category.id if self.category else None,
-                    'is_active': self.is_active
-                }
+                    "discount_id": self.id,
+                    "retailer_id": self.retailer_id,
+                    "category_id": self.category_id,
+                },
             )
-        except ValidationError as ve:
+        except ValidationError as ve:  # pragma: no cover
             geo_structured_logger.error(
                 geo_logger,
-                "Validation error saving discount",
+                "Validation error",
                 "discount_save",
                 ve,
-                {
-                    'retailer_id': self.retailer.id,
-                    'category_id': self.category.id if self.category else None
-                }
+                {"retailer_id": self.retailer_id},
             )
             raise
-        except Exception as e:
+        except Exception as exc:  # pragma: no cover
             geo_structured_logger.error(
                 geo_logger,
-                "Error saving discount",
+                "Unexpected error",
                 "discount_save",
-                e,
-                {
-                    'retailer_id': self.retailer.id,
-                    'category_id': self.category.id if self.category else None
-                }
+                exc,
+                {"retailer_id": self.retailer_id},
             )
             raise
 
 
 
 class SharedDiscount(models.Model):
-    """
-    Represents shared discount codes and group purchases.
+    """A simple group-purchase / referral wrapper around :class:`Discount`."""
 
-    Attributes:
-        discount (Discount): The discount being shared.
-        group_name (str): Name of the group sharing the discount.
-        participants (list): List of participant user IDs in the shared discount.
-        min_participants (int): Minimum number of participants required.
-        max_participants (int): Maximum number of participants allowed.
-        status (str): Status of the shared discount (e.g., active, completed, expired).
-        created_at (datetime): Timestamp when the shared discount was created.
-        updated_at (datetime): Timestamp when the shared discount was last updated.
-    """
-
-    discount: Discount = models.ForeignKey(
+    discount = models.ForeignKey(
         Discount,
         on_delete=models.CASCADE,
         related_name="shared_discounts",
-        help_text="Discount being shared.",
+        help_text="Underlying discount being shared.",
     )
-    group_name: str = models.CharField(
-        max_length=255, help_text="Name of the group sharing the discount."
-    )
+    group_name = models.CharField(max_length=255)
     participants: List[int] = models.JSONField(
-        help_text="List of participant user IDs sharing the discount."
+        help_text="User IDs of participants.",
     )
-    min_participants: int = models.PositiveIntegerField(
-        help_text="Minimum number of participants required for the shared discount.",
-        default=2
-    )
-    max_participants: int = models.PositiveIntegerField(
-        help_text="Maximum number of participants allowed in the shared discount.",
-        default=10
-    )
-    status: str = models.CharField(
+    min_participants = models.PositiveIntegerField(default=2)
+    max_participants = models.PositiveIntegerField(default=10)
+    status = models.CharField(
         max_length=50,
         choices=[("active", "Active"), ("completed", "Completed"), ("expired", "Expired")],
         default="active",
     )
-    created_at: models.DateTimeField = models.DateTimeField(
-        auto_now_add=True, help_text="Timestamp when the shared discount was created."
-    )
-    updated_at: models.DateTimeField = models.DateTimeField(
-        auto_now=True,
-        help_text="Timestamp when the shared discount was last updated.",
-    )
 
-    def __str__(self) -> str:
-        """Returns a formatted string representing the shared discount."""
-        return f"{self.group_name} - {self.discount.discount_code}"
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "shared_discounts"
+        ordering = ["-created_at"]
+
+    # --------------------------------------------------------------------- #
+    def __str__(self) -> str:  # pragma: no cover
+        return f"{self.group_name} — {self.discount.discount_code}"
 
     def save(self, *args: Any, **kwargs: Any) -> None:
-        """Save the shared discount with logging."""
         try:
             super().save(*args, **kwargs)
             geo_structured_logger.info(
                 geo_logger,
-                "Shared discount saved successfully",
+                "Shared discount saved",
                 "shared_discount_save",
                 {
-                    'shared_discount_id': self.id,
-                    'discount_id': self.discount.id,
-                    'group_name': self.group_name,
-                    'status': self.status
-                }
+                    "shared_discount_id": self.id,
+                    "discount_id": self.discount_id,
+                    "status": self.status,
+                },
             )
-        except Exception as e:
+        except Exception as exc:  # pragma: no cover
             geo_structured_logger.error(
                 geo_logger,
                 "Error saving shared discount",
                 "shared_discount_save",
-                e,
-                {
-                    'discount_id': self.discount.id,
-                    'group_name': self.group_name
-                }
+                exc,
+                {"discount_id": self.discount_id},
             )
             raise
 
-class WebSocketDiscountRequest(models.Model):
-    """
-    Tracks WebSocket discount requests and their status.
 
-    In a sharded architecture where users are in a different database shard,
-    we store the user_id as a regular field instead of a direct foreign key.
+# --------------------------------------------------------------------------- #
+#  Conversation-related models                                                #
+# --------------------------------------------------------------------------- #
+class Conversation(models.Model):
+    """A single chat session between *one* user and the assistant."""
 
-    Attributes:
-        request_id (str): Unique identifier for the request
-        user_id (int): ID of the user who made the request (stored as value, not FK)
-        location (Point): The location for the discount search
-        radius (float): Search radius in kilometers
-        category (Optional[Category]): The category to filter by
-        status (str): Current status of the request
-        results (Dict[str, Any]): The results of the request
-        conversation_history (List[Dict[str, Any]]): History of conversation messages
-        websocket_url (str): URL for WebSocket connection
-        created_at (datetime): When the request was created
-        updated_at (datetime): When the request was last updated
-    """
-    
-    request_id = models.UUIDField(
-        primary_key=True,
-        default=uuid.uuid4,
-        editable=False,
-        help_text="Unique identifier for the WebSocket request"
+    class ConversationStatus(models.TextChoices):
+        ACTIVE = "active", "Active"
+        ARCHIVED = "archived", "Archived"
+        DELETED = "deleted", "Deleted"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="conversations",
+        db_constraint=False,  # cross-shard FK
     )
-    # Store user ID as integer instead of foreign key
-    user_id = models.BigIntegerField(
-        help_text="ID of the user who made the request"
-    )
-    location = models.PointField(
-        help_text="Location for the discount search"
-    )
-    radius = models.FloatField(
-        default=10.0,
-        help_text="Search radius in kilometers"
-    )
-    category = models.ForeignKey(
-        Category,
-        on_delete=models.SET_NULL,
-        null=True,
+    title = models.CharField(
+        max_length=200,
         blank=True,
-        related_name="websocket_requests",
-        help_text="Category to filter by"
+        help_text="Auto-generated from the first user turn.",
     )
     status = models.CharField(
-        max_length=20,
-        choices=[
-            ("pending", "Pending"),
-            ("processing", "Processing"),
-            ("completed", "Completed"),
-            ("failed", "Failed")
-        ],
-        default="pending",
-        help_text="Current status of the request"
+        max_length=20, choices=ConversationStatus.choices, default=ConversationStatus.ACTIVE
     )
-    results = models.JSONField(
+
+    user_preferences = models.JSONField(
+        default=dict, blank=True, help_text="Lightweight prefs extracted in-chat."
+    )
+    last_location = gis_models.PointField(
+        null=True, blank=True, help_text="Last lat/lon supplied by the user."
+    )
+    last_radius = models.FloatField(
+        default=5_000.0, help_text="Search radius (m) to assume when geo-filtering."
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "conversations"
+        ordering = ["-updated_at"]
+        indexes = [
+            models.Index(fields=["user", "-updated_at"]),
+            models.Index(fields=["status"]),
+        ]
+
+    # --------------------------------------------------------------------- #
+    def __str__(self) -> str:  # pragma: no cover
+        return f"Conversation {self.id} — {getattr(self.user, 'username', 'unknown')}"
+
+    @property
+    def message_count(self) -> int:
+        return self.messages.count()
+
+    @property
+    def last_message(self) -> "ConversationMessage | None":
+        return self.messages.order_by("-created_at").first()
+
+    # Helper to set the sidebar title ------------------------------------- #
+    def generate_title(self) -> None:
+        first = self.messages.filter(role=ConversationMessage.MessageRole.USER).first()
+        if first:
+            preview = first.content[:50]
+            self.title = f"{preview}…" if len(first.content) > 50 else preview
+            self.save(update_fields=["title"])
+
+
+# --------------------------------------------------------------------------- #
+class ConversationMessage(models.Model):
+    """A single utterance (user / assistant / system)."""
+
+    class MessageRole(models.TextChoices):
+        USER = "user", "User"
+        ASSISTANT = "assistant", "Assistant"
+        SYSTEM = "system", "System"
+
+    class MessageType(models.TextChoices):
+        GREETING = "greeting", "Greeting"
+        SEARCH_QUERY = "search_query", "Search Query"
+        SEARCH_RESULTS = "search_results", "Search Results"
+        CONVERSATION = "conversation", "Conversation"
+        ERROR = "error", "Error"
+        SYSTEM_INFO = "system_info", "System Info"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    conversation = models.ForeignKey(
+        Conversation, on_delete=models.CASCADE, related_name="messages"
+    )
+    role = models.CharField(max_length=20, choices=MessageRole.choices)
+    message_type = models.CharField(
+        max_length=20, choices=MessageType.choices, default=MessageType.CONVERSATION
+    )
+    content = models.TextField()
+
+    metadata = models.JSONField(
         default=dict,
         blank=True,
-        help_text="Results of the request"
+        help_text="Arbitrary structured data (token count, model name…).",
     )
-    conversation_history = models.JSONField(
-        default=list,
-        blank=True,
-        help_text="History of conversation messages"
-    )
-    websocket_url = models.URLField(
-        max_length=500,
-        blank=True,
-        help_text="URL for WebSocket connection"
-    )
-    created_at = models.DateTimeField(
-        auto_now_add=True,
-        help_text="When the request was created"
-    )
-    updated_at = models.DateTimeField(
-        auto_now=True,
-        help_text="When the request was last updated"
-    )
-    # Optional: Store additional user information for quick access
-    user_email = models.EmailField(
-        max_length=255,
-        blank=True,
+    search_request = models.ForeignKey(
+        "SearchRequest",
         null=True,
-        help_text="User email for quick reference without cross-shard query"
+        blank=True,
+        on_delete=models.SET_NULL,
+        help_text="Link if this message produced a search.",
     )
 
-    def __str__(self) -> str:
-        """Returns a formatted string representing the request."""
-        return f"Request {self.request_id} ({self.status})"
-
-    def save(self, *args: Any, **kwargs: Any) -> None:
-        """Save the WebSocket request with logging."""
-        try:
-            super().save(*args, **kwargs)
-            geo_structured_logger.info(
-                geo_logger,
-                "WebSocket request saved successfully",
-                "websocket_request_save",
-                {
-                    'request_id': str(self.request_id),
-                    'user_id': self.user_id,
-                    'status': self.status
-                }
-            )
-        except Exception as e:
-            geo_structured_logger.error(
-                geo_logger,
-                "Error saving WebSocket request",
-                "websocket_request_save",
-                e,
-                {
-                    'request_id': str(self.request_id),
-                    'user_id': self.user_id
-                }
-            )
-            raise
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        db_table = "conversation_messages"
+        ordering = ["created_at"]
         indexes = [
-            models.Index(fields=['request_id']),
-            models.Index(fields=['user_id']),  
-            models.Index(fields=['status']),
-            models.Index(fields=['created_at']),
+            models.Index(fields=["conversation", "created_at"]),
+            models.Index(fields=["role", "message_type"]),
         ]
-        ordering = ['-created_at']
 
-class Location(models.Model):
+    def __str__(self) -> str:  # pragma: no cover
+        return f"{self.role}: {self.content[:50]}…"
+
+
+# --------------------------------------------------------------------------- #
+class SearchRequest(models.Model):
     """
-    Represents a geographical location with a radius.
-
-    Attributes:
-        name (str): Name of the location.
-        latitude (float): Latitude coordinate.
-        longitude (float): Longitude coordinate.
-        radius (float): Radius in meters for the location.
-        is_valid (bool): Whether the location is valid.
-        last_updated (datetime): When the location was last updated.
+    A geo-aware product/location search triggered during a conversation.
     """
 
-    name: str = models.CharField(
-        max_length=255,
-        help_text="Name of the location."
-    )
-    latitude: float = models.FloatField(
-        validators=[
-            MinValueValidator(-90.0),
-            MaxValueValidator(90.0)
-        ],
-        help_text="Latitude coordinate (-90 to 90)."
-    )
-    longitude: float = models.FloatField(
-        validators=[
-            MinValueValidator(-180.0),
-            MaxValueValidator(180.0)
-        ],
-        help_text="Longitude coordinate (-180 to 180)."
-    )
-    radius: float = models.FloatField(
-        validators=[MinValueValidator(0.0)],
-        help_text="Radius in meters for the location."
-    )
-    is_valid: bool = models.BooleanField(
-        default=True,
-        help_text="Whether the location is valid."
-    )
-    last_updated: models.DateTimeField = models.DateTimeField(
-        auto_now=True,
-        help_text="When the location was last updated."
+    class SearchStatus(models.TextChoices):
+        PENDING = "pending", "Pending"
+        PROCESSING = "processing", "Processing"
+        COMPLETED = "completed", "Completed"
+        FAILED = "failed", "Failed"
+        TIMEOUT = "timeout", "Timeout"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    conversation = models.ForeignKey(
+        Conversation, on_delete=models.CASCADE, related_name="search_requests"
     )
 
-    def __str__(self) -> str:
-        """Returns a string representation of the location."""
-        return f"{self.name} ({self.latitude}, {self.longitude})"
+    query = models.TextField(help_text="Raw user query.")
+    location = gis_models.PointField(help_text="Lon/lat used as search centre.")
+    radius = models.FloatField(default=5_000.0, help_text="Radius in metres.")
+    search_context = models.JSONField(default=dict, blank=True)
 
-    def calculate_distance(self, other: 'Location') -> float:
-        """Calculate distance to another location in meters.
-        
-        Args:
-            other (Location): The other location to calculate distance to.
-            
-        Returns:
-            float: Distance in meters.
-        """
-        from django.contrib.gis.geos import Point
-        from django.contrib.gis.measure import D
-        
-        point1 = Point(self.longitude, self.latitude)
-        point2 = Point(other.longitude, other.latitude)
-        
-        return point1.distance(point2) * 100000  # Convert to meters
+    status = models.CharField(
+        max_length=20, choices=SearchStatus.choices, default=SearchStatus.PENDING
+    )
+    results = models.JSONField(default=list, blank=True)
+    result_count = models.IntegerField(default=0)
 
-    def overlaps_with(self, other: 'Location') -> bool:
-        """Check if this location overlaps with another location.
-        
-        Args:
-            other (Location): The other location to check.
-            
-        Returns:
-            bool: True if locations overlap, False otherwise.
-        """
-        distance = self.calculate_distance(other)
-        return distance < (self.radius + other.radius)
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    processing_time = models.FloatField(null=True, blank=True)
+    error_message = models.TextField(blank=True)
 
-    def get_bounding_box(self) -> tuple:
-        """Get the bounding box for this location.
-        
-        Returns:
-            tuple: (min_lat, min_lng, max_lat, max_lng)
-        """
-        # Convert radius from meters to degrees (approximate)
-        lat_radius = self.radius / 111000  # 111km per degree
-        lng_radius = self.radius / (111000 * abs(self.latitude))
-        
-        return (
-            self.latitude - lat_radius,
-            self.longitude - lng_radius,
-            self.latitude + lat_radius,
-            self.longitude + lng_radius
+    class Meta:
+        db_table = "search_requests"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["conversation", "-created_at"]),
+            models.Index(fields=["status"]),
+            models.Index(fields=["location"]),
+        ]
+
+    def __str__(self) -> str:  # pragma: no cover
+        return f"Search «{self.query[:50]}…» ({self.status})"
+
+    # Convenience helpers -------------------------------------------------- #
+    def mark_completed(self, *, results: List[Dict], processing_time: float | None = None) -> None:
+        from django.utils import timezone
+
+        self.status = self.SearchStatus.COMPLETED
+        self.results = results
+        self.result_count = len(results)
+        self.completed_at = timezone.now()
+        if processing_time is not None:
+            self.processing_time = processing_time
+        self.save(
+            update_fields=[
+                "status",
+                "results",
+                "result_count",
+                "completed_at",
+                "processing_time",
+            ]
         )
 
-    def to_geojson(self) -> Dict[str, Any]:
-        """Convert location to GeoJSON format.
-        
-        Returns:
-            Dict[str, Any]: GeoJSON representation of the location.
-        """
-        return {
-            'type': 'Feature',
-            'geometry': {
-                'type': 'Point',
-                'coordinates': [self.longitude, self.latitude]
-            },
-            'properties': {
-                'name': self.name,
-                'radius': self.radius
-            }
-        }
+    def mark_failed(self, *, error_message: str = "") -> None:
+        from django.utils import timezone
+
+        self.status = self.SearchStatus.FAILED
+        self.error_message = error_message
+        self.completed_at = timezone.now()
+        self.save(update_fields=["status", "error_message", "completed_at"])
+
+
+# --------------------------------------------------------------------------- #
+class UserPreference(models.Model):
+    """
+    A single preference pattern extracted from any conversation a user has.
+    """
+
+    class PreferenceType(models.TextChoices):
+        CATEGORY = "category", "Category"
+        LOCATION = "location", "Location"
+        PRICE_RANGE = "price_range", "Price Range"
+        BRAND = "brand", "Brand"
+        SEARCH_RADIUS = "search_radius", "Search Radius"
+        OTHER = "other", "Other"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="preferences",
+        db_constraint=False,  # cross-shard FK
+    )
+    conversation = models.ForeignKey(
+        Conversation, on_delete=models.CASCADE, related_name="extracted_preferences"
+    )
+
+    preference_type = models.CharField(max_length=20, choices=PreferenceType.choices)
+    key = models.CharField(max_length=100, help_text="Canonical preference key.")
+    value = models.TextField(help_text="Raw value (plain or JSON string).")
+    confidence = models.FloatField(
+        default=0.5, help_text="0–1 confidence score from the extractor."
+    )
+
+    extracted_from_message = models.ForeignKey(
+        ConversationMessage, null=True, blank=True, on_delete=models.SET_NULL
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
+        db_table = "user_preferences"
+        unique_together = ["user", "preference_type", "key"]
         indexes = [
-            models.Index(fields=['latitude', 'longitude']),
-            models.Index(fields=['is_valid']),
-            models.Index(fields=['last_updated']),
+            models.Index(fields=["user", "preference_type"]),
+            models.Index(fields=["confidence"]),
         ]
-        ordering = ['-last_updated']
+
+    def __str__(self) -> str:  # pragma: no cover
+        return f"{self.user_id} • {self.key} → {self.value}"
+
+
+# --------------------------------------------------------------------------- #
+class ConversationContext(models.Model):
+    """
+    Cached summary of the latest state of a conversation.
+
+    Lets the assistant answer follow-ups without scanning the full history.
+    """
+
+    conversation = models.OneToOneField(
+        Conversation, on_delete=models.CASCADE, related_name="context"
+    )
+
+    topics_discussed = models.JSONField(default=list)
+    search_history = models.JSONField(default=list)
+    location_mentions = models.JSONField(default=list)
+    user_intent = models.CharField(max_length=50, blank=True)
+
+    stage = models.CharField(
+        max_length=20,
+        default="initial",
+        help_text="Lifecycle stage: initial / developing / ongoing.",
+    )
+
+    avg_response_time = models.FloatField(null=True, blank=True)
+    successful_searches = models.IntegerField(default=0)
+    failed_searches = models.IntegerField(default=0)
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "conversation_contexts"
+
+    # --------------------------------------------------------------------- #
+    # Lightweight heuristics; heavy NLP should run in a background task.    #
+    # --------------------------------------------------------------------- #
+    def update_context(self) -> None:
+        msgs = self.conversation.messages.all()
+        self.topics_discussed = self._extract_topics(msgs)
+        self.search_history = self._extract_search_history(msgs)
+        self.location_mentions = self._extract_locations(msgs)
+        self.stage = self._determine_stage(msgs)
+        self.save(
+            update_fields=[
+                "topics_discussed",
+                "search_history",
+                "location_mentions",
+                "stage",
+            ]
+        )
+
+    # Basic keyword extraction ------------------------------------------- #
+    @staticmethod
+    def _extract_topics(messages) -> List[str]:
+        topics: List[str] = []
+        keywords_map = {
+            "food": ["restaurant", "pizza", "burger", "eat"],
+            "shopping": ["shop", "buy", "store", "mall"],
+            "entertainment": ["movie", "cinema", "show", "event"],
+        }
+        for m in messages.filter(role=ConversationMessage.MessageRole.USER):
+            content = m.content.lower()
+            for topic, kws in keywords_map.items():
+                if any(k in content for k in kws) and topic not in topics:
+                    topics.append(topic)
+        return topics
+
+    @staticmethod
+    def _extract_search_history(messages) -> List[str]:
+        return list(
+            messages.filter(
+                role=ConversationMessage.MessageRole.USER,
+                message_type=ConversationMessage.MessageType.SEARCH_QUERY,
+            )
+            .order_by("-created_at")
+            .values_list("content", flat=True)[:5]
+        )
+
+    @staticmethod
+    def _extract_locations(messages) -> List[str]:
+        locs: List[str] = []
+        keywords = ["near", "around", "close to", "in", "at"]
+        for m in messages.filter(role=ConversationMessage.MessageRole.USER):
+            words = m.content.lower().split()
+            for k in keywords:
+                if k in words:
+                    try:
+                        idx = words.index(k)
+                        candidate = words[idx + 1]
+                        if candidate not in locs:
+                            locs.append(candidate)
+                    except (ValueError, IndexError):
+                        continue
+        return locs
+
+    @staticmethod
+    def _determine_stage(messages) -> str:
+        count = messages.count()
+        if count <= 2:
+            return "initial"
+        if count <= 10:
+            return "developing"
+        return "ongoing"
