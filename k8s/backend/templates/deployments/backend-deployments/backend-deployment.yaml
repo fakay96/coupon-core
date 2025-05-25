@@ -127,5 +127,9 @@ spec:
               key: CELERY_DB
         - name: SERVICE_TYPE
           value: "backend"
-
-        
+        - name: GEMINI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: GEMINI_API_KEY
+      
