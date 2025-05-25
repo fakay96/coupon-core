@@ -33,30 +33,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-          cache: 'poetry'
-
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          version: latest
-          virtualenvs-create: true
-          virtualenvs-in-project: true
-
-      - name: Load cached venv
-        id: cached-poetry-dependencies
-        uses: actions/cache@v3
-        with:
-          path: .venv
-          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
-
-      - name: Install dependencies
-        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --no-root
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
@@ -77,25 +53,41 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and push images
+      # Build backend services
+      - name: Build and push backend services
         uses: docker/build-push-action@v4
         with:
           context: .
+          file: ./docker/Dockerfile.core
           push: true
           tags: |
-            ${{ env.DOCKER_REGISTRY }}/coupon-base:${{ env.VERSION_TAG }}
             ${{ env.DOCKER_REGISTRY }}/coupon-core:${{ env.VERSION_TAG }}
             ${{ env.DOCKER_REGISTRY }}/coupon-celery:${{ env.VERSION_TAG }}
             ${{ env.DOCKER_REGISTRY }}/coupon-crawler:${{ env.VERSION_TAG }}
             ${{ env.DOCKER_REGISTRY }}/coupon-inference:${{ env.VERSION_TAG }}
+          labels: |
+            org.opencontainers.image.version=${{ env.VERSION_TAG }}
+            org.opencontainers.image.created=${{ github.event.repository.updated_at }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=registry,ref=${{ env.DOCKER_REGISTRY }}/coupon-core:buildcache
+          cache-to: type=registry,ref=${{ env.DOCKER_REGISTRY }}/coupon-core:buildcache,mode=max
+
+      # Build frontend services
+      - name: Build and push frontend services
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./docker/Dockerfile.frontend
+          push: true
+          tags: |
             ${{ env.DOCKER_REGISTRY }}/coupon-frontend:${{ env.VERSION_TAG }}
             ${{ env.DOCKER_REGISTRY }}/coupon-frontend-staging:${{ env.VERSION_TAG }}
           labels: |
             org.opencontainers.image.version=${{ env.VERSION_TAG }}
             org.opencontainers.image.created=${{ github.event.repository.updated_at }}
             org.opencontainers.image.revision=${{ github.sha }}
-          cache-from: type=registry,ref=${{ env.DOCKER_REGISTRY }}/coupon-base:buildcache
-          cache-to: type=registry,ref=${{ env.DOCKER_REGISTRY }}/coupon-base:buildcache,mode=max
+          cache-from: type=registry,ref=${{ env.DOCKER_REGISTRY }}/coupon-frontend:buildcache
+          cache-to: type=registry,ref=${{ env.DOCKER_REGISTRY }}/coupon-frontend:buildcache,mode=max
 
       - name: Save version metadata
         run: |
@@ -113,18 +105,21 @@ jobs:
         with:
           name: version-metadata
           path: version-metadata.json
+          retention-days: 5
 
   deploy:
     needs: build
-    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment || 'staging' }}
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || (github.ref == 'refs/heads/main' && 'production' || 'staging') }}
     steps:
       - name: Download version metadata
         uses: actions/download-artifact@v4
         with:
           name: version-metadata
           path: .
+          pattern: version-metadata.json
+          merge-multiple: false
 
       - name: Set up kubectl
         uses: azure/setup-kubectl@v3
@@ -157,41 +152,3 @@ jobs:
             kubectl get pods -l app=$service
             kubectl describe deployment $service
           done
-
-  cleanup:
-    needs: deploy
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Trigger cleanup workflow
-        uses: peter-evans/repository-dispatch@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          event-type: cleanup-trigger
-          client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}"}'
-
-  notify:
-    needs: [build, deploy, cleanup]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download version metadata
-        uses: actions/download-artifact@v4
-        with:
-          name: version-metadata
-          path: .
-
-      - name: Send notification
-        uses: rtCamp/action-slack-notify@v2
-        env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_CHANNEL: deployments
-          SLACK_COLOR: ${{ job.status }}
-          SLACK_TITLE: Deployment Status
-          SLACK_MESSAGE: |
-            *Environment:* ${{ inputs.environment || 'staging' }}
-            *Version:* $(jq -r '.version' version-metadata.json)
-            *Status:* ${{ job.status }}
-            *Commit:* $(jq -r '.commit' version-metadata.json)
-            *Actor:* $(jq -r '.actor' version-metadata.json)
-            *Timestamp:* $(jq -r '.timestamp' version-metadata.json)
