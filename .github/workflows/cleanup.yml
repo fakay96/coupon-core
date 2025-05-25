@@ -1,31 +1,80 @@
-name: Docker Cleanup
-
+name: Docker Image Cleanup
 on:
   schedule:
-    - cron: '0 2 * * *'  # Runs every day at 02:00 UTC
+    - cron: '0 0 * * 0'  # Run weekly on Sunday
   workflow_dispatch:
+    inputs:
+      days_to_keep:
+        description: 'Number of days to keep images'
+        required: false
+        type: number
+        default: 30
 
 jobs:
   cleanup:
     runs-on: ubuntu-latest
     steps:
-      - name: Log Docker disk usage before cleanup
-        run: docker system df
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      - name: Remove unused containers
-        run: docker container prune -f
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Remove unused images
-        run: docker image prune -f
+      - name: Set retention period
+        id: retention
+        run: |
+          DAYS_TO_KEEP=${{ inputs.days_to_keep || 30 }}
+          echo "days_to_keep=$DAYS_TO_KEEP" >> $GITHUB_OUTPUT
 
-      - name: Remove unused volumes
-        run: docker volume prune -f
+      - name: Cleanup old images
+        run: |
+          SERVICES=(
+            "coupon-core"
+            "coupon-celery"
+            "coupon-crawler"
+            "coupon-inference"
+            "coupon-frontend"
+            "coupon-frontend-staging"
+          )
 
-      - name: Remove unused networks
-        run: docker network prune -f
+          for service in "${SERVICES[@]}"; do
+            echo "Cleaning up old images for $service..."
+            
+            # Get all versions except latest and rollback tags
+            VERSIONS=$(docker manifest inspect fakay96/$service:latest | \
+              jq -r '.history[].v1Compatibility | fromjson | .config.Labels["org.opencontainers.image.version"]' | \
+              sort -u | grep -v "latest" | grep -v "rollback")
+            
+            for version in $VERSIONS; do
+              # Get image creation date
+              CREATED=$(docker manifest inspect fakay96/$service:$version | \
+                jq -r '.history[].v1Compatibility | fromjson | .config.Labels["org.opencontainers.image.created"]')
+              
+              # Calculate days since creation
+              CREATED_EPOCH=$(date -jf "%Y-%m-%dT%H:%M:%SZ" "$CREATED" +%s 2>/dev/null || date -d "$CREATED" +%s)
+              CURRENT_EPOCH=$(date +%s)
+              DAYS_OLD=$(( ($CURRENT_EPOCH - $CREATED_EPOCH) / 86400 ))
+              
+              if [ $DAYS_OLD -gt ${{ steps.retention.outputs.days_to_keep }} ]; then
+                echo "Removing $service:$version (created $DAYS_OLD days ago)"
+                docker manifest rm fakay96/$service:$version || true
+              fi
+            done
+          done
 
-      - name: Remove all dangling images, containers, and cache
-        run: docker system prune -af
+      - name: Generate cleanup report
+        run: |
+          echo "{
+            \"timestamp\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\",
+            \"retention_days\": ${{ steps.retention.outputs.days_to_keep }},
+            \"services_cleaned\": [\"coupon-core\", \"coupon-celery\", \"coupon-crawler\", \"coupon-inference\", \"coupon-frontend\", \"coupon-frontend-staging\"]
+          }" > cleanup-report.json
 
-      - name: Log Docker disk usage after cleanup
-        run: docker system df
+      - name: Upload cleanup report
+        uses: actions/upload-artifact@v4
+        with:
+          name: cleanup-report
+          path: cleanup-report.json

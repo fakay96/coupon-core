@@ -1,0 +1,156 @@
+name: Version Manager
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+          - list-versions
+          - rollback
+          - compare-versions
+      service:
+        description: 'Service to manage'
+        required: true
+        type: choice
+        options:
+          - coupon-core
+          - coupon-celery
+          - coupon-crawler
+          - coupon-inference
+          - coupon-frontend
+          - coupon-frontend-staging
+      version:
+        description: 'Version to rollback to (required for rollback action)'
+        required: false
+        type: string
+      compare_version:
+        description: 'Version to compare with (required for compare-versions action)'
+        required: false
+        type: string
+
+jobs:
+  manage-versions:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: List versions
+        if: inputs.action == 'list-versions'
+        run: |
+          echo "Available versions for ${{ inputs.service }}:"
+          echo "----------------------------------------"
+          docker manifest inspect fakay96/${{ inputs.service }}:latest | \
+            jq -r '.history[].v1Compatibility | fromjson | {
+              version: .config.Labels["org.opencontainers.image.version"],
+              created: .config.Labels["org.opencontainers.image.created"],
+              commit: .config.Labels["org.opencontainers.image.revision"]
+            }' | jq -s 'sort_by(.created) | reverse' | \
+            jq -r '.[] | "Version: \(.version)\nCreated: \(.created)\nCommit: \(.commit)\n"'
+
+      - name: Compare versions
+        if: inputs.action == 'compare-versions' && inputs.version != '' && inputs.compare_version != ''
+        run: |
+          echo "Comparing versions for ${{ inputs.service }}:"
+          echo "----------------------------------------"
+          
+          # Get metadata for both versions
+          V1_METADATA=$(docker manifest inspect fakay96/${{ inputs.service }}:${{ inputs.version }} | \
+            jq -r '.history[].v1Compatibility | fromjson | {
+              version: .config.Labels["org.opencontainers.image.version"],
+              created: .config.Labels["org.opencontainers.image.created"],
+              commit: .config.Labels["org.opencontainers.image.revision"]
+            }')
+          
+          V2_METADATA=$(docker manifest inspect fakay96/${{ inputs.service }}:${{ inputs.compare_version }} | \
+            jq -r '.history[].v1Compatibility | fromjson | {
+              version: .config.Labels["org.opencontainers.image.version"],
+              created: .config.Labels["org.opencontainers.image.created"],
+              commit: .config.Labels["org.opencontainers.image.revision"]
+            }')
+          
+          echo "Version 1 (${{ inputs.version }}):"
+          echo "$V1_METADATA" | jq -r 'to_entries | .[] | "  \(.key): \(.value)"'
+          echo
+          echo "Version 2 (${{ inputs.compare_version }}):"
+          echo "$V2_METADATA" | jq -r 'to_entries | .[] | "  \(.key): \(.value)"'
+          
+          # Calculate time difference
+          V1_DATE=$(echo "$V1_METADATA" | jq -r '.created')
+          V2_DATE=$(echo "$V2_METADATA" | jq -r '.created')
+          V1_EPOCH=$(date -jf "%Y-%m-%dT%H:%M:%SZ" "$V1_DATE" +%s 2>/dev/null || date -d "$V1_DATE" +%s)
+          V2_EPOCH=$(date -jf "%Y-%m-%dT%H:%M:%SZ" "$V2_DATE" +%s 2>/dev/null || date -d "$V2_DATE" +%s)
+          TIME_DIFF=$(( ($V2_EPOCH - $V1_EPOCH) / 3600 ))
+          
+          echo
+          echo "Time difference: $TIME_DIFF hours"
+
+      - name: Verify version exists
+        if: inputs.action == 'rollback' && inputs.version != ''
+        id: verify
+        run: |
+          if ! docker manifest inspect fakay96/${{ inputs.service }}:${{ inputs.version }} > /dev/null 2>&1; then
+            echo "Version ${{ inputs.version }} not found for ${{ inputs.service }}"
+            exit 1
+          fi
+          echo "version_exists=true" >> $GITHUB_OUTPUT
+
+      - name: Create rollback tag
+        if: inputs.action == 'rollback' && inputs.version != '' && steps.verify.outputs.version_exists == 'true'
+        run: |
+          # Get current latest version
+          CURRENT_VERSION=$(docker manifest inspect fakay96/${{ inputs.service }}:latest | \
+            jq -r '.history[].v1Compatibility | fromjson | .config.Labels["org.opencontainers.image.version"]' | head -n1)
+          
+          # Tag current latest as rollback
+          docker pull fakay96/${{ inputs.service }}:latest
+          docker tag fakay96/${{ inputs.service }}:latest fakay96/${{ inputs.service }}:rollback-$CURRENT_VERSION
+          docker push fakay96/${{ inputs.service }}:rollback-$CURRENT_VERSION
+          
+          # Update latest to point to specified version
+          docker pull fakay96/${{ inputs.service }}:${{ inputs.version }}
+          docker tag fakay96/${{ inputs.service }}:${{ inputs.version }} fakay96/${{ inputs.service }}:latest
+          docker push fakay96/${{ inputs.service }}:latest
+
+      - name: Create version metadata
+        if: inputs.action == 'rollback' && inputs.version != '' && steps.verify.outputs.version_exists == 'true'
+        run: |
+          CURRENT_VERSION=$(docker manifest inspect fakay96/${{ inputs.service }}:rollback-$CURRENT_VERSION | \
+            jq -r '.history[].v1Compatibility | fromjson | .config.Labels["org.opencontainers.image.version"]' | head -n1)
+          
+          # Get additional metadata
+          CURRENT_CREATED=$(docker manifest inspect fakay96/${{ inputs.service }}:rollback-$CURRENT_VERSION | \
+            jq -r '.history[].v1Compatibility | fromjson | .config.Labels["org.opencontainers.image.created"]' | head -n1)
+          
+          ROLLBACK_CREATED=$(docker manifest inspect fakay96/${{ inputs.service }}:${{ inputs.version }} | \
+            jq -r '.history[].v1Compatibility | fromjson | .config.Labels["org.opencontainers.image.created"]' | head -n1)
+          
+          echo "{
+            \"service\": \"${{ inputs.service }}\",
+            \"rollback_from\": {
+              \"version\": \"$CURRENT_VERSION\",
+              \"created\": \"$CURRENT_CREATED\"
+            },
+            \"rollback_to\": {
+              \"version\": \"${{ inputs.version }}\",
+              \"created\": \"$ROLLBACK_CREATED\"
+            },
+            \"timestamp\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\",
+            \"commit\": \"${{ github.sha }}\",
+            \"actor\": \"${{ github.actor }}\"
+          }" > rollback-metadata.json
+
+      - name: Upload rollback metadata
+        if: inputs.action == 'rollback' && inputs.version != '' && steps.verify.outputs.version_exists == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rollback-metadata
+          path: rollback-metadata.json 

@@ -52,6 +52,9 @@ jobs:
         run: |
           docker buildx build -f docker/Dockerfile.core \
             --build-arg SERVICE_TYPE=base \
+            --label org.opencontainers.image.version=${{ env.VERSION_TAG }} \
+            --label org.opencontainers.image.created=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+            --label org.opencontainers.image.revision=${{ github.sha }} \
             -t fakay96/coupon-base:${{ env.VERSION_TAG }} \
             --platform linux/amd64 --no-cache --push .
       
@@ -60,6 +63,9 @@ jobs:
           docker buildx build -f docker/Dockerfile.core \
             --build-arg SERVICE_TYPE=backend \
             --cache-from type=registry,ref=fakay96/coupon-base:${{ env.VERSION_TAG }} \
+            --label org.opencontainers.image.version=${{ env.VERSION_TAG }} \
+            --label org.opencontainers.image.created=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+            --label org.opencontainers.image.revision=${{ github.sha }} \
             -t fakay96/coupon-core:${{ env.VERSION_TAG }} \
             --platform linux/amd64 --push .
       
@@ -68,21 +74,13 @@ jobs:
           docker buildx build -f docker/Dockerfile.core \
             --build-arg SERVICE_TYPE=celery \
             --cache-from type=registry,ref=fakay96/coupon-base:${{ env.VERSION_TAG }} \
+            --label org.opencontainers.image.version=${{ env.VERSION_TAG }} \
+            --label org.opencontainers.image.created=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+            --label org.opencontainers.image.revision=${{ github.sha }} \
             -t fakay96/coupon-celery:${{ env.VERSION_TAG }} \
             --platform linux/amd64 --push .
       
-      # ───────── crawler images ─────────
-      - name: Build crawler image
-        run: |
-          docker buildx build -f docker/Dockerfile.crawler \
-            -t fakay96/coupon-crawler:${{ env.VERSION_TAG }} \
-            --platform linux/amd64 --push .
-      
-      - name: Build inference service image
-        run: |
-          docker buildx build -f docker/Dockerfile.inference \
-            -t fakay96/coupon-inference:${{ env.VERSION_TAG }} \
-            --platform linux/amd64 --push .
+     
       
       # ───────── frontend images ─────────
       - name: Build & push STAGING frontend image
@@ -91,6 +89,9 @@ jobs:
             --build-arg BUILD_MODE=staging \
             --platform linux/amd64 \
             --cache-to type=registry,ref=fakay96/coupon-frontend:buildcache,mode=max \
+            --label org.opencontainers.image.version=${{ env.VERSION_TAG }} \
+            --label org.opencontainers.image.created=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+            --label org.opencontainers.image.revision=${{ github.sha }} \
             -t fakay96/coupon-frontend-staging:${{ env.VERSION_TAG }} \
             --push .
       
@@ -101,6 +102,9 @@ jobs:
             --platform linux/amd64 \
             --cache-from type=registry,ref=fakay96/coupon-frontend:buildcache \
             --cache-to type=registry,ref=fakay96/coupon-frontend:buildcache,mode=max \
+            --label org.opencontainers.image.version=${{ env.VERSION_TAG }} \
+            --label org.opencontainers.image.created=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+            --label org.opencontainers.image.revision=${{ github.sha }} \
             -t fakay96/coupon-frontend:${{ env.VERSION_TAG }} \
             --push .
           
