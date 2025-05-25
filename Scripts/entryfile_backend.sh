@@ -155,5 +155,7 @@ exec gunicorn coupon_core.wsgi:application \
   --workers 2 \
   --threads 1 \
   --timeout 120 \
+  --graceful-timeout 120 \
   --access-logfile "$ACCESS_LOG" \
   --error-logfile "$ERROR_LOG"
+
