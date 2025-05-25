@@ -109,9 +109,9 @@ jobs:
 
   deploy:
     needs: build
-    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment || 'staging' }}
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || (github.ref == 'refs/heads/main' && 'production' || 'staging') }}
     steps:
       - name: Download version metadata
         uses: actions/download-artifact@v4
@@ -152,31 +152,3 @@ jobs:
             kubectl get pods -l app=$service
             kubectl describe deployment $service
           done
-
-  notify:
-    needs: [build, deploy]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download version metadata
-        uses: actions/download-artifact@v4
-        with:
-          name: version-metadata
-          path: .
-          pattern: version-metadata.json
-          merge-multiple: false
-
-      - name: Send notification
-        uses: rtCamp/action-slack-notify@v2
-        env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_CHANNEL: deployments
-          SLACK_COLOR: ${{ job.status }}
-          SLACK_TITLE: Deployment Status
-          SLACK_MESSAGE: |
-            *Environment:* ${{ inputs.environment || 'staging' }}
-            *Version:* $(jq -r '.version' version-metadata.json)
-            *Status:* ${{ job.status }}
-            *Commit:* $(jq -r '.commit' version-metadata.json)
-            *Actor:* $(jq -r '.actor' version-metadata.json)
-            *Timestamp:* $(jq -r '.timestamp' version-metadata.json)
