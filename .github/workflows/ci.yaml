@@ -40,11 +40,14 @@ jobs:
           cache: 'poetry'
 
       - name: Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          version: latest
-          virtualenvs-create: true
-          virtualenvs-in-project: true
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Configure Poetry
+        run: |
+          poetry config virtualenvs.create true
+          poetry config virtualenvs.in-project true
 
       - name: Load cached venv
         id: cached-poetry-dependencies
@@ -113,6 +116,7 @@ jobs:
         with:
           name: version-metadata
           path: version-metadata.json
+          retention-days: 5
 
   deploy:
     needs: build
@@ -125,6 +129,8 @@ jobs:
         with:
           name: version-metadata
           path: .
+          pattern: version-metadata.json
+          merge-multiple: false
 
       - name: Set up kubectl
         uses: azure/setup-kubectl@v3
@@ -162,13 +168,48 @@ jobs:
     needs: deploy
     if: always()
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
     steps:
-      - name: Trigger cleanup workflow
-        uses: peter-evans/repository-dispatch@v2
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          event-type: cleanup-trigger
-          client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}"}'
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Cleanup old images
+        run: |
+          SERVICES=(${SERVICES//,/ })
+          DAYS_TO_KEEP=30
+          
+          for service in "${SERVICES[@]}"; do
+            echo "Cleaning up old images for $service..."
+            
+            # Get all versions except latest and rollback tags
+            VERSIONS=$(docker manifest inspect ${{ env.DOCKER_REGISTRY }}/$service:latest | \
+              jq -r '.history[].v1Compatibility | fromjson | .config.Labels["org.opencontainers.image.version"]' | \
+              sort -u | grep -v "latest" | grep -v "rollback")
+            
+            for version in $VERSIONS; do
+              # Get image creation date
+              CREATED=$(docker manifest inspect ${{ env.DOCKER_REGISTRY }}/$service:$version | \
+                jq -r '.history[].v1Compatibility | fromjson | .config.Labels["org.opencontainers.image.created"]')
+              
+              # Calculate days since creation
+              CREATED_EPOCH=$(date -jf "%Y-%m-%dT%H:%M:%SZ" "$CREATED" +%s 2>/dev/null || date -d "$CREATED" +%s)
+              CURRENT_EPOCH=$(date +%s)
+              DAYS_OLD=$(( ($CURRENT_EPOCH - $CREATED_EPOCH) / 86400 ))
+              
+              if [ $DAYS_OLD -gt $DAYS_TO_KEEP ]; then
+                echo "Removing $service:$version (created $DAYS_OLD days ago)"
+                docker manifest rm ${{ env.DOCKER_REGISTRY }}/$service:$version || true
+              fi
+            done
+          done
 
   notify:
     needs: [build, deploy, cleanup]
@@ -180,6 +221,8 @@ jobs:
         with:
           name: version-metadata
           path: .
+          pattern: version-metadata.json
+          merge-multiple: false
 
       - name: Send notification
         uses: rtCamp/action-slack-notify@v2
