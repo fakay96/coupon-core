@@ -359,3 +359,5 @@ WEBSOCKET_HEARTBEAT_INTERVAL = 30  # Seconds between heartbeat messages
 WEBSOCKET_MAX_MESSAGE_SIZE = 1024 * 1024  # 1MB default max message size
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 
+EXTERNAL_API_KEY=os.getenv("DISHPAL_EMAIL_PASSWORD")
+GEMINI_API_KEY=os.getenv("GEMINI_API_KEY")

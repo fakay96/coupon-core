@@ -86,9 +86,9 @@ def run_spiders():
         # Add spiders to process
         # Decide which spiders to run here:
         LOGGER.info("Adding spiders to crawl process...")
-        # process.crawl(MuellerSpider) # Uncomment if you want to run Mueller
+        #process.crawl(MuellerSpider) # Uncomment if you want to run Mueller
         process.crawl(PennySpider)   # *** UNCOMMENTED PENNY SPIDER ***
-       # process.crawl(ZalandoSpider) # Keep commented if not running
+        process.crawl(ZalandoSpider) # Keep commented if not running
 
         LOGGER.info("Starting crawler process...")
         # Start the crawler (this blocks until done)

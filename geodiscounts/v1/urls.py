@@ -23,44 +23,21 @@ from geodiscounts.v1.views.discount_category_view import (
     CategoryView,
     
 )
-from geodiscounts.v1.views.retailer_views import (
-    RetailerListCreateView,
-    RetailerDetailView,
-    NearbyRetailersView,
-    RetailerAnalyticsView,
-)
-from geodiscounts.v1.views.shared_discount_views import (
-    SharedDiscountListCreateView,
-    SharedDiscountDetailView,
+
+from geodiscounts.v1.views.geodiscount_views import (
+    ConversationalDiscountView,
 )
 
-from geodiscounts.v1.views.geodiscount_views import(
-    SearchDiscountsView
-)
-# from geodiscounts.v1.views.websocket_views import (
-#     WebSocketDiscountRequestView,
-#     WebSocketDiscountRequestDetailView,
-# )
+from geodiscounts.v1.views.discount_process_view import (
+    ImportDiscountsAPIView
 
+)
 app_name = "geodiscounts"
 
 urlpatterns = [
     # Discount URLs
 
     path('discounts/categories/',CategoryView.as_view(), name='category-view'),
-    path('discount/geodiscount/',SearchDiscountsView.as_view(),name='discount-search'),
-    
-    # Retailer URLs
-    path('retailers/', RetailerListCreateView.as_view(), name='retailer-list-create'),
-    path('retailers/<int:pk>/', RetailerDetailView.as_view(), name='retailer-detail'),
-    path('retailers/nearby/', NearbyRetailersView.as_view(), name='retailer-nearby'),
-    path('retailers/<int:pk>/analytics/', RetailerAnalyticsView.as_view(), name='merchant-analytics'),
-    
-    # Shared Discount URLs
-    path('shared-discounts/', SharedDiscountListCreateView.as_view(), name='shared-discount-list-create'),
-    path('shared-discounts/<int:pk>/', SharedDiscountDetailView.as_view(), name='shared-discount-detail'),
-    
-    # # WebSocket discount request URLs
-    # path('websocket-requests/', WebSocketDiscountRequestView.as_view(), name='websocket-request-list-create'),
-    # path('websocket-requests/<str:request_id>/', WebSocketDiscountRequestDetailView.as_view(), name='websocket-request-detail'),
+    path('discounts/search/', ConversationalDiscountView.as_view(), name='nearby-discounts'),
+    path('discounts/publish/',ImportDiscountsAPIView.as_view(), name='publish-discounts')
 ]
