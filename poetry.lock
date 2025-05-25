@@ -1936,22 +1936,6 @@ tomli = {version = "*", markers = "python_version < \"3.11\""}
 scripts = ["click (>=6.0)"]
 
 [[package]]
-name = "inexactsearch"
-version = "1.0.2"
-description = "Fuzzy String search algorithm using Soundex for Indian language"
-optional = false
-python-versions = "*"
-groups = ["main"]
-markers = "python_version >= \"3.12\" or python_version <= \"3.11\""
-files = [
-    {file = "inexactsearch-1.0.2.tar.gz", hash = "sha256:b7df09c46e1ea73996449ceb4df265483e4dc6b61dac2ea4df6f2e5ad8d53b75"},
-]
-
-[package.dependencies]
-silpa_common = ">=0.3"
-soundex = ">=1.0"
-
-[[package]]
 name = "inflection"
 version = "0.5.1"
 description = "A port of Ruby on Rails inflector to Python"
@@ -3953,23 +3937,6 @@ files = [
 ]
 
 [[package]]
-name = "repoze-lru"
-version = "0.7"
-description = "A tiny LRU cache implementation and decorator"
-optional = false
-python-versions = "*"
-groups = ["main"]
-markers = "python_version >= \"3.12\" or python_version <= \"3.11\""
-files = [
-    {file = "repoze.lru-0.7-py3-none-any.whl", hash = "sha256:f77bf0e1096ea445beadd35f3479c5cff2aa1efe604a133e67150bc8630a62ea"},
-    {file = "repoze.lru-0.7.tar.gz", hash = "sha256:0429a75e19380e4ed50c0694e26ac8819b4ea7851ee1fc7583c8572db80aff77"},
-]
-
-[package.extras]
-docs = ["Sphinx"]
-testing = ["coverage", "nose"]
-
-[[package]]
 name = "requests"
 version = "2.32.3"
 description = "Python HTTP for Humans."
@@ -4276,21 +4243,6 @@ test = ["build[virtualenv] (>=1.0.3)", "filelock (>=3.4.0)", "ini2toml[lite] (>=
 type = ["importlib_metadata (>=7.0.2)", "jaraco.develop (>=7.21)", "mypy (==1.14.*)", "pytest-mypy"]
 
 [[package]]
-name = "silpa-common"
-version = "0.3"
-description = "Common functions for SILPA and related modules"
-optional = false
-python-versions = "*"
-groups = ["main"]
-markers = "python_version >= \"3.12\" or python_version <= \"3.11\""
-files = [
-    {file = "silpa_common-0.3.tar.gz", hash = "sha256:d4a4366193fd606fdcbf6d6e996a57a8bed9ff54ec8e2f798d2b7bc885dde3fd"},
-]
-
-[package.dependencies]
-"repoze.lru" = "*"
-
-[[package]]
 name = "six"
 version = "1.17.0"
 description = "Python 2 and 3 compatibility utilities"
@@ -4317,21 +4269,6 @@ files = [
 ]
 
 [[package]]
-name = "soundex"
-version = "1.1.3"
-description = "Soundex algorith implementation for English and Indian languages"
-optional = false
-python-versions = "*"
-groups = ["main"]
-markers = "python_version >= \"3.12\" or python_version <= \"3.11\""
-files = [
-    {file = "soundex-1.1.3.tar.gz", hash = "sha256:f837692afab3dc4f0132a36d8e8a8384f6ac8349fffdf5103291c3d1c2d48ad3"},
-]
-
-[package.dependencies]
-silpa_common = ">=0.3"
-
-[[package]]
 name = "soupsieve"
 version = "2.7"
 description = "A modern CSS selector implementation for Beautiful Soup."
@@ -4343,22 +4280,6 @@ files = [
     {file = "soupsieve-2.7-py3-none-any.whl", hash = "sha256:6e60cc5c1ffaf1cebcc12e8188320b72071e922c2e897f737cadce79ad5d30c4"},
     {file = "soupsieve-2.7.tar.gz", hash = "sha256:ad282f9b6926286d2ead4750552c8a6142bc4c783fd66b0293547c8fe6ae126a"},
 ]
-
-[[package]]
-name = "spellchecker"
-version = "0.4"
-description = "Indian Language Spellchecker Library"
-optional = false
-python-versions = "*"
-groups = ["main"]
-markers = "python_version >= \"3.12\" or python_version <= \"3.11\""
-files = [
-    {file = "spellchecker-0.4.tar.gz", hash = "sha256:7ebe5480641d2fa555e4a9d0592e6f6866d095c37c5563e38a349f8ce26358c7"},
-]
-
-[package.dependencies]
-inexactsearch = "*"
-setuptools = "*"
 
 [[package]]
 name = "sqlparse"
@@ -5172,4 +5093,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "51fd455cf5281e13e24a86d8d411ff2fdb23cd9bbf29163929d6d89e013dc283"
+content-hash = "132f73d60ade49230d4874eae8a6010e792ae4914661a278c39224b0740d3de0"

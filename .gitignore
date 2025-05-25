@@ -33,3 +33,4 @@ req.txt
 .cache
 venv/
 .xm/
+dist/
