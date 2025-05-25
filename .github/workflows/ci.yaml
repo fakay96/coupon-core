@@ -111,9 +111,9 @@ jobs:
     needs: build
     if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
-    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || (github.ref == 'refs/heads/main' && 'production' || 'staging') }}
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || (github.ref == 'refs/heads/develop' && 'staging' || (github.ref == 'refs/heads/main' && 'production')) }}
     env:
-      NAMESPACE: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || (github.ref == 'refs/heads/main' && 'production' || 'staging') }}
+      NAMESPACE: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || (github.ref == 'refs/heads/develop' && 'staging' || (github.ref == 'refs/heads/main' && 'production')) }}
     steps:
       - name: Download version metadata
         uses: actions/download-artifact@v4
@@ -123,15 +123,14 @@ jobs:
           pattern: version-metadata.json
           merge-multiple: false
 
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v3
-        with:
-          version: 'latest'
-
-      - name: Configure kubectl
+      - name: Configure kubectl for DigitalOcean
         run: |
-          echo "${{ secrets.KUBE_CONFIG }}" > kubeconfig.yaml
-          export KUBECONFIG=kubeconfig.yaml
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG_CONTENT }}" > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Verify kubeconfig access
+        run: kubectl get nodes
 
       - name: Validate Namespace
         run: |
@@ -178,10 +177,35 @@ jobs:
             --atomic --force --cleanup-on-fail --history-max 5 \
             --timeout 5m0s
 
+      - name: Deploy Inference Service
+        run: |
+          helm upgrade --install inference ./k8s/backend \
+            --set inference.enabled=true \
+            --set inference.image.repository=fakay96/coupon-inference \
+            --set inference.image.tag=${{ env.VERSION_TAG }} \
+            --namespace $NAMESPACE --create-namespace \
+            -f ./k8s/backend/values/$NAMESPACE-values.yaml \
+            --atomic --force --cleanup-on-fail --history-max 5 \
+            --timeout 5m0s
+
+      - name: Deploy Crawler
+        run: |
+          helm upgrade --install crawler ./k8s/crawler \
+            --set crawler.image.repository=fakay96/discount-crawler \
+            --set crawler.image.tag=${{ env.VERSION_TAG }} \
+            --set crawler.operator.image.repository=fakay96/crawler-resource-operator \
+            --set crawler.operator.image.tag=${{ env.VERSION_TAG }} \
+            --namespace $NAMESPACE --create-namespace \
+            -f ./k8s/crawler/values/$NAMESPACE-values.yaml \
+            --atomic --force --cleanup-on-fail --history-max 5 \
+            --timeout 5m0s
+
       - name: Verify service endpoints
         run: |
           kubectl get endpoints coupon-service -n $NAMESPACE || echo "Backend service endpoint not found!"
           kubectl get endpoints frontend -n $NAMESPACE || echo "Frontend service endpoint not found!"
+          kubectl get endpoints inference -n $NAMESPACE || echo "Inference service endpoint not found!"
+          kubectl get endpoints crawler -n $NAMESPACE || echo "Crawler service endpoint not found!"
 
       - name: Debug pod logs on failure
         if: failure()
@@ -189,6 +213,8 @@ jobs:
           echo "Fetching logs for failed pods..."
           kubectl logs -l app=backend -n $NAMESPACE || echo "No logs found for backend"
           kubectl logs -l app=frontend -n $NAMESPACE || echo "No logs found for frontend"
+          kubectl logs -l app=inference -n $NAMESPACE || echo "No logs found for inference"
+          kubectl logs -l app=crawler -n $NAMESPACE || echo "No logs found for crawler"
 
       - name: Rollback on failure
         if: failure()
@@ -196,6 +222,10 @@ jobs:
           echo "Rolling back deployments..."
           LAST_BACKEND_REVISION=$(helm history coupon-service -n $NAMESPACE | tail -n 2 | head -n 1 | awk '{print $1}')
           LAST_FRONTEND_REVISION=$(helm history frontend -n $NAMESPACE | tail -n 2 | head -n 1 | awk '{print $1}')
+          LAST_INFERENCE_REVISION=$(helm history inference -n $NAMESPACE | tail -n 2 | head -n 1 | awk '{print $1}')
+          LAST_CRAWLER_REVISION=$(helm history crawler -n $NAMESPACE | tail -n 2 | head -n 1 | awk '{print $1}')
           
           helm rollback coupon-service $LAST_BACKEND_REVISION -n $NAMESPACE || echo "Failed to rollback backend"
           helm rollback frontend $LAST_FRONTEND_REVISION -n $NAMESPACE || echo "Failed to rollback frontend"
+          helm rollback inference $LAST_INFERENCE_REVISION -n $NAMESPACE || echo "Failed to rollback inference"
+          helm rollback crawler $LAST_CRAWLER_REVISION -n $NAMESPACE || echo "Failed to rollback crawler"
