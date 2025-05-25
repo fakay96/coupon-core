@@ -168,10 +168,9 @@ CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
     "https://app-staging.dishpal.ai",
     "https://admin-staging.dishpal.ai",
-    "http://0.0.0.0:5173",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "http:://192.210.55.154.5173"
+
 ]
 
 CELERY_ALWAYS_EAGER=True
@@ -187,8 +186,6 @@ WEBSOCKET_PATH = '/ws/discount-requests/'
 WEBSOCKET_ALLOWED_ORIGINS = [
     'https://app-staging.dishpal.ai',
     'https://admin-staging.dishpal.ai',
-    'http://0.0.0.0:5173',
     'http://localhost:5173',
     'http://127.0.0.1:5173',
-    'http://192.210.55.154:5173',
 ]
