@@ -53,21 +53,6 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # Build base image first
-      - name: Build and push base image
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          file: ./docker/Dockerfile.base
-          push: true
-          tags: ${{ env.DOCKER_REGISTRY }}/coupon-base:${{ env.VERSION_TAG }}
-          labels: |
-            org.opencontainers.image.version=${{ env.VERSION_TAG }}
-            org.opencontainers.image.created=${{ github.event.repository.updated_at }}
-            org.opencontainers.image.revision=${{ github.sha }}
-          cache-from: type=registry,ref=${{ env.DOCKER_REGISTRY }}/coupon-base:buildcache
-          cache-to: type=registry,ref=${{ env.DOCKER_REGISTRY }}/coupon-base:buildcache,mode=max
-
       # Build backend services
       - name: Build and push backend services
         uses: docker/build-push-action@v4
@@ -84,14 +69,15 @@ jobs:
             org.opencontainers.image.version=${{ env.VERSION_TAG }}
             org.opencontainers.image.created=${{ github.event.repository.updated_at }}
             org.opencontainers.image.revision=${{ github.sha }}
-          cache-from: type=registry,ref=${{ env.DOCKER_REGISTRY }}/coupon-base:${{ env.VERSION_TAG }}
+          cache-from: type=registry,ref=${{ env.DOCKER_REGISTRY }}/coupon-core:buildcache
+          cache-to: type=registry,ref=${{ env.DOCKER_REGISTRY }}/coupon-core:buildcache,mode=max
 
       # Build frontend services
       - name: Build and push frontend services
         uses: docker/build-push-action@v4
         with:
           context: ./frontend
-          file: ./frontend/Dockerfile
+          file: ./docker/Dockerfile.frontend
           push: true
           tags: |
             ${{ env.DOCKER_REGISTRY }}/coupon-frontend:${{ env.VERSION_TAG }}
@@ -100,7 +86,8 @@ jobs:
             org.opencontainers.image.version=${{ env.VERSION_TAG }}
             org.opencontainers.image.created=${{ github.event.repository.updated_at }}
             org.opencontainers.image.revision=${{ github.sha }}
-          cache-from: type=registry,ref=${{ env.DOCKER_REGISTRY }}/coupon-base:${{ env.VERSION_TAG }}
+          cache-from: type=registry,ref=${{ env.DOCKER_REGISTRY }}/coupon-frontend:buildcache
+          cache-to: type=registry,ref=${{ env.DOCKER_REGISTRY }}/coupon-frontend:buildcache,mode=max
 
       - name: Save version metadata
         run: |
