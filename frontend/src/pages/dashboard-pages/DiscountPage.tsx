@@ -1,13 +1,8 @@
 import isEmpty from "lodash/isEmpty";
-import {
-  discountFilters,
-} from "@/constants";
-import { FaHeart } from "react-icons/fa6";
 import { FaRegHeart } from "react-icons/fa";
 import { useEffect, useMemo, useState } from "react";
 import { IoLocationSharp } from "react-icons/io5";
 import { MdOutlineStar } from "react-icons/md";
-import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
 import { discountApiQuery } from "@/queries/geo-discount-queries";
 import SearchInputNavbar from "@/components/globals/searchInputNavbar";
@@ -19,7 +14,6 @@ import { DiscountItemT } from "@/types";
 
 const DiscountPage = () => {
   const location = useLocation();
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const discount = searchParams.get("discount");
   const { data: allDiscounts } = discountApiQuery();
@@ -72,12 +66,12 @@ const DiscountPage = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full max-w-screen-xl">
               {filteredDiscounts.map((item: DiscountItemT) => (
                 <div
-                  key={item.id}
+                  key={item.title}
                   className="bg-white rounded-lg shadow-md overflow-hidden"
                 >
                   <div className="relative">
                     <img
-                      src={item.image}
+                      src={item.img}
                       alt={item.title}
                       className="w-full h-48 object-cover"
                     />
@@ -89,22 +83,22 @@ const DiscountPage = () => {
                     <div className="flex items-center gap-2 mb-2">
                       <IoLocationSharp className="text-vividOrange" />
                       <span className="text-sm text-gray-600">
-                        {item.location}
+                        {item.title}
                       </span>
                     </div>
                     <h3 className="font-semibold text-lg mb-2">{item.title}</h3>
-                    <p className="text-gray-600 text-sm mb-4">{item.description}</p>
+                    <p className="text-gray-600 text-sm mb-4">{item.title}</p>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1">
                         <MdOutlineStar className="text-yellow-400" />
-                        <span className="text-sm">{item.rating}</span>
+                        <span className="text-sm">4.5</span>
                       </div>
                       <div className="text-right">
                         <p className="text-vividOrange font-semibold">
-                          {formatCurrency(item.price)}
+                          {formatCurrency(10.99)}
                         </p>
                         <p className="text-sm text-gray-500 line-through">
-                          {formatCurrency(item.originalPrice)}
+                          {formatCurrency(19.99)}
                         </p>
                       </div>
                     </div>
@@ -130,7 +124,7 @@ const SearchInputBox = ({ discount }: { discount: string | null }) => {
   const navigate = useNavigate();
   useEffect(() => {
     navigate(`/dashboard/discount?discount=${value}`);
-  }, [debouncedSearch]);
+  }, [debouncedSearch, navigate]);
 
   return (
     <div className="relative max-w-screen-md mx-auto mb-16">
