@@ -112,6 +112,8 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
     environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || (github.ref == 'refs/heads/main' && 'production' || 'staging') }}
+    env:
+      NAMESPACE: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || (github.ref == 'refs/heads/main' && 'production' || 'staging') }}
     steps:
       - name: Download version metadata
         uses: actions/download-artifact@v4
@@ -131,24 +133,69 @@ jobs:
           echo "${{ secrets.KUBE_CONFIG }}" > kubeconfig.yaml
           export KUBECONFIG=kubeconfig.yaml
 
-      - name: Deploy to Kubernetes
+      - name: Validate Namespace
         run: |
-          VERSION=$(jq -r '.version' version-metadata.json)
-          ENV=$(jq -r '.environment' version-metadata.json)
-          
-          # Update deployments with new image versions
-          for service in ${SERVICES//,/ }; do
-            kubectl set image deployment/$service $service=${{ env.DOCKER_REGISTRY }}/$service:$VERSION
-          done
-          
-          # Wait for deployments to roll out
-          for service in ${SERVICES//,/ }; do
-            kubectl rollout status deployment/$service --timeout=300s
-          done
+          if [ -z "$NAMESPACE" ]; then
+            echo "Error: NAMESPACE is not set"
+            exit 1
+          fi
+          if [[ "$NAMESPACE" != "staging" && "$NAMESPACE" != "production" ]]; then
+            echo "Error: Invalid NAMESPACE value: $NAMESPACE"
+            exit 1
+          fi
 
-      - name: Verify deployment
+      - name: Ensure namespace exists
         run: |
-          for service in ${SERVICES//,/ }; do
-            kubectl get pods -l app=$service
-            kubectl describe deployment $service
-          done
+          kubectl get namespace $NAMESPACE || kubectl create namespace $NAMESPACE
+
+      - name: Select frontend repo
+        run: |
+          if [ "$NAMESPACE" = "staging" ]; then
+            echo "FRONTEND_REPO=fakay96/coupon-frontend-staging" >> $GITHUB_ENV
+          else
+            echo "FRONTEND_REPO=fakay96/coupon-frontend" >> $GITHUB_ENV
+          fi
+
+      - name: Deploy Backend & Celery
+        run: |
+          helm upgrade --install coupon-service ./k8s/backend \
+            --set backend.image.repository=fakay96/coupon-core \
+            --set backend.image.tag=${{ env.VERSION_TAG }} \
+            --set celery.image.repository=fakay96/coupon-celery \
+            --set celery.image.tag=${{ env.VERSION_TAG }} \
+            --namespace $NAMESPACE --create-namespace \
+            -f ./k8s/backend/values/$NAMESPACE-values.yaml \
+            --atomic --force --cleanup-on-fail --history-max 5 \
+            --timeout 8m0s
+
+      - name: Deploy Frontend
+        run: |
+          helm upgrade --install frontend ./k8s/frontend \
+            --set frontend.image.repository=$FRONTEND_REPO \
+            --set frontend.image.tag=${{ env.VERSION_TAG }} \
+            --namespace $NAMESPACE --create-namespace \
+            -f ./k8s/frontend/values/$NAMESPACE-values.yaml \
+            --atomic --force --cleanup-on-fail --history-max 5 \
+            --timeout 5m0s
+
+      - name: Verify service endpoints
+        run: |
+          kubectl get endpoints coupon-service -n $NAMESPACE || echo "Backend service endpoint not found!"
+          kubectl get endpoints frontend -n $NAMESPACE || echo "Frontend service endpoint not found!"
+
+      - name: Debug pod logs on failure
+        if: failure()
+        run: |
+          echo "Fetching logs for failed pods..."
+          kubectl logs -l app=backend -n $NAMESPACE || echo "No logs found for backend"
+          kubectl logs -l app=frontend -n $NAMESPACE || echo "No logs found for frontend"
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "Rolling back deployments..."
+          LAST_BACKEND_REVISION=$(helm history coupon-service -n $NAMESPACE | tail -n 2 | head -n 1 | awk '{print $1}')
+          LAST_FRONTEND_REVISION=$(helm history frontend -n $NAMESPACE | tail -n 2 | head -n 1 | awk '{print $1}')
+          
+          helm rollback coupon-service $LAST_BACKEND_REVISION -n $NAMESPACE || echo "Failed to rollback backend"
+          helm rollback frontend $LAST_FRONTEND_REVISION -n $NAMESPACE || echo "Failed to rollback frontend"
