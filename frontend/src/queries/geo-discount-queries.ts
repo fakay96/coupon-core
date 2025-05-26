@@ -12,10 +12,16 @@ export const discountApiQuery = () => {
   return useQuery({
     queryKey: ["discountApi"],
     queryFn: async () => {
-      const response = await aiSearchApi({
-        message: "Show me all available discounts"
-      });
-      return response.results;
+      try {
+        const response = await aiSearchApi({
+          message: "Show me all available discounts"
+        });
+        // Ensure we always return an array, even if the response is malformed
+        return Array.isArray(response?.results) ? response.results : [];
+      } catch (error) {
+        console.error('Failed to fetch discounts:', error);
+        return []; // Return empty array on error
+      }
     },
   });
 };

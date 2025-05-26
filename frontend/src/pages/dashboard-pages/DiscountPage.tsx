@@ -36,17 +36,17 @@ const DiscountPage = () => {
 
   // Filter discounts based on search results or all discounts
   const filteredDiscounts = useMemo(() => {
-    if (searchResults && searchResults.length > 0) {
+    if (Array.isArray(searchResults) && searchResults.length > 0) {
       // If we have AI search results, use those
       return searchResults;
     } else if (discount) {
       // If we have a specific discount query, filter all discounts
-      return allDiscounts?.filter((item: DiscountItemT) =>
+      return Array.isArray(allDiscounts) ? allDiscounts.filter((item: DiscountItemT) =>
         item.title.toLowerCase().includes(discount.toLowerCase())
-      ) || [];
+      ) : [];
     }
     // Otherwise show all discounts
-    return allDiscounts || [];
+    return Array.isArray(allDiscounts) ? allDiscounts : [];
   }, [searchResults, discount, allDiscounts]);
 
   // Handle initial search from location state
