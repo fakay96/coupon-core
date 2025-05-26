@@ -61,6 +61,16 @@ from django.utils import timezone
 import logging
 from django.db.models import Prefetch
 
+# Module-level singleton for Gemini client
+_gemini_client = None
+
+def get_gemini_client() -> GeminiEmbeddingClient:
+    """Get or create the singleton Gemini client instance."""
+    global _gemini_client
+    if _gemini_client is None:
+        _gemini_client = GeminiEmbeddingClient()
+    return _gemini_client
+
 # Greeting patterns
 GREETING_PATTERNS = re.compile(r'^(hi|hello|hey|greetings)$', re.IGNORECASE)
 MAX_DISTANCE_PARAM = 10
@@ -72,6 +82,17 @@ def correct_spelling(text: str) -> str:
     words = text.split()
     corrected = [spell.correction(w) or w for w in words]
     return " ".join(corrected)
+
+# Search query detection patterns
+SEARCH_KEYWORDS = [
+    'find', 'search', 'look for', 'discount', 'deal', 'offer',
+    'coupon', 'sale', 'cheap', 'near me', 'around here'
+]
+
+def is_search_query(text: str) -> bool:
+    """Determine if the text contains search-related keywords."""
+    text_lower = text.lower()
+    return any(keyword in text_lower for keyword in SEARCH_KEYWORDS)
 
 class CategoryView(APIView):
     """
@@ -214,19 +235,8 @@ class ConversationalDiscountView(APIView):
 
     @property
     def gemini_client(self):
-        """Lazy initialization of Gemini client."""
-        try:
-            if not hasattr(self, '_gemini_client'):
-                self._gemini_client = GeminiEmbeddingClient()
-            return self._gemini_client
-        except Exception as e:
-            geo_structured_logger.error(
-                geo_logger,
-                "Failed to initialize Gemini client",
-                "service_initialization",
-                error=str(e)
-            )
-            raise
+        """Get the singleton Gemini client instance."""
+        return get_gemini_client()
 
     def _safe_service_call(self, service_property, method_name, *args, **kwargs):
         """Safely call a service method with proper error handling."""
@@ -309,6 +319,22 @@ class ConversationalDiscountView(APIView):
             if not message:
                 return {"error": "Message is required"}
 
+            # Create user message
+            user_message = ConversationMessage(
+                conversation=conversation,
+                role=ConversationMessage.MessageRole.USER,
+                content=message,
+                message_type=ConversationMessage.MessageType.SEARCH_QUERY if is_search_query(message) 
+                    else ConversationMessage.MessageType.CONVERSATION
+            )
+
+            # Extract user preferences
+            self._safe_service_call(
+                'conversation_service',
+                'extract_user_preferences',
+                user_message
+            )
+
             # Get conversation context
             context = self._safe_service_call(
                 'conversation_service',
@@ -317,11 +343,11 @@ class ConversationalDiscountView(APIView):
             )
 
             # Handle general conversation
-            if not self._is_search_query(message):
-                return self._handle_general_conversation(message, conversation)
+            if not is_search_query(message):
+                return self._handle_general_conversation(user_message, conversation)
 
             # Handle search query
-            return self._handle_search_query(message, conversation, context)
+            return self._handle_search_query(user_message, conversation, context)
 
         except Exception as e:
             geo_structured_logger.error(
@@ -332,25 +358,27 @@ class ConversationalDiscountView(APIView):
             )
             raise
 
-    def _handle_general_conversation(self, message: str, conversation: Conversation) -> Dict:
+    def _handle_general_conversation(self, message: ConversationMessage, conversation: Conversation) -> Dict:
         """Handle non-search conversation messages."""
         try:
-            # Extract user preferences
-            self._safe_service_call(
-                'conversation_service',
-                'extract_user_preferences',
-                message
-            )
-
             # Generate response using Gemini
             response = self.gemini_client.generate_content(
-                f"User message: {message}\nGenerate a helpful response:"
+                f"User message: {message.content}\nGenerate a helpful response:"
+            )
+
+            # Create assistant message
+            assistant_message = ConversationMessage.objects.create(
+                conversation=conversation,
+                role=ConversationMessage.MessageRole.ASSISTANT,
+                content=response.text,
+                message_type=ConversationMessage.MessageType.CONVERSATION
             )
 
             return {
                 "type": "conversation",
                 "message": response.text,
-                "conversation_id": conversation.id
+                "message_id": str(assistant_message.id),
+                "conversation_id": str(conversation.id)
             }
 
         except Exception as e:
@@ -362,18 +390,37 @@ class ConversationalDiscountView(APIView):
             )
             raise
 
-    def _handle_search_query(self, message: str, conversation: Conversation, context: Dict) -> Dict:
+    def _handle_search_query(self, message: ConversationMessage, conversation: Conversation, context: Dict) -> Dict:
         """Handle search-related queries."""
         try:
+            # Get user location
+            lat = message.conversation.last_location.y if message.conversation.last_location else None
+            lon = message.conversation.last_location.x if message.conversation.last_location else None
+            radius = message.conversation.last_radius or 5000
+
+            if not lat or not lon:
+                return {
+                    "type": "error",
+                    "message": "Location information is required for search. Please share your location.",
+                    "conversation_id": str(conversation.id)
+                }
+
             # Enhance search query
             enhanced = self.gemini_client.generate_content(
-                f"Enhance this search query: {message}"
+                f"Enhance this search query: {message.content}"
             )
 
             # Create search request
-            search_request = SearchRequest(
+            search_request = SearchRequest.objects.create(
+                conversation=conversation,
                 query=enhanced.text,
-                context=context
+                location=Point(lon, lat),
+                radius=radius,
+                search_context={
+                    **context,
+                    'enhanced_query': enhanced.text,
+                    'original_query': message.content
+                }
             )
 
             # Perform search
@@ -384,10 +431,23 @@ class ConversationalDiscountView(APIView):
                 timeout=30
             )
 
+            # Create assistant message
+            assistant_message = ConversationMessage.objects.create(
+                conversation=conversation,
+                role=ConversationMessage.MessageRole.ASSISTANT,
+                content=f"Found {len(search_results.get('results', []))} results for your search.",
+                message_type=ConversationMessage.MessageType.SEARCH_RESULTS,
+                metadata={'search_id': str(search_request.id)},
+                search_request=search_request
+            )
+
             return {
                 "type": "search_results",
-                "results": search_results,
-                "conversation_id": conversation.id
+                "message": assistant_message.content,
+                "message_id": str(assistant_message.id),
+                "conversation_id": str(conversation.id),
+                "results": search_results.get('results', []),
+                "search_id": str(search_request.id)
             }
 
         except Exception as e:

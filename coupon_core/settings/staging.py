@@ -16,7 +16,7 @@ import os
 from datetime import timedelta
 
 # Debug
-DEBUG = True
+DEBUG = False
 
 # Allowed Hosts
 ALLOWED_HOSTS = ["api-staging.dishpal.ai"]
