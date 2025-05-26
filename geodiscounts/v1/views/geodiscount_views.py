@@ -269,643 +269,136 @@ class ConversationalDiscountView(APIView):
                 }
             ))}
     )
-    def post(self, request: Request) -> Response:
+    def post(self, request: Request, *args, **kwargs) -> Response:
+        """Handle incoming messages and return appropriate responses."""
         try:
-            raw = request.data.get('message','').strip()
-            if not raw:
-                return Response({"error":"Message is required"},status=HTTP_400_BAD_REQUEST)
-            message_content = correct_spelling(raw)
+            # Get conversation ID from query params or create new
+            conv_id = request.query_params.get('conversation_id')
+            if not conv_id:
+                conv_id = str(uuid.uuid4())
 
-            conv_id = request.data.get('conversation_id')
-            lat = request.client_latitude
-            lon = request.client_longitude
-            radius = float(request.data.get('radius',5000))
-            loc_data = {"latitude":lat,"longitude":lon}
+            # Get or create conversation
+            conversation = self._safe_service_call(
+                'conversation_service',
+                'get_or_create_conversation',
+                user=request.user,
+                conversation_id=conv_id
+            )
 
-            conversation = self.conversation_service.get_or_create_conversation(
-                user=request.user,conversation_id=conv_id
-            )
-            user_msg = ConversationMessage.objects.create(
-                conversation=conversation,
-                role=ConversationMessage.MessageRole.USER,
-                content=message_content,
-                message_type=self._determine_message_type(message_content)
-            )
-            response_data = self._process_message(
-                message=user_msg,conversation=conversation,
-                request=request,radius=radius,location_data=loc_data
-            )
-            assistant_msg = ConversationMessage.objects.create(
-                conversation=conversation,
-                role=ConversationMessage.MessageRole.ASSISTANT,
-                content=response_data['response'],
-                message_type=response_data['message_type'],
-                metadata=response_data.get('metadata',{}),
-                search_request=response_data.get('search_request')
-            )
-            self.conversation_service.update_conversation_context(conversation)
+            # Process message and get response
+            response = self._process_message(request, conversation)
 
-            # Learning log
-            if 'search_id' in response_data:
-                learning_logger.info("Search run",extra={
-                    'query':user_msg.content,'search_id':response_data['search_id'],
-                    'count':len(response_data.get('results',[])),
-                    'suggestions':response_data.get('suggestions',[])
-                })
+            return Response(response)
 
-            response_data.update({
-                'message_id':str(assistant_msg.id),
-                'conversation_id':str(conversation.id)
-            })
-            return Response(response_data, status=HTTP_200_OK)
-
-        except Exception as e:
-            geo_structured_logger.error(
-                geo_logger,"Error processing conversational message",
-                "conversational_discount",e,{'user_id':request.user.id}
-            )
-            return Response({"error":"Internal server error"},status=HTTP_500_INTERNAL_SERVER_ERROR)
-            
         except Exception as e:
             geo_structured_logger.error(
                 geo_logger,
-                "Error in conversational message processing",
-                "conversational_discount",
-                e,
-                {'user_id': request.user.id}
+                "Error processing message",
+                "message_processing",
+                error=str(e)
             )
             return Response(
-                {"error": "Internal server error"},
+                {"error": "Failed to process message"},
                 status=HTTP_500_INTERNAL_SERVER_ERROR
             )
-    
-    def _determine_message_type(self, content: str) -> str:
-        """Determine the type of user message."""
-        content_lower = content.lower()
-        
-        # Check for greetings
-        greeting_patterns = [
-            r'^(hi|hello|hey|greetings|good\s(morning|afternoon|evening))$'
-        ]
-        if any(re.match(pattern, content_lower) for pattern in greeting_patterns):
-            return ConversationMessage.MessageType.GREETING
-        
-        # Check for search queries
-        search_keywords = [
-            'find', 'search', 'look for', 'discount', 'deal', 'offer',
-            'coupon', 'sale', 'cheap', 'near me', 'around here'
-        ]
-        if any(keyword in content_lower for keyword in search_keywords):
-            return ConversationMessage.MessageType.SEARCH_QUERY
-        
-        return ConversationMessage.MessageType.CONVERSATION
-    
-    def _process_message(
-        self, 
-        message: ConversationMessage, 
-        conversation: Conversation,
-        request: Request, 
-        radius: float,
-        location_data: Dict
-    ) -> Dict[str, Any]:
-        """Process message and generate appropriate response."""
-        
-        # Get conversation context
-        context = self.conversation_service.get_conversation_context(conversation)
-        
-        # Handle different message types
-        if message.message_type == ConversationMessage.MessageType.GREETING:
-            return self._handle_greeting(context)
-        
-        elif message.message_type == ConversationMessage.MessageType.SEARCH_QUERY:
-            return self._handle_search_query(
-                message, conversation, request, radius, location_data, context
-            )
-        
-        else:
-            return self._handle_general_conversation(message, context)
-    
-    def _handle_greeting(self, context: Dict) -> Dict[str, Any]:
-        """Handle greeting messages."""
-        stage = context.get('stage', 'initial')
-        
-        if stage == 'initial':
-            response = "Hello! I'm here to help you find the best discounts and deals. What are you looking for today?"
-            suggestions = [
-                "Find restaurants near me",
-                "Show me clothing deals", 
-                "What discounts are available nearby?"
-            ]
-        else:
-            response = "Hi again! How can I continue helping you find great deals?"
-            suggestions = [
-                "Search for different discounts",
-                "Expand my search area",
-                "Show me more options"
-            ]
-        
-        return {
-            'response': response,
-            'message_type': ConversationMessage.MessageType.GREETING,
-            'suggestions': suggestions,
-            'context': context,
-            'metadata': {'greeting_type': stage}
-        }
-    
-    def _enhance_search_query(self, query: str, context: Dict) -> Dict[str, Any]:
-        """Enhance search query using Gemini for better understanding."""
+
+    def _process_message(self, request: Request, conversation: Conversation) -> Dict:
+        """Process incoming message and return appropriate response."""
         try:
-            # Use Gemini to analyze and enhance the query
-            enhanced = self.gemini_client.generate_content(
-                prompt=f"""
-                Analyze this search query and determine the most relevant category and search terms:
-                Query: "{query}"
-                Context: {json.dumps(context)}
-                
-                Return a JSON object with these exact fields:
-                {{
-                    "enhanced_query": "improved search query",
-                    "search_type": "general/specific/category/location",
-                    "confidence": 0.8,
-                    "category": {{
-                        "name": "exact category name",
-                        "confidence": 0.8
-                    }},
-                    "suggested_filters": {{
-                        "price_range": {{
-                            "min": 0,
-                            "max": 1000
-                        }},
-                        "brand": "brand name"
-                    }}
-                }}
-                
-                IMPORTANT: 
-                - The category name must exactly match one of: fashion, grocery, electronics, home, beauty, sports, entertainment, other
-                - If unsure about category, use "other"
-                - Return ONLY the JSON object, no other text
-                """,
-                response_schema={
-                    'type': 'OBJECT',
-                    'properties': {
-                        'enhanced_query': {'type': 'STRING'},
-                        'search_type': {'type': 'STRING'},
-                        'confidence': {'type': 'NUMBER'},
-                        'category': {
-                            'type': 'OBJECT',
-                            'properties': {
-                                'name': {'type': 'STRING'},
-                                'confidence': {'type': 'NUMBER'}
-                            }
-                        },
-                        'suggested_filters': {
-                            'type': 'OBJECT',
-                            'properties': {
-                                'price_range': {
-                                    'type': 'OBJECT',
-                                    'properties': {
-                                        'min': {'type': 'NUMBER'},
-                                        'max': {'type': 'NUMBER'}
-                                    }
-                                },
-                                'brand': {'type': 'STRING'}
-                            }
-                        }
-                    }
-                }
+            message = request.data.get('message', '')
+            if not message:
+                return {"error": "Message is required"}
+
+            # Get conversation context
+            context = self._safe_service_call(
+                'conversation_service',
+                'get_conversation_context',
+                conversation
             )
-            
-            if not enhanced or not enhanced.text:
-                # Return all categories when no specific matches found
-                return {
-                    'query': query,
-                    'confidence': 0.5,
-                    'search_type': 'general',
-                    'category': {
-                        'name': 'other',
-                        'confidence': 0.5
-                    },
-                    'filters': {
-                        'price_range': {'min': 0, 'max': float('inf')}
-                    }
-                }
-                
-            # Extract JSON from response
-            text = enhanced.text.strip()
-            json_start = text.find('{')
-            json_end = text.rfind('}') + 1
-            if json_start >= 0 and json_end > json_start:
-                json_str = text[json_start:json_end]
-                result = json.loads(json_str)
-                
-                # Validate category
-                valid_categories = ['fashion', 'grocery', 'electronics', 'home', 'beauty', 'sports', 'entertainment', 'other']
-                category_name = result.get('category', {}).get('name', '').lower()
-                if category_name not in valid_categories:
-                    category_name = 'other'
-                
-                # If confidence is low or no specific category found, return all categories
-                if (result.get('confidence', 0) < 0.3 or 
-                    result.get('category', {}).get('confidence', 0) < 0.3):
-                    return {
-                        'query': query,
-                        'confidence': 0.5,
-                        'search_type': 'general',
-                        'category': {
-                            'name': category_name,
-                            'confidence': 0.5
-                        },
-                        'filters': {
-                            'price_range': {'min': 0, 'max': float('inf')}
-                        }
-                    }
-                
-                return {
-                    'query': result.get('enhanced_query', query),
-                    'search_type': result.get('search_type', 'general'),
-                    'confidence': result.get('confidence', 0.5),
-                    'category': {
-                        'name': category_name,
-                        'confidence': result.get('category', {}).get('confidence', 0.5)
-                    },
-                    'filters': result.get('suggested_filters', {})
-                }
-            
-            # Return all categories if JSON parsing fails
-            return {
-                'query': query,
-                'confidence': 0.5,
-                'search_type': 'general',
-                'category': {
-                    'name': 'other',
-                    'confidence': 0.5
-                },
-                'filters': {
-                    'price_range': {'min': 0, 'max': float('inf')}
-                }
-            }
-            
+
+            # Handle general conversation
+            if not self._is_search_query(message):
+                return self._handle_general_conversation(message, conversation)
+
+            # Handle search query
+            return self._handle_search_query(message, conversation, context)
+
         except Exception as e:
             geo_structured_logger.error(
                 geo_logger,
-                "Query enhancement failed",
-                "query_enhancement",
-                {
-                    'error': str(e),
-                    'context': {'query': query}
-                }
+                "Error in message processing",
+                "message_processing",
+                error=str(e)
             )
-            # Return all categories on error
+            raise
+
+    def _handle_general_conversation(self, message: str, conversation: Conversation) -> Dict:
+        """Handle non-search conversation messages."""
+        try:
+            # Extract user preferences
+            self._safe_service_call(
+                'conversation_service',
+                'extract_user_preferences',
+                message
+            )
+
+            # Generate response using Gemini
+            response = self.gemini_client.generate_content(
+                f"User message: {message}\nGenerate a helpful response:"
+            )
+
             return {
-                'query': query,
-                'confidence': 0.5,
-                'search_type': 'general',
-                'category': {
-                    'name': 'other',
-                    'confidence': 0.5
-                },
-                'filters': {
-                    'price_range': {'min': 0, 'max': float('inf')}
-                }
+                "type": "conversation",
+                "message": response.text,
+                "conversation_id": conversation.id
             }
 
-    def _handle_search_query(
-        self,
-        message: ConversationMessage,
-        conversation: Conversation,
-        request: Request,
-        radius: float,
-        location_data: Dict,
-        context: Dict
-    ) -> Dict[str, Any]:
-        """Handle search query messages."""
-        
-        # Get user location
+        except Exception as e:
+            geo_structured_logger.error(
+                geo_logger,
+                "Error in general conversation",
+                "conversation_handling",
+                error=str(e)
+            )
+            raise
+
+    def _handle_search_query(self, message: str, conversation: Conversation, context: Dict) -> Dict:
+        """Handle search-related queries."""
         try:
-            if location_data.get('latitude') and location_data.get('longitude'):
-                latitude = float(location_data['latitude'])
-                longitude = float(location_data['longitude'])
-            else:
-                latitude = float(request.client_latitude)
-                longitude = float(request.client_longitude)
-        except (TypeError, ValueError, AttributeError):
-            return {
-                'response': "I need your location to search for nearby discounts. Please share your location and try again.",
-                'message_type': ConversationMessage.MessageType.ERROR,
-                'suggestions': ["Share your location", "Try again"]
-            }
-        
-        # Enhance the query using Gemini
-        query_enhancement = self._enhance_search_query(message.content, context)
-        
-        # Create search request with enhanced query
-        search_request = SearchRequest.objects.create(
-            conversation=conversation,
-            query=query_enhancement['query'],
-            location=Point(longitude, latitude),
-            radius=radius,
-            search_context={
-                **context,
-                'enhanced_query': query_enhancement,
-                'original_query': message.content
-            }
-        )
-        
-        # Update conversation location
-        conversation.last_location = Point(longitude, latitude)
-        conversation.last_radius = radius
-        conversation.save(update_fields=['last_location', 'last_radius'])
-        
-        # Perform search
-        try:
-            # Use the correct search method name
-            search_results = self.search_service.find_discounts(
+            # Enhance search query
+            enhanced = self.gemini_client.generate_content(
+                f"Enhance this search query: {message}"
+            )
+
+            # Create search request
+            search_request = SearchRequest(
+                query=enhanced.text,
+                context=context
+            )
+
+            # Perform search
+            search_results = self._safe_service_call(
+                'search_service',
+                'find_discounts',
                 req=search_request,
                 timeout=30
             )
-            
-            if search_results['status'] == 'completed':
-                result_count = len(search_results['results'])
-                if result_count > 0:
-                    # Use enhanced query context for better response
-                    if query_enhancement['confidence'] > 0.7:
-                        response = f"I found {result_count} great deals matching your search for {query_enhancement['query']}!"
-                    else:
-                        response = f"I found {result_count} deals that might interest you!"
-                else:
-                    # When no specific results found, get category deals
-                    category_deals = self._get_all_categories()
-                    if category_deals:
-                        # Get the category from the enhanced query if available
-                        category = query_enhancement.get('category', {}).get('name', '')
-                        if category and category != 'other':
-                            response = f"I couldn't find exactly what you're looking for, but here are some great {category} deals in your area!"
-                        else:
-                            response = "I couldn't find exactly what you're looking for, but here are some great deals in your area!"
-                    else:
-                        response = "I couldn't find any deals matching your search. Would you like to try a different search term?"
-                    
-                    search_results['results'] = category_deals
-                    result_count = len(category_deals)
-                
-                # Generate suggestions based on the results
-                try:
-                    suggestions = self._generate_search_suggestions(search_results['results'])
-                except Exception as e:
-                    geo_structured_logger.error(
-                        geo_logger,
-                        "Failed to generate suggestions",
-                        "suggestion_generation",
-                        error=str(e)
-                    )
-                    suggestions = [
-                        "Try a different search term",
-                        "Browse all categories",
-                        "Expand your search area"
-                    ]
-                
-                return {
-                    'response': response,
-                    'message_type': ConversationMessage.MessageType.SEARCH_RESULTS,
-                    'results': search_results['results'],
-                    'suggestions': suggestions,
-                    'context': {
-                        **context,
-                        'enhanced_query': query_enhancement
-                    },
-                    'search_id': str(search_request.id),
-                    'metadata': {
-                        'result_count': result_count,
-                        'search_time': search_results.get('processing_time'),
-                        'query_confidence': query_enhancement['confidence']
-                    }
-                }
-            
-            elif search_results['status'] == 'timeout':
-                # On timeout, return category deals with appropriate message
-                category_deals = self._get_all_categories()
-                return {
-                    'response': "I couldn't complete your search in time, but here are some great deals in your area!",
-                    'message_type': ConversationMessage.MessageType.SEARCH_RESULTS,
-                    'results': category_deals,
-                    'suggestions': [
-                        "Try a different search term",
-                        "Browse all categories",
-                        "Expand your search area"
-                    ],
-                    'search_id': str(search_request.id)
-                }
-            
-            else:  # failed
-                # On failure, return category deals with appropriate message
-                category_deals = self._get_all_categories()
-                search_request.mark_failed(error_message="")
-                return {
-                    'response': "I couldn't complete your search, but here are some great deals in your area!",
-                    'message_type': ConversationMessage.MessageType.SEARCH_RESULTS,
-                    'results': category_deals,
-                    'suggestions': [
-                        "Try a different search term",
-                        "Browse all categories",
-                        "Expand your search area"
-                    ],
-                    'search_id': str(search_request.id)
-                }
-                
-        except Exception as e:
-            # On any error, return category deals with appropriate message
-            category_deals = self._get_all_categories()
-            search_request.mark_failed(error_message=str(e))
+
             return {
-                'response': "I encountered an issue with your search, but here are some great deals in your area!",
-                'message_type': ConversationMessage.MessageType.SEARCH_RESULTS,
-                'results': category_deals,
-                'suggestions': [
-                    "Try a different search term",
-                    "Browse all categories",
-                    "Expand your search area"
-                ],
-                'search_id': str(search_request.id)
+                "type": "search_results",
+                "results": search_results,
+                "conversation_id": conversation.id
             }
 
-    def _get_all_categories(self) -> List[Dict]:
-        """Get all available categories and their discounts grouped by retailer."""
-        try:
-            # Get only categories that have discounts
-            categories = Category.objects.filter(discounts__isnull=False).distinct().prefetch_related(
-                Prefetch(
-                    'discounts',
-                    queryset=Discount.objects.select_related('retailer').order_by('retailer__name', '-created_at')
-                )
-            )
-            
-            results = []
-            
-            for category in categories:
-                # Get the first discount for each category as an example
-                sample_discount = category.discounts.first()
-                
-                # Only include category if it has discounts
-                if sample_discount:
-                    # Group discounts by retailer
-                    retailer_groups = {}
-                    # Use all() to get the queryset of discounts
-                    for discount in category.discounts.all():
-                        retailer = discount.retailer
-                        if retailer:
-                            if retailer.id not in retailer_groups:
-                                retailer_groups[retailer.id] = {
-                                    'id': str(retailer.id),
-                                    'name': retailer.name,
-                                    'type': 'retailer',
-                                    'image': None,  # Remove image access since Retailer model doesn't have it
-                                    'description': f"Browse all {retailer.name} deals",
-                                    'discounts': []
-                                }
-                            
-                            retailer_groups[retailer.id]['discounts'].append({
-                                'id': str(discount.id),
-                                'title': discount.title,
-                                'url': discount.url,
-                                'type': 'discount',
-                                'category': {
-                                    'id': str(category.id),
-                                    'name': category.name
-                                }
-                            })
-                    
-                    # Add category with its retailer groups
-                    category_data = {
-                        'id': str(category.id),
-                        'name': category.name,
-                        'type': 'category',
-                        'image': category.image.url if category.image else None,
-                        'description': f"Browse all {category.name} deals",
-                        'discount_count': category.discounts.count(),
-                        'retailers': list(retailer_groups.values())
-                    }
-                    
-                    # Add category to results
-                    results.append(category_data)
-            
-            # If no categories with discounts found, return empty list
-            if not results:
-                return []
-                
-            return results
-            
         except Exception as e:
             geo_structured_logger.error(
                 geo_logger,
-                "Failed to get all categories",
-                "category_list",
-                {
-                    'error': str(e)
-                }
-            )
-            return []
-    
-    def _handle_general_conversation(self, message: ConversationMessage, context: Dict) -> Dict[str, Any]:
-        """Handle general conversation messages."""
-        
-        # Extract preferences from conversation
-        self.conversation_service.extract_user_preferences(message)
-        
-        # Generate contextual response using Gemini
-        response = self._generate_contextual_response(message.content, context)
-        
-        return {
-            'response': response,
-            'message_type': ConversationMessage.MessageType.CONVERSATION,
-            'context': context,
-            'suggestions': [
-                "Search for discounts near me",
-                "Find specific deals", 
-                "What's available in my area?"
-            ]
-        }
-    
-    def _generate_contextual_response(self, content: str, context: Dict) -> str:
-        """Generate contextual response using Gemini."""
-        try:
-            response = self.gemini_client.generate_content(
-                prompt=f"""
-                Generate a helpful response for this user message:
-                Message: "{content}"
-                Context: {json.dumps(context)}
-                
-                The response should be:
-                - Natural and conversational
-                - Relevant to the user's query
-                - Include suggestions if appropriate
-                - Be concise but informative
-                """,
-                response_schema={
-                    'type': 'OBJECT',
-                    'properties': {
-                        'response': {'type': 'STRING'},
-                        'suggestions': {
-                            'type': 'ARRAY',
-                            'items': {'type': 'STRING'}
-                        }
-                    }
-                }
-            )
-            
-            if not response or not response.text:
-                return "I understand you're looking for deals. Could you tell me more about what you're interested in?"
-                
-            result = json.loads(response.text.strip())
-            return result.get('response', "I understand you're looking for deals. Could you tell me more about what you're interested in?")
-            
-        except Exception as e:
-            geo_structured_logger.error(
-                geo_logger,
-                "Response generation failed",
-                "response_generation",
-                error=str(e),
-                content=content
-            )
-            return "I understand you're looking for deals. Could you tell me more about what you're interested in?"
-    
-    def _generate_search_suggestions(self, results: List[Dict]) -> List[str]:
-        """Generate search suggestions using Gemini."""
-        try:
-            if not results:
-                return []
-                
-            response = self.gemini_client.generate_content(
-                prompt=f"""
-                Generate helpful search suggestions based on these results:
-                Results: {json.dumps(results)}
-                
-                Return a JSON array of suggestion strings that:
-                - Are relevant to the search results
-                - Help users refine their search
-                - Are natural and conversational
-                - Are specific and actionable
-                """,
-                response_schema={
-                    'type': 'ARRAY',
-                    'items': {'type': 'STRING'}
-                }
-            )
-            
-            if not response or not response.text:
-                return []
-                
-            suggestions = json.loads(response.text.strip())
-            return suggestions[:5]  # Limit to 5 suggestions
-            
-        except Exception as e:
-            geo_structured_logger.error(
-                geo_logger,
-                "Suggestion generation failed",
-                "suggestion_generation",
+                "Error in search query handling",
+                "search_handling",
                 error=str(e)
             )
-            return []
-  
+            raise
+
     def get(self, request: Request, conversation_id: str = None) -> Response:
         """Get conversation details or list user's conversations."""
         try:
