@@ -61,7 +61,7 @@ from drf_yasg import openapi
 from rest_framework.request import Request
 from django.utils import timezone
 import logging
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Q
 
 
 # Module-level singleton for Gemini client
@@ -920,7 +920,7 @@ class ConversationalDiscountView(APIView):
             raise
 
     def _handle_search_query(self, message: str, conversation_id: str, intent_analysis: Dict) -> Dict[str, Any]:
-        """Handle a search query message."""
+        """Handle a search query message with enhanced context awareness."""
         try:
             geo_structured_logger.info(
                 geo_logger,
@@ -931,10 +931,40 @@ class ConversationalDiscountView(APIView):
                     "conversation_id": conversation_id
                 }
             )
+
+            # Get conversation
+            conversation = Conversation.objects.get(id=conversation_id)
+            
+            # Create user message and extract preferences
+            user_message = ConversationMessage.objects.create(
+                conversation=conversation,
+                role=ConversationMessage.MessageRole.USER,
+                content=message,
+                message_type=ConversationMessage.MessageType.SEARCH_QUERY,
+                metadata={
+                    "intent_analysis": intent_analysis,
+                    "confidence": intent_analysis["confidence"]
+                }
+            )
+
+            # Extract user preferences
+            self._safe_service_call(
+                'conversation_service',
+                'extract_user_preferences',
+                user_message
+            )
+
+            # Get enhanced context
+            enhanced_context = self._safe_service_call(
+                'conversation_service',
+                'get_conversation_context',
+                conversation
+            )
+
             # Create search request with default location
             search_request = SearchRequest.objects.create(
                 query=message,
-                conversation_id=conversation_id,
+                conversation=conversation,
                 location=Point(0, 0),  # Default location at origin
                 radius=5000,  # Default radius in meters
                 status='pending'
@@ -951,10 +981,33 @@ class ConversationalDiscountView(APIView):
                 }
             )
             
-            # Get search results
+            # Get search results using enhanced search service
             start_time = time.time()
-            search_service = EnhancedSearchService()
-            results = search_service.search(message)
+            try:
+                # First try enhanced search with just the query
+                search_results = self._safe_service_call(
+                    'search_service',
+                    'search',
+                    query=message
+                )
+            except Exception as search_error:
+                geo_structured_logger.error(
+                    geo_logger,
+                    "Search service error",
+                    "search_service_error",
+                    error=str(search_error),
+                    context={
+                        'query': message,
+                        'search_id': str(search_request.id)
+                    }
+                )
+                # Fallback to basic text search if enhanced search fails
+                search_results = {
+                    'results': self._basic_text_search(search_request),
+                    'message': 'Here are the results I found:',
+                    'context': enhanced_context
+                }
+
             processing_time = time.time() - start_time
             
             # Mark search request as completed
@@ -970,16 +1023,35 @@ class ConversationalDiscountView(APIView):
                 {
                     'search_id': str(search_request.id),
                     'processing_time': processing_time,
-                    'results_count': len(results.get('results', []))
+                    'results_count': len(search_results.get('results', []))
                 }
+            )
+
+            # Create assistant message
+            assistant_message = ConversationMessage.objects.create(
+                conversation=conversation,
+                role=ConversationMessage.MessageRole.ASSISTANT,
+                content=search_results.get('message', 'Here are the results I found:'),
+                message_type=ConversationMessage.MessageType.SEARCH_RESULTS,
+                metadata={
+                    'search_id': str(search_request.id),
+                    'results_count': len(search_results.get('results', [])),
+                    'intent_analysis': intent_analysis,
+                    'processing_time': processing_time
+                },
+                search_request=search_request
             )
             
             return {
                 'type': 'search_results',
-                'results': results.get('results', []),
-                'context': results.get('context', {}),
-                'message': "Here are the search results I found:",
-                'intent_analysis': intent_analysis
+                'results': search_results.get('results', []),
+                'context': search_results.get('context', {}),
+                'message': search_results.get('message', 'Here are the results I found:'),
+                'message_id': str(assistant_message.id),
+                'conversation_id': str(conversation.id),
+                'search_id': str(search_request.id),
+                'intent_analysis': intent_analysis,
+                'processing_time': processing_time
             }
             
         except Exception as e:
@@ -1070,14 +1142,24 @@ class ConversationalDiscountView(APIView):
                 status=HTTP_404_NOT_FOUND
             )
 
+    def _detect_language(self, text: str) -> str:
+        """Detect the language of the input text.
+        
+        Args:
+            text: The text to detect language for
+            
+        Returns:
+            str: Language code ('en' or 'de')
+        """
+        # For now, default to English
+        # TODO: Implement proper language detection
+        return 'en'
+
     def _basic_text_search(self, req: SearchRequest) -> List[Dict]:
         """Perform a basic text-based search with bilingual support."""
         try:
-            # Detect language of the query
-            language = self._detect_language(req.query)
-            
-            # Create cache key
-            cache_key = f"search_{req.query}_{language}"
+            # Create cache key (sanitized for memcached)
+            cache_key = f"search_{req.query.replace(' ', '_')}"
             cached_results = cache.get(cache_key)
             if cached_results:
                 return cached_results
@@ -1085,7 +1167,7 @@ class ConversationalDiscountView(APIView):
             # Build base query
             base_query = Q(is_active=True, valid_until__gt=timezone.now())
             
-            # Build bilingual search query
+            # Build text query
             text_query = Q()
             words = req.query.lower().split()
             
@@ -1113,7 +1195,7 @@ class ConversationalDiscountView(APIView):
                 'category'
             ).order_by('-discount_percentage', '-created_at')[:5]
 
-            # Process results with both languages
+            # Process results
             processed_results = []
             for result in results:
                 result_data = {
@@ -1138,9 +1220,7 @@ class ConversationalDiscountView(APIView):
                     'discount_percentage': float(result.discount_percentage) if result.discount_percentage else None,
                     'valid_until': result.valid_until.isoformat() if result.valid_until else None,
                     'product_url': result.product_url,
-                    'image': result.image.url if result.image else None,
-                    # Add language detection
-                    'detected_language': language
+                    'image': result.image.url if result.image else None
                 }
                 processed_results.append(result_data)
 
