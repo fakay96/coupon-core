@@ -46,7 +46,8 @@ from geodiscounts.models import (
     Conversation, ConversationMessage, SearchRequest, 
 )
 from spellchecker import SpellChecker
-from geodiscounts.v1.services.conversation_service import ConversationService, EnhancedSearchService
+from geodiscounts.v1.services.conversation.service import ConversationService
+from geodiscounts.v1.services.search.service import EnhancedSearchService
 from geodiscounts.v1.utils.understand_context import GeminiEmbeddingClient
 from geodiscounts.v1.serializers import ConversationSerializer
 
@@ -241,17 +242,61 @@ class ConversationalDiscountView(APIView):
     def _safe_service_call(self, service_property, method_name, *args, **kwargs):
         """Safely call a service method with proper error handling."""
         try:
+            geo_structured_logger.info(
+                geo_logger,
+                f"Attempting service call: {service_property}.{method_name}",
+                "service_call_start",
+                context={
+                    'service': service_property,
+                    'method': method_name,
+                    'args': str(args),
+                    'kwargs': str(kwargs)
+                }
+            )
+            
             service = getattr(self, service_property)
             method = getattr(service, method_name)
-            return method(*args, **kwargs)
+            
+            geo_structured_logger.info(
+                geo_logger,
+                f"Service and method found, executing call",
+                "service_call_execute",
+                context={
+                    'service_type': type(service).__name__,
+                    'method_type': type(method).__name__
+                }
+            )
+            
+            result = method(*args, **kwargs)
+            
+            geo_structured_logger.info(
+                geo_logger,
+                f"Service call completed successfully",
+                "service_call_success",
+                context={
+                    'service': service_property,
+                    'method': method_name,
+                    'result_type': type(result).__name__,
+                    'result_length': len(result) if hasattr(result, '__len__') else None
+                }
+            )
+            
+            return result
+            
         except Exception as e:
             geo_structured_logger.error(
                 geo_logger,
                 f"Service call failed: {service_property}.{method_name}",
-                "service_call",
+                "service_call_error",
                 error=str(e),
-                args=args,
-                kwargs=kwargs
+                context={
+                    'service': service_property,
+                    'method': method_name,
+                    'args': str(args),
+                    'kwargs': str(kwargs),
+                    'error_type': type(e).__name__,
+                    'error_args': getattr(e, 'args', None)
+                }
             )
             raise
 
@@ -319,8 +364,8 @@ class ConversationalDiscountView(APIView):
             if not message:
                 return {"error": "Message is required"}
 
-            # Create user message
-            user_message = ConversationMessage(
+            # Create and save user message
+            user_message = ConversationMessage.objects.create(
                 conversation=conversation,
                 role=ConversationMessage.MessageRole.USER,
                 content=message,
@@ -347,7 +392,7 @@ class ConversationalDiscountView(APIView):
                 return self._handle_general_conversation(user_message, conversation)
 
             # Handle search query
-            return self._handle_search_query(user_message, conversation, context)
+            return self._handle_search_query(message, conversation.id)
 
         except Exception as e:
             geo_structured_logger.error(
@@ -390,60 +435,83 @@ class ConversationalDiscountView(APIView):
             )
             raise
 
-    def _handle_search_query(self, message: ConversationMessage, conversation: Conversation, context: Dict) -> Dict:
-        """Handle search-related queries."""
+    def _handle_search_query(self, message: str, conversation_id: str) -> Dict[str, Any]:
+        """Handle a search query message."""
         try:
-            # Enhance search query
-            enhanced = self.gemini_client.generate_content(
-                f"Enhance this search query: {message.content}"
-            )
-
-            # Create search request without location
-            search_request = SearchRequest.objects.create(
-                conversation=conversation,
-                query=enhanced.text,
-                search_context={
-                    **context,
-                    'enhanced_query': enhanced.text,
-                    'original_query': message.content
+            geo_structured_logger.info(
+                geo_logger,
+                "Processing search query",
+                "search_query_processing",
+                {
+                    "query_text": message,
+                    "conversation_id": conversation_id
                 }
             )
-
-            # Perform search
-            search_results = self._safe_service_call(
-                'search_service',
-                'find_discounts',
-                req=search_request,
-                timeout=30
+            # Create search request with default location
+            search_request = SearchRequest.objects.create(
+                query=message,
+                conversation_id=conversation_id,
+                location=Point(0, 0),  # Default location at origin
+                radius=5000,  # Default radius in meters
+                status='pending'
             )
-
-            # Create assistant message
-            assistant_message = ConversationMessage.objects.create(
-                conversation=conversation,
-                role=ConversationMessage.MessageRole.ASSISTANT,
-                content=f"Found {len(search_results.get('results', []))} results for your search.",
-                message_type=ConversationMessage.MessageType.SEARCH_RESULTS,
-                metadata={'search_id': str(search_request.id)},
-                search_request=search_request
+            
+            # Log search request creation
+            geo_structured_logger.info(
+                geo_logger,
+                "Created search request",
+                "search_request_creation",
+                {
+                    'search_id': str(search_request.id),
+                    'query_text': message
+                }
             )
-
+            
+            # Get search results
+            start_time = time.time()
+            search_service = EnhancedSearchService()
+            results = search_service.search(message)
+            processing_time = time.time() - start_time
+            
+            # Mark search request as completed
+            search_request.processing_time = processing_time
+            search_request.status = 'completed'
+            search_request.save()
+            
+            # Log search completion
+            geo_structured_logger.info(
+                geo_logger,
+                "Search request completed",
+                "search_request_completion",
+                {
+                    'search_id': str(search_request.id),
+                    'processing_time': processing_time,
+                    'results_count': len(results.get('results', []))
+                }
+            )
+            
             return {
-                "type": "search_results",
-                "message": assistant_message.content,
-                "message_id": str(assistant_message.id),
-                "conversation_id": str(conversation.id),
-                "results": search_results.get('results', []),
-                "search_id": str(search_request.id)
+                'type': 'search_results',
+                'results': results.get('results', []),
+                'context': results.get('context', {}),
+                'message': "Here are the search results I found:"
             }
-
+            
         except Exception as e:
             geo_structured_logger.error(
                 geo_logger,
-                "Error in search query handling",
-                "search_handling",
-                error=str(e)
+                "Error processing search query",
+                "search_query_error",
+                error=str(e),
+                context={
+                    "query_text": message,
+                    "conversation_id": conversation_id
+                }
             )
-            raise
+            return {
+                'type': 'error',
+                'message': "I encountered an error while searching. Please try again."
+            }
 
     def get(self, request: Request, conversation_id: str = None) -> Response:
         """Get conversation details or list user's conversations."""
@@ -515,3 +583,184 @@ class ConversationalDiscountView(APIView):
                 {"error": "Conversation not found"},
                 status=HTTP_404_NOT_FOUND
             )
+
+    def _basic_text_search(self, req: SearchRequest) -> List[Dict]:
+        """Perform a basic text-based search with bilingual support."""
+        try:
+            # Detect language of the query
+            language = self._detect_language(req.query)
+            
+            # Create cache key
+            cache_key = f"search_{req.query}_{language}"
+            cached_results = cache.get(cache_key)
+            if cached_results:
+                return cached_results
+
+            # Build base query
+            base_query = Q(is_active=True, valid_until__gt=timezone.now())
+            
+            # Build bilingual search query
+            text_query = Q()
+            words = req.query.lower().split()
+            
+            for word in words:
+                if len(word) > 2:
+                    # Search in both English and German fields
+                    text_query |= (
+                        # English fields
+                        Q(name__icontains=word) |
+                        Q(description__icontains=word) |
+                        Q(brand__icontains=word) |
+                        Q(store_name__icontains=word) |
+                        # German fields
+                        Q(name_de__icontains=word) |
+                        Q(description_de__icontains=word) |
+                        Q(brand_de__icontains=word) |
+                        Q(store_name_de__icontains=word)
+                    )
+
+            # Perform search
+            results = Discount.objects.using('geodiscounts_db').filter(
+                base_query & text_query
+            ).select_related(
+                'retailer',
+                'category'
+            ).order_by('-discount_percentage', '-created_at')[:5]
+
+            # Process results with both languages
+            processed_results = []
+            for result in results:
+                result_data = {
+                    'id': str(result.id),
+                    # English data
+                    'name': result.name,
+                    'description': result.description,
+                    'retailer_name': result.retailer.name,
+                    'category': result.category.name,
+                    'brand': result.brand,
+                    'store_name': result.store_name,
+                    # German data
+                    'name_de': result.name_de,
+                    'description_de': result.description_de,
+                    'retailer_name_de': result.retailer.name_de,
+                    'category_de': result.category.name_de,
+                    'brand_de': result.brand_de,
+                    'store_name_de': result.store_name_de,
+                    # Common fields
+                    'price': float(result.price_per_unit) if result.price_per_unit else None,
+                    'discount_value': float(result.discount_value) if result.discount_value else None,
+                    'discount_percentage': float(result.discount_percentage) if result.discount_percentage else None,
+                    'valid_until': result.valid_until.isoformat() if result.valid_until else None,
+                    'product_url': result.product_url,
+                    'image': result.image.url if result.image else None,
+                    # Add language detection
+                    'detected_language': language
+                }
+                processed_results.append(result_data)
+
+            # Cache results
+            cache.set(cache_key, processed_results, timeout=300)
+            return processed_results
+
+        except Exception as e:
+            geo_structured_logger.error(geo_logger, "Basic text search error", "search_service", e)
+            return []
+
+    def _format_search_response(self, results: List[Dict], search_request: SearchRequest, conversation: Conversation, enhanced_query: str) -> Dict:
+        """Format search response with bilingual support."""
+        try:
+            language = self._detect_language(search_request.query)
+            
+            # Format message in both languages
+            if results:
+                message_en = f"Found {len(results)} results for your search."
+                message_de = f"I habe {len(results)} Ergebnisse für Ihre Suche gefunden."
+                
+                # Add retailer information if available
+                retailers = {r['retailer_name'] for r in results if r['retailer_name']}
+                if retailers:
+                    message_en += f" Results from: {', '.join(retailers)}."
+                    message_de += f" Ergebnisse von: {', '.join(retailers)}."
+            else:
+                message_en = "I couldn't find any results matching your search. Would you like to try a different search term?"
+                message_de = "Ich konnte keine Ergebnisse für Ihre Suche finden. Möchten Sie einen anderen Suchbegriff versuchen?"
+
+            # Create assistant message
+            assistant_message = ConversationMessage.objects.create(
+                conversation=conversation,
+                role=ConversationMessage.MessageRole.ASSISTANT,
+                content=message_en,  # Store English as primary
+                message_type=ConversationMessage.MessageType.SEARCH_RESULTS,
+                metadata={
+                    'search_id': str(search_request.id),
+                    'message_de': message_de,  # Store German translation
+                    'detected_language': language
+                },
+                search_request=search_request
+            )
+
+            return {
+                "type": "search_results",
+                "message": message_en,
+                "message_de": message_de,
+                "message_id": str(assistant_message.id),
+                "conversation_id": str(conversation.id),
+                "results": results,
+                "search_id": str(search_request.id),
+                "detected_language": language
+            }
+
+        except Exception as e:
+            geo_structured_logger.error(geo_logger, "Error formatting search response", "response_formatting", e)
+            raise
+
+    def _handle_no_results(self, message: ConversationMessage, conversation: Conversation, search_request: SearchRequest, query_analysis: Dict) -> Dict:
+        """Handle no results with bilingual support."""
+        try:
+            language = self._detect_language(message.content)
+            components = query_analysis['components']
+            
+            # Format messages in both languages
+            if components['retailer']:
+                message_en = f"I found some deals from {components['retailer']}"
+                message_de = f"Ich habe einige Angebote von {components['retailer']} gefunden"
+                
+                if components.get('category'):
+                    message_en += f" in the {components['category']} category"
+                    message_de += f" in der Kategorie {components['category']}"
+                
+                message_en += ". Would you like to see these?"
+                message_de += ". Möchten Sie diese sehen?"
+            else:
+                message_en = "I found some general deals. Would you like to see these?"
+                message_de = "Ich habe einige allgemeine Angebote gefunden. Möchten Sie diese sehen?"
+
+            # Create assistant message
+            assistant_message = ConversationMessage.objects.create(
+                conversation=conversation,
+                role=ConversationMessage.MessageRole.ASSISTANT,
+                content=message_en,
+                message_type=ConversationMessage.MessageType.SEARCH_RESULTS,
+                metadata={
+                    'search_id': str(search_request.id),
+                    'message_de': message_de,
+                    'detected_language': language
+                },
+                search_request=search_request
+            )
+
+            return {
+                "type": "search_results",
+                "message": message_en,
+                "message_de": message_de,
+                "message_id": str(assistant_message.id),
+                "conversation_id": str(conversation.id),
+                "results": [],
+                "search_id": str(search_request.id),
+                "detected_language": language,
+                "is_fallback": True
+            }
+
+        except Exception as e:
+            geo_structured_logger.error(geo_logger, "Error in handling no results", "no_results_handling", e)
+            raise

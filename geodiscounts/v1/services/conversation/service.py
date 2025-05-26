@@ -1,31 +1,21 @@
 """
-Services for Conversational Discount Discovery System
-===================================================
-
-Business logic layer that handles:
-- Conversation management and context tracking
-- User preference extraction and learning
-- Search request processing with timeout handling
+Conversation service for managing chat sessions and context.
 """
 from __future__ import annotations
 
-import time
 import logging
-from typing import Dict, List, Optional, Any, Union
+from typing import Dict, List, Optional, Any
 from django.utils import timezone
-from django.db import transaction
 
 from geodiscounts.models import (
     Conversation, ConversationMessage, ConversationContext,
-    SearchRequest, UserPreference, Discount
+    SearchRequest
 )
-from .search.service import EnhancedSearchService
-from .search.context import SearchContext, SearchContextManager
-from .preferences.service import PreferenceService
+from ..search.service import EnhancedSearchService
+from ..preferences.service import PreferenceService
 from geodiscounts.v1.utils.understand_context import GeminiEmbeddingClient
-from .conversation.formatters import SearchResponseFormatter
+from .formatters import SearchResponseFormatter
 
-# Initialize logger
 logger = logging.getLogger(__name__)
 
 class ConversationService:
@@ -158,6 +148,129 @@ class ConversationService:
             logger.error("Get context error", extra={'error': str(e)})
             return {}
 
-def get_conversation_service() -> ConversationService:
-    """Get or create conversation service instance."""
-    return ConversationService()
+    def get_conversation_context(self, conv: Conversation) -> Dict[str, Any]:
+        """Get conversation context.
+        
+        This is an alias for get_context to maintain backward compatibility.
+        
+        Args:
+            conv: The conversation to get context for.
+            
+        Returns:
+            Dictionary containing context information.
+        """
+        return self.get_context(conv)
+
+    def get_or_create_conversation(self, user, conversation_id: Optional[str] = None) -> Conversation:
+        """Get or create a conversation for a user.
+        
+        Args:
+            user: The user to create/get conversation for.
+            conversation_id: Optional conversation ID to retrieve.
+            
+        Returns:
+            The conversation object.
+            
+        Raises:
+            Exception: If there's an error creating or retrieving the conversation.
+        """
+        try:
+            if conversation_id:
+                conv = Conversation.objects.using('geodiscounts_db').get(
+                    id=conversation_id, 
+                    user=user, 
+                    status=Conversation.ConversationStatus.ACTIVE
+                )
+                conv.updated_at = timezone.now()
+                conv.save(update_fields=['updated_at'], using='geodiscounts_db')
+                return conv
+                
+            # Create new conversation
+            conv = Conversation.objects.using('geodiscounts_db').create(
+                user=user,
+                status=Conversation.ConversationStatus.ACTIVE
+            )
+            
+            # Create associated context
+            ConversationContext.objects.using('geodiscounts_db').create(
+                conversation=conv
+            )
+            
+            logger.info(
+                "New conversation created",
+                extra={
+                    'conversation_id': str(conv.id),
+                    'user_id': str(user.id)
+                }
+            )
+            
+            return conv
+            
+        except Conversation.DoesNotExist:
+            # If conversation not found, create new one
+            return self.get_or_create_conversation(user, None)
+            
+        except Exception as e:
+            logger.error(
+                "Error in get_or_create_conversation",
+                extra={
+                    'error': str(e),
+                    'user_id': str(user.id),
+                    'conversation_id': conversation_id
+                }
+            )
+            raise 
+
+    def extract_user_preferences(self, message: ConversationMessage) -> Dict[str, Any]:
+        """Extract user preferences from a conversation message.
+        
+        Args:
+            message: The conversation message to analyze.
+            
+        Returns:
+            Dictionary containing extracted preferences.
+            
+        Raises:
+            Exception: If there's an error extracting preferences.
+        """
+        try:
+            # Get message content
+            content = message.content
+            
+            # Extract preferences using preference service
+            preferences = self.preference_service.extract_preferences(content)
+            
+            # Extract product signals
+            product_signals = self.gemini.extract_structured_signals(content)
+            
+            # Combine preferences and signals
+            extracted_data = {
+                'preferences': preferences,
+                'product_signals': product_signals,
+                'message_id': str(message.id),
+                'conversation_id': str(message.conversation.id)
+            }
+            
+            logger.info(
+                "Extracted user preferences",
+                extra={
+                    'message_id': str(message.id),
+                    'preferences': preferences,
+                    'product_signals': product_signals
+                }
+            )
+            
+            # Update conversation context with new preferences
+            self.update_context(message.conversation)
+            
+            return extracted_data
+            
+        except Exception as e:
+            logger.error(
+                "Error extracting user preferences",
+                extra={
+                    'error': str(e),
+                    'message_id': str(message.id)
+                }
+            )
+            raise 
