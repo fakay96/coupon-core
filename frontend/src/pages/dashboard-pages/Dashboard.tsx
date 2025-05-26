@@ -77,7 +77,7 @@ export const SearchInputAndCategory = () => {
         state: { 
           searchResults: response.results,
           message: response.message,
-          attempts: response.attempts
+          attempts: response.attempts || 0
         }
       });
     } catch (error) {

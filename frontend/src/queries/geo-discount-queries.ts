@@ -7,6 +7,7 @@ interface SearchResponse {
   conversation_id?: string;
   type?: string;
   metadata?: any;
+  attempts?: number;
 }
 
 /**
