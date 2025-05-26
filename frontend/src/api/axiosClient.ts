@@ -7,6 +7,16 @@ import { toast } from "sonner";
 // Base URL for the API
 const apiUrl = import.meta.env.VITE_API_URL;
 
+// List of public endpoints that don't require authentication
+const publicEndpoints = [
+  '/api/authentication/v1/login/',
+  '/api/authentication/v1/register/',
+  '/api/authentication/v1/guest-token/',
+  '/api/geodiscounts/v1/discounts/',
+  '/api/geodiscounts/v1/discounts/categories/',
+  '/api/geodiscounts/v1/discounts/search/',
+];
+
 // Create an axios instance with the base URL
 const api = axios.create({
   baseURL: apiUrl,
@@ -29,9 +39,17 @@ const addRefreshSubscriber = (callback: (token: string) => void) => {
 // Request interceptor to add the Authorization header with the access token
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    const accessToken = Cookies.get("access");
-    if (accessToken) {
-      config.headers.Authorization = `Bearer ${accessToken}`;
+    // Check if the endpoint is public
+    const isPublicEndpoint = publicEndpoints.some(endpoint => 
+      config.url?.includes(endpoint)
+    );
+
+    // Only add auth header if not a public endpoint
+    if (!isPublicEndpoint) {
+      const accessToken = Cookies.get("access");
+      if (accessToken) {
+        config.headers.Authorization = `Bearer ${accessToken}`;
+      }
     }
     return config;
   },

@@ -1,4 +1,4 @@
-import { categoriesApi, nearbyApi, specificRetailerApi, aiSearchApi, refineSearchApi } from "@/api/geoDiscountApi";
+import { categoriesApi, nearbyApi, specificRetailerApi, aiSearchApi, refineSearchApi, discountApi } from "@/api/geoDiscountApi";
 import { useQuery, useMutation } from "@tanstack/react-query";
 
 interface SearchResponse {
@@ -11,7 +11,7 @@ interface SearchResponse {
 }
 
 /**
- * Custom hook to fetch all available discounts using AI search
+ * Custom hook to fetch all available discounts
  * @returns {UseQueryResult} Query result containing all discount data
  * @throws {Error} If discount fetch fails
  * @example
@@ -22,9 +22,8 @@ export const discountApiQuery = () => {
     queryKey: ["discountApi"],
     queryFn: async () => {
       try {
-        const response = await aiSearchApi({
-          message: "Show me all available discounts"
-        });
+        // Use the regular discountApi for initial load
+        const response = await discountApi();
         
         // Validate response structure
         if (!response || typeof response !== 'object') {
@@ -33,7 +32,7 @@ export const discountApiQuery = () => {
         }
 
         // Ensure results is an array
-        const results = response.results;
+        const results = Array.isArray(response) ? response : response.results;
         if (!Array.isArray(results)) {
           console.error('Results is not an array:', results);
           return [];

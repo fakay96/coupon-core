@@ -8,8 +8,10 @@ import { AxiosError } from 'axios';
  */
 export const discountApi = async () => {
   try {
-    const response = await axiosInstance.get("/api/geodiscounts/v1/discounts/");
-    return response.data;
+    const response = await axiosInstance.post("/api/geodiscounts/v1/discounts/search/", {
+      message: "Show me all available discounts"
+    });
+    return response.data.results || [];
   } catch (error) {
     if (error instanceof AxiosError && error.response?.data) {
       console.error('Discount API Error:', error.response.data);
