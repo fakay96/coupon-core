@@ -1,6 +1,6 @@
 .venv
 
-poetry.lock
+
 .DS_Store
 .env
 static/

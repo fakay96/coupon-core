@@ -1,4 +1,4 @@
-import { categoriesApi, discountApi, nearbyApi, specificRetailerApi, aiSearchApi } from "@/api/geoDiscountApi";
+import { categoriesApi, discountApi, nearbyApi, specificRetailerApi, aiSearchApi, refineSearchApi } from "@/api/geoDiscountApi";
 import { useQuery, useMutation } from "@tanstack/react-query";
 
 /**
@@ -82,5 +82,37 @@ export const useAiSearch = () => {
       maxRadius?: number;
       maxRetries?: number;
     }) => await aiSearchApi(params),
+  });
+};
+
+/**
+ * Custom hook to refine search based on conversation context
+ * @returns {UseMutationResult} Mutation result for refined search
+ * @throws {Error} If search refinement fails
+ * @example
+ * const { mutate: refineSearch, data: refinedResults } = useRefineSearch();
+ * refineSearch({
+ *   conversation_id: '123',
+ *   query: 'Show me more options',
+ *   context: {
+ *     previous_queries: ['Show me food discounts'],
+ *     filters: { price_range: { min: 0, max: 50 } }
+ *   }
+ * });
+ */
+export const useRefineSearch = () => {
+  return useMutation({
+    mutationFn: async (params: {
+      conversation_id: string;
+      query: string;
+      context?: {
+        previous_queries?: string[];
+        filters?: {
+          price_range?: { min: number; max: number };
+          categories?: string[];
+          distance?: number;
+        };
+      };
+    }) => await refineSearchApi(params),
   });
 };
