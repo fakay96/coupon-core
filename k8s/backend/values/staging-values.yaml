@@ -19,12 +19,11 @@ backend:
     pullPolicy: IfNotPresent
   resources:
     requests:
-      memory: "512Mi"
-      cpu:    "500m"
+      memory: "256Mi"
+      cpu: "250m"
     limits:
-      memory: "2.Gi"
-      cpu:    "1.2"
-
+      memory: "512Mi"
+      cpu: "500m"
   replicas: 1
 
   service:

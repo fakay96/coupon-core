@@ -150,14 +150,12 @@ python manage.py collectstatic --noinput 2>&1 | tee -a "$LOG_FILE"
 ########################################
 log_and_print "🚀 Starting Gunicorn server with logging..."
 
-# exec gunicorn coupon_core.wsgi:application \
-#   --bind 0.0.0.0:8000 \
-#   --workers 2 \
-#   --threads 1 \
-#   --timeout 120 \
-#   --graceful-timeout 120 \
-#   --access-logfile "$ACCESS_LOG" \
-#   --error-logfile "$ERROR_LOG"
+exec gunicorn coupon_core.wsgi:application \
+  --bind 0.0.0.0:8000 \
+  --workers 2 \
+  --threads 1 \
+  --timeout 120 \
+  --graceful-timeout 120 \
+  --access-logfile "$ACCESS_LOG" \
+  --error-logfile "$ERROR_LOG"
 
-
-exec python manage.py runserver 0.0.0.0:8000
