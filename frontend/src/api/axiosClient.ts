@@ -12,9 +12,7 @@ const publicEndpoints = [
   '/api/authentication/v1/login/',
   '/api/authentication/v1/register/',
   '/api/authentication/v1/guest-token/',
-  '/api/geodiscounts/v1/discounts/',
   '/api/geodiscounts/v1/discounts/categories/',
-  '/api/geodiscounts/v1/discounts/search/',
 ];
 
 // Create an axios instance with the base URL
