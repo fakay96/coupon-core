@@ -67,11 +67,6 @@ MAX_DISTANCE_PARAM = 10
 spell = SpellChecker()
 learning_logger = logging.getLogger("search.learning")
 
-# Initialize shared Gemini client
-gemini_client = GeminiEmbeddingClient(
-   
-)
-
 def correct_spelling(text: str) -> str:
     """Correct common typos in user input."""
     words = text.split()
@@ -185,11 +180,70 @@ class ConversationalDiscountView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
-    def __init__(self):
-        super().__init__()
-        self.conversation_service = ConversationService()
-        self.search_service = EnhancedSearchService()
-        self.gemini_client = gemini_client  # Use the shared client instance
+    @property
+    def conversation_service(self):
+        """Lazy initialization of conversation service."""
+        try:
+            if not hasattr(self, '_conversation_service'):
+                self._conversation_service = ConversationService()
+            return self._conversation_service
+        except Exception as e:
+            geo_structured_logger.error(
+                geo_logger,
+                "Failed to initialize conversation service",
+                "service_initialization",
+                error=str(e)
+            )
+            raise
+
+    @property
+    def search_service(self):
+        """Lazy initialization of search service."""
+        try:
+            if not hasattr(self, '_search_service'):
+                self._search_service = EnhancedSearchService()
+            return self._search_service
+        except Exception as e:
+            geo_structured_logger.error(
+                geo_logger,
+                "Failed to initialize search service",
+                "service_initialization",
+                error=str(e)
+            )
+            raise
+
+    @property
+    def gemini_client(self):
+        """Lazy initialization of Gemini client."""
+        try:
+            if not hasattr(self, '_gemini_client'):
+                self._gemini_client = GeminiEmbeddingClient()
+            return self._gemini_client
+        except Exception as e:
+            geo_structured_logger.error(
+                geo_logger,
+                "Failed to initialize Gemini client",
+                "service_initialization",
+                error=str(e)
+            )
+            raise
+
+    def _safe_service_call(self, service_property, method_name, *args, **kwargs):
+        """Safely call a service method with proper error handling."""
+        try:
+            service = getattr(self, service_property)
+            method = getattr(service, method_name)
+            return method(*args, **kwargs)
+        except Exception as e:
+            geo_structured_logger.error(
+                geo_logger,
+                f"Service call failed: {service_property}.{method_name}",
+                "service_call",
+                error=str(e),
+                args=args,
+                kwargs=kwargs
+            )
+            raise
 
     @swagger_auto_schema(
         operation_description="Send a message in conversational discount search",
