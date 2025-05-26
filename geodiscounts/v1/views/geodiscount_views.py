@@ -20,6 +20,7 @@ import uuid
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import json
+from better_profanity import profanity  
 
 from django.core.cache import cache
 from django.contrib.gis.db.models.functions import Distance
@@ -39,7 +40,7 @@ from rest_framework.status import (
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 
-from geodiscounts.models import Discount, Category
+from geodiscounts.models import Discount, Category, Retailer
 from geodiscounts.v1.serializers.discount_serializers import DiscountSerializer, CategorySerializer
 
 from geodiscounts.models import (
@@ -74,10 +75,16 @@ def get_gemini_client() -> GeminiEmbeddingClient:
     return _gemini_client
 
 # Greeting patterns
-GREETING_PATTERNS = re.compile(r'^(hi|hello|hey|greetings)$', re.IGNORECASE)
+GREETING_PATTERNS = re.compile(
+    r'^(hi|hello|hey|greetings|good\s+(morning|afternoon|evening|day)|morning|afternoon|evening|sup|yo|howdy|hola|hey\s+there|hi\s+there|hello\s+there)$',
+    re.IGNORECASE
+)
 MAX_DISTANCE_PARAM = 10
 spell = SpellChecker()
 learning_logger = logging.getLogger("search.learning")
+
+# Initialize profanity filter with custom words if needed
+profanity.load_censor_words()
 
 def correct_spelling(text: str) -> str:
     """Correct common typos in user input."""
@@ -358,6 +365,299 @@ class ConversationalDiscountView(APIView):
                 status=HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+    def _deep_think_about_intent(self, message: str, conversation: Conversation) -> Dict[str, Any]:
+        """Perform deep analysis of user intent and context using Gemini.
+        
+        Args:
+            message: The user's message
+            conversation: The current conversation
+            
+        Returns:
+            Dictionary containing analyzed intent, context, and suggestions
+        """
+        try:
+            # First check for simple greetings
+            message_lower = message.lower().strip()
+            if GREETING_PATTERNS.match(message_lower):
+                # Check if it's a time-based greeting
+                time_based = any(phrase in message_lower for phrase in ['good morning', 'good afternoon', 'good evening', 'good day'])
+                return {
+                    "primary_intent": "greeting",
+                    "confidence": 0.95,
+                    "context": {
+                        "greeting_type": "time_based" if time_based else "simple",
+                        "time_of_day": self._get_time_of_day() if time_based else None
+                    },
+                    "suggested_queries": [],
+                    "explanation": "Matches greeting pattern",
+                    "follow_up_questions": []
+                }
+
+            # Get recent conversation history for context
+            recent_messages = ConversationMessage.objects.filter(
+                conversation=conversation
+            ).order_by('-created_at')[:5]  # Get last 5 messages
+            
+            conversation_history = "\n".join([
+                f"{'User' if msg.role == ConversationMessage.MessageRole.USER else 'Assistant'}: {msg.content}"
+                for msg in reversed(recent_messages)
+            ])
+
+            # Get user's search history and preferences
+            recent_searches = SearchRequest.objects.filter(
+                conversation=conversation
+            ).order_by('-created_at')[:3]  # Get last 3 searches
+            
+            search_history = "\n".join([
+                f"Previous search: {search.query}"
+                for search in recent_searches
+            ])
+
+            # Use Gemini to analyze intent and context
+            response = self.gemini_client.generate_content(
+                f"""Analyze this user message and conversation context to understand their intent and provide helpful suggestions.
+
+                User Message: {message}
+                
+                Recent Conversation:
+                {conversation_history}
+                
+                Recent Searches:
+                {search_history}
+                
+                Return a JSON object with:
+                {{
+                    "primary_intent": "greeting/search/browse/compare/ask/other",
+                    "confidence": 0.0 to 1.0,
+                    "context": {{
+                        "category": "detected category or null",
+                        "price_range": {{"min": 0, "max": 1000}} or null,
+                        "brand": "detected brand or null",
+                        "location": "detected location or null",
+                        "time_sensitivity": "high/medium/low",
+                        "question_type": "available_discounts/general/specific" or null,
+                        "is_general_inquiry": true/false
+                    }},
+                    "suggested_queries": [
+                        "list of suggested search queries based on intent"
+                    ],
+                    "explanation": "Brief explanation of the analysis",
+                    "follow_up_questions": [
+                        "list of clarifying questions if needed"
+                    ]
+                }}
+                
+                Focus on understanding:
+                1. What they're really looking for
+                2. Any implicit preferences or constraints
+                3. How to help them find what they want
+                4. What additional information might be helpful
+                
+                Important: 
+                - If the message is a greeting (hi, hello, hey, good morning, etc.), classify it as "greeting" with high confidence.
+                - If the message is asking about available discounts or deals in general (like "what discounts can you find", "show me available deals", etc.), classify it as "ask" with high confidence and set question_type to "available_discounts" and is_general_inquiry to true.
+                - For specific discount searches (like "find me shoes on sale"), use "search" intent.
+                - For browsing categories or retailers, use "browse" intent.
+                - For comparing deals, use "compare" intent.
+                """
+            )
+
+            # Parse the response
+            try:
+                analysis = json.loads(response.text)
+                
+                # If it's a question about available discounts, ensure proper context
+                if (analysis["primary_intent"] == "ask" and 
+                    analysis["context"].get("question_type") == "available_discounts" and 
+                    analysis["context"].get("is_general_inquiry")):
+                    analysis["confidence"] = max(analysis["confidence"], 0.9)
+                
+                return analysis
+                
+            except json.JSONDecodeError:
+                # Fallback to basic analysis
+                if GREETING_PATTERNS.match(message_lower):
+                    time_based = any(phrase in message_lower for phrase in ['good morning', 'good afternoon', 'good evening', 'good day'])
+                    return {
+                        "primary_intent": "greeting",
+                        "confidence": 0.9,
+                        "context": {
+                            "greeting_type": "time_based" if time_based else "simple",
+                            "time_of_day": self._get_time_of_day() if time_based else None
+                        },
+                        "suggested_queries": [],
+                        "explanation": "Matches greeting pattern",
+                        "follow_up_questions": []
+                    }
+                return {
+                    "primary_intent": "search",
+                    "confidence": 0.5,
+                    "context": {},
+                    "suggested_queries": [message],
+                    "explanation": "Basic intent analysis",
+                    "follow_up_questions": []
+                }
+
+        except Exception as e:
+            geo_structured_logger.error(
+                geo_logger,
+                "Error in deep thinking analysis",
+                "intent_analysis",
+                error=str(e)
+            )
+            return {
+                "primary_intent": "search",
+                "confidence": 0.0,
+                "context": {},
+                "suggested_queries": [message],
+                "explanation": "Analysis failed",
+                "follow_up_questions": []
+            }
+
+    def _get_time_of_day(self) -> str:
+        """Get the current time of day for greeting context."""
+        hour = timezone.now().hour
+        if 5 <= hour < 12:
+            return "morning"
+        elif 12 <= hour < 17:
+            return "afternoon"
+        elif 17 <= hour < 22:
+            return "evening"
+        else:
+            return "night"
+
+    def _handle_greeting(self, message: ConversationMessage, conversation: Conversation) -> Dict:
+        """Handle greeting messages."""
+        try:
+            # Get greeting context
+            greeting_type = message.metadata.get('intent_analysis', {}).get('context', {}).get('greeting_type', 'simple')
+            time_of_day = message.metadata.get('intent_analysis', {}).get('context', {}).get('time_of_day')
+            
+            # Generate appropriate greeting response
+            if greeting_type == "time_based" and time_of_day:
+                greeting_prompt = f"""Generate a friendly {time_of_day} greeting response to: {message.content}
+                Include a brief mention of how I can help find discounts and deals.
+                Make it feel natural and time-appropriate."""
+            else:
+                greeting_prompt = f"""Generate a friendly greeting response to: {message.content}
+                Include a brief mention of how I can help find discounts and deals."""
+
+            response = self.gemini_client.generate_content(greeting_prompt)
+
+            # Create assistant message
+            assistant_message = ConversationMessage.objects.create(
+                conversation=conversation,
+                role=ConversationMessage.MessageRole.ASSISTANT,
+                content=response.text,
+                message_type=ConversationMessage.MessageType.CONVERSATION,
+                metadata={
+                    "greeting_type": greeting_type,
+                    "time_of_day": time_of_day
+                }
+            )
+
+            return {
+                "type": "greeting",
+                "message": response.text,
+                "message_id": str(assistant_message.id),
+                "conversation_id": str(conversation.id)
+            }
+
+        except Exception as e:
+            geo_structured_logger.error(
+                geo_logger,
+                "Error in greeting handling",
+                "greeting_handling",
+                error=str(e)
+            )
+            raise
+
+    def _is_inappropriate_content(self, message: str) -> bool:
+        """Check if the message contains inappropriate content.
+        
+        Args:
+            message: The message to check
+            
+        Returns:
+            bool: True if the message contains inappropriate content
+        """
+        try:
+            # Check for profanity
+            if profanity.contains_profanity(message):
+                return True
+            
+            # Check for aggressive or threatening language
+            aggressive_patterns = [
+                r'\b(kill|die|hate|stupid|dumb|idiot|fool)\b',
+                r'\b(threat|attack|hurt|harm)\b',
+                r'\b(racist|sexist|homophobic)\b',
+                r'\b(illegal|criminal|hack|steal)\b'
+            ]
+            
+            message_lower = message.lower()
+            for pattern in aggressive_patterns:
+                if re.search(pattern, message_lower):
+                    return True
+                
+            return False
+            
+        except Exception as e:
+            geo_structured_logger.error(
+                geo_logger,
+                "Error checking inappropriate content",
+                "content_check",
+                error=str(e)
+            )
+            # If there's an error in checking, err on the side of caution
+            return True
+
+    def _handle_inappropriate_content(self, message: ConversationMessage, conversation: Conversation) -> Dict:
+        """Handle messages containing inappropriate content."""
+        try:
+            # Create a polite but firm response
+            response = self.gemini_client.generate_content(
+                """Generate a professional response to inappropriate content that:
+                1. Maintains a professional tone
+                2. Politely but firmly indicates that such content is not acceptable
+                3. Redirects the conversation to the purpose of finding discounts and deals
+                4. Does not repeat or acknowledge the inappropriate content
+                """
+            )
+
+            # Create assistant message
+            assistant_message = ConversationMessage.objects.create(
+                conversation=conversation,
+                role=ConversationMessage.MessageRole.ASSISTANT,
+                content=response.text,
+                message_type=ConversationMessage.MessageType.CONVERSATION,
+                metadata={
+                    "is_inappropriate": True,
+                    "handled_at": timezone.now().isoformat()
+                }
+            )
+
+            return {
+                "type": "conversation",
+                "message": response.text,
+                "message_id": str(assistant_message.id),
+                "conversation_id": str(conversation.id)
+            }
+
+        except Exception as e:
+            geo_structured_logger.error(
+                geo_logger,
+                "Error handling inappropriate content",
+                "inappropriate_handling",
+                error=str(e)
+            )
+            # Fallback response if Gemini fails
+            return {
+                "type": "conversation",
+                "message": "I aim to maintain a professional and respectful environment. I'm here to help you find great deals and discounts. How can I assist you with that?",
+                "message_id": str(uuid.uuid4()),
+                "conversation_id": str(conversation.id)
+            }
+
     def _process_message(self, request: Request, conversation: Conversation) -> Dict:
         """Process incoming message and return appropriate response."""
         try:
@@ -365,13 +665,35 @@ class ConversationalDiscountView(APIView):
             if not message:
                 return {"error": "Message is required"}
 
-            # Create and save user message
+            # Check for inappropriate content first
+            if self._is_inappropriate_content(message):
+                # Create user message with inappropriate flag
+                user_message = ConversationMessage.objects.create(
+                    conversation=conversation,
+                    role=ConversationMessage.MessageRole.USER,
+                    content=message,
+                    message_type=ConversationMessage.MessageType.CONVERSATION,
+                    metadata={
+                        "is_inappropriate": True,
+                        "detected_at": timezone.now().isoformat()
+                    }
+                )
+                return self._handle_inappropriate_content(user_message, conversation)
+
+            # Perform deep thinking analysis
+            intent_analysis = self._deep_think_about_intent(message, conversation)
+            
+            # Create and save user message with intent analysis
             user_message = ConversationMessage.objects.create(
                 conversation=conversation,
                 role=ConversationMessage.MessageRole.USER,
                 content=message,
-                message_type=ConversationMessage.MessageType.SEARCH_QUERY if is_search_query(message) 
-                    else ConversationMessage.MessageType.CONVERSATION
+                message_type=ConversationMessage.MessageType.SEARCH_QUERY if intent_analysis["primary_intent"] == "search" 
+                    else ConversationMessage.MessageType.CONVERSATION,
+                metadata={
+                    "intent_analysis": intent_analysis,
+                    "confidence": intent_analysis["confidence"]
+                }
             )
 
             # Extract user preferences
@@ -388,18 +710,179 @@ class ConversationalDiscountView(APIView):
                 conversation
             )
 
-            # Handle general conversation
-            if not is_search_query(message):
+            # Handle based on analyzed intent
+            if intent_analysis["primary_intent"] == "greeting":
+                return self._handle_greeting(user_message, conversation)
+            elif intent_analysis["primary_intent"] == "ask":
+                # Check if it's a question about available discounts
+                if (intent_analysis["context"].get("question_type") == "available_discounts" and 
+                    intent_analysis["context"].get("is_general_inquiry")):
+                    return self._handle_question(user_message, conversation)
+                # For other types of questions
+                return self._handle_question(user_message, conversation)
+            elif intent_analysis["primary_intent"] == "search":
+                # If confidence is low, ask clarifying questions
+                if intent_analysis["confidence"] < 0.6 and intent_analysis["follow_up_questions"]:
+                    return self._handle_low_confidence_search(user_message, conversation, intent_analysis)
+                return self._handle_search_query(message, conversation.id, intent_analysis)
+            elif intent_analysis["primary_intent"] == "browse":
+                return self._handle_browse_request(user_message, conversation, intent_analysis)
+            elif intent_analysis["primary_intent"] == "compare":
+                return self._handle_compare_request(user_message, conversation, intent_analysis)
+            else:
                 return self._handle_general_conversation(user_message, conversation)
-
-            # Handle search query
-            return self._handle_search_query(message, conversation.id)
 
         except Exception as e:
             geo_structured_logger.error(
                 geo_logger,
                 "Error in message processing",
                 "message_processing",
+                error=str(e)
+            )
+            raise
+
+    def _handle_low_confidence_search(self, message: ConversationMessage, conversation: Conversation, intent_analysis: Dict) -> Dict:
+        """Handle search requests with low confidence by asking clarifying questions."""
+        try:
+            # Generate clarifying response
+            response = self.gemini_client.generate_content(
+                f"""Generate a friendly response to help clarify the user's search intent.
+                User message: {message.content}
+                Analysis: {json.dumps(intent_analysis, indent=2)}
+                
+                Include:
+                1. Acknowledge their request
+                2. Ask one of the follow-up questions: {intent_analysis['follow_up_questions']}
+                3. Suggest some of the suggested queries: {intent_analysis['suggested_queries']}
+                """
+            )
+
+            # Create assistant message
+            assistant_message = ConversationMessage.objects.create(
+                conversation=conversation,
+                role=ConversationMessage.MessageRole.ASSISTANT,
+                content=response.text,
+                message_type=ConversationMessage.MessageType.CONVERSATION,
+                metadata={
+                    "intent_analysis": intent_analysis,
+                    "is_clarifying": True
+                }
+            )
+
+            return {
+                "type": "clarification_needed",
+                "message": response.text,
+                "message_id": str(assistant_message.id),
+                "conversation_id": str(conversation.id),
+                "suggested_queries": intent_analysis["suggested_queries"],
+                "follow_up_questions": intent_analysis["follow_up_questions"]
+            }
+
+        except Exception as e:
+            geo_structured_logger.error(
+                geo_logger,
+                "Error in handling low confidence search",
+                "low_confidence_handling",
+                error=str(e)
+            )
+            raise
+
+    def _handle_question(self, message: ConversationMessage, conversation: Conversation) -> Dict:
+        """Handle question messages."""
+        try:
+            # Check if the question is about available discounts
+            if any(keyword in message.content.lower() for keyword in ['what discounts', 'available discounts', 'what deals', 'available deals']):
+                # Query active retailers and their categories
+                retailers = Retailer.objects.using('geodiscounts_db').filter(
+                    is_active=True
+                ).prefetch_related(
+                    'discounts__category'  # Use the correct relation through discounts
+                ).order_by('name')
+
+                if not retailers.exists():
+                    return {
+                        "type": "question",
+                        "message": "I apologize, but I don't have any active retailers in the system at the moment.",
+                        "message_id": str(message.id),
+                        "conversation_id": str(conversation.id)
+                    }
+
+                # Format retailer information
+                retailer_info = []
+                for retailer in retailers:
+                    # Get unique categories from retailer's discounts
+                    categories = set(
+                        disc.category.name 
+                        for disc in retailer.discounts.all() 
+                        if disc.category and disc.is_active and disc.valid_until > timezone.now()
+                    )
+                    retailer_info.append({
+                        'name': retailer.name,
+                        'categories': list(categories),
+                        'discount_count': retailer.discounts.filter(
+                            is_active=True,
+                            valid_until__gt=timezone.now()
+                        ).count()
+                    })
+
+                # Generate response using Gemini
+                response = self.gemini_client.generate_content(
+                    f"""Based on this retailer information, generate a helpful response about available discounts:
+                    {json.dumps(retailer_info, indent=2)}
+                    
+                    Include:
+                    1. Total number of retailers
+                    2. Mention some popular categories
+                    3. Suggest how the user can search for specific discounts
+                    """
+                )
+
+                # Create assistant message
+                assistant_message = ConversationMessage.objects.create(
+                    conversation=conversation,
+                    role=ConversationMessage.MessageRole.ASSISTANT,
+                    content=response.text,
+                    message_type=ConversationMessage.MessageType.CONVERSATION,
+                    metadata={
+                        'retailer_count': len(retailer_info),
+                        'total_discounts': sum(r['discount_count'] for r in retailer_info)
+                    }
+                )
+
+                return {
+                    "type": "question",
+                    "message": response.text,
+                    "message_id": str(assistant_message.id),
+                    "conversation_id": str(conversation.id),
+                    "retailers": retailer_info
+                }
+
+            # Handle other types of questions
+            response = self.gemini_client.generate_content(
+                f"""Answer this question about discounts and deals: {message.content}
+                If the question is about specific products or discounts, mention that I can search for them."""
+            )
+
+            # Create assistant message
+            assistant_message = ConversationMessage.objects.create(
+                conversation=conversation,
+                role=ConversationMessage.MessageRole.ASSISTANT,
+                content=response.text,
+                message_type=ConversationMessage.MessageType.CONVERSATION
+            )
+
+            return {
+                "type": "question",
+                "message": response.text,
+                "message_id": str(assistant_message.id),
+                "conversation_id": str(conversation.id)
+            }
+
+        except Exception as e:
+            geo_structured_logger.error(
+                geo_logger,
+                "Error in question handling",
+                "question_handling",
                 error=str(e)
             )
             raise
@@ -436,7 +919,7 @@ class ConversationalDiscountView(APIView):
             )
             raise
 
-    def _handle_search_query(self, message: str, conversation_id: str) -> Dict[str, Any]:
+    def _handle_search_query(self, message: str, conversation_id: str, intent_analysis: Dict) -> Dict[str, Any]:
         """Handle a search query message."""
         try:
             geo_structured_logger.info(
@@ -495,7 +978,8 @@ class ConversationalDiscountView(APIView):
                 'type': 'search_results',
                 'results': results.get('results', []),
                 'context': results.get('context', {}),
-                'message': "Here are the search results I found:"
+                'message': "Here are the search results I found:",
+                'intent_analysis': intent_analysis
             }
             
         except Exception as e:
@@ -511,7 +995,8 @@ class ConversationalDiscountView(APIView):
             )
             return {
                 'type': 'error',
-                'message': "I encountered an error while searching. Please try again."
+                'message': "I encountered an error while searching. Please try again.",
+                'intent_analysis': intent_analysis
             }
 
     def get(self, request: Request, conversation_id: str = None) -> Response:
@@ -716,54 +1201,91 @@ class ConversationalDiscountView(APIView):
             raise
 
     def _handle_no_results(self, message: ConversationMessage, conversation: Conversation, search_request: SearchRequest, query_analysis: Dict) -> Dict:
-        """Handle no results with bilingual support."""
+        """Handle no results with helpful guidance."""
         try:
-            language = self._detect_language(message.content)
-            components = query_analysis['components']
-            
-            # Format messages in both languages
-            if components['retailer']:
-                message_en = f"I found some deals from {components['retailer']}"
-                message_de = f"Ich habe einige Angebote von {components['retailer']} gefunden"
+            # Get available categories and retailers
+            categories = Category.objects.using('geodiscounts_db').filter(
+                is_active=True
+            ).order_by('name')[:5]  # Get top 5 categories
+
+            retailers = Retailer.objects.using('geodiscounts_db').filter(
+                is_active=True
+            ).order_by('name')[:5]  # Get top 5 retailers
+
+            # Get popular discounts for suggestions
+            popular_discounts = Discount.objects.using('geodiscounts_db').filter(
+                is_active=True,
+                valid_until__gt=timezone.now()
+            ).order_by('-discount_percentage')[:3]
+
+            # Prepare suggestion data
+            suggestion_data = {
+                'categories': [cat.name for cat in categories],
+                'retailers': [ret.name for ret in retailers],
+                'popular_discounts': [
+                    {
+                        'description': disc.description,  # Use description instead of name
+                        'retailer': disc.retailer.name,
+                        'discount': f"{disc.discount_percentage}% off" if disc.discount_percentage else f"${disc.discount_value} off"
+                    }
+                    for disc in popular_discounts
+                ],
+                'query': message.content
+            }
+
+            # Generate helpful response using Gemini
+            response = self.gemini_client.generate_content(
+                f"""The user searched for: {message.content}
+                No results were found. Generate a helpful response that:
+                1. Acknowledges no results were found
+                2. Suggests some available categories: {suggestion_data['categories']}
+                3. Mentions some retailers we have: {suggestion_data['retailers']}
+                4. Shows some current popular deals: {suggestion_data['popular_discounts']}
+                5. Provides guidance on how to refine their search
                 
-                if components.get('category'):
-                    message_en += f" in the {components['category']} category"
-                    message_de += f" in der Kategorie {components['category']}"
-                
-                message_en += ". Would you like to see these?"
-                message_de += ". Möchten Sie diese sehen?"
-            else:
-                message_en = "I found some general deals. Would you like to see these?"
-                message_de = "Ich habe einige allgemeine Angebote gefunden. Möchten Sie diese sehen?"
+                Make the response friendly and encouraging, suggesting they try searching by:
+                - Specific product names
+                - Categories
+                - Retailers
+                - Price ranges
+                """
+            )
 
             # Create assistant message
             assistant_message = ConversationMessage.objects.create(
                 conversation=conversation,
                 role=ConversationMessage.MessageRole.ASSISTANT,
-                content=message_en,
+                content=response.text,
                 message_type=ConversationMessage.MessageType.SEARCH_RESULTS,
                 metadata={
                     'search_id': str(search_request.id),
-                    'message_de': message_de,
-                    'detected_language': language
+                    'suggestions': suggestion_data,
+                    'is_no_results': True
                 },
                 search_request=search_request
             )
 
             return {
                 "type": "search_results",
-                "message": message_en,
-                "message_de": message_de,
+                "message": response.text,
                 "message_id": str(assistant_message.id),
                 "conversation_id": str(conversation.id),
-                "results": [],
+                "suggestions": {
+                    "categories": suggestion_data['categories'],
+                    "retailers": suggestion_data['retailers'],
+                    "popular_deals": suggestion_data['popular_discounts']
+                },
                 "search_id": str(search_request.id),
-                "detected_language": language,
-                "is_fallback": True
+                "is_no_results": True
             }
 
         except Exception as e:
-            geo_structured_logger.error(geo_logger, "Error in handling no results", "no_results_handling", e)
+            geo_structured_logger.error(
+                geo_logger,
+                "Error in handling no results",
+                "no_results_handling",
+                error=str(e)
+            )
             raise
 
     @swagger_auto_schema(

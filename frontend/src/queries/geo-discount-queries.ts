@@ -13,12 +13,7 @@ export const discountApiQuery = () => {
     queryKey: ["discountApi"],
     queryFn: async () => {
       const response = await aiSearchApi({
-        query: "Show me all available discounts",
-        latitude: 0,
-        longitude: 0,
-        radius: 50, // Use a large radius to get all discounts
-        maxRadius: 50,
-        maxRetries: 1
+        message: "Show me all available discounts"
       });
       return response.results;
     },
@@ -71,12 +66,7 @@ export const specificRetailerQuery = (id: string) => {
 /**
  * Custom hook to perform AI-powered discount search
  * @param {Object} params - Search parameters
- * @param {string} params.query - The search query
- * @param {number} params.latitude - User's latitude
- * @param {number} params.longitude - User's longitude
- * @param {number} params.radius - Initial search radius in kilometers
- * @param {number} params.maxRadius - Maximum search radius in kilometers
- * @param {number} params.maxRetries - Maximum number of retry attempts
+ * @param {string} params.message - The search message
  * @returns {UseMutationResult} Mutation result containing search results
  * @throws {Error} If search fails
  * @example
@@ -85,12 +75,7 @@ export const specificRetailerQuery = (id: string) => {
 export const useAiSearch = () => {
   return useMutation({
     mutationFn: async (params: {
-      query: string;
-      latitude: number;
-      longitude: number;
-      radius?: number;
-      maxRadius?: number;
-      maxRetries?: number;
+      message: string;
     }) => await aiSearchApi(params),
   });
 };

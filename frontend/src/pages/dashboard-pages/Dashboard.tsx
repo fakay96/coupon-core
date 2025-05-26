@@ -6,17 +6,7 @@ import { categoriesT } from "@/types";
 import { useState } from "react";
 import { BsFillSendFill } from "react-icons/bs";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "@/context/authContext";
 import { toast } from "sonner";
-
-interface UserLocation {
-  latitude: number;
-  longitude: number;
-}
-
-interface UserT extends UserLocation {
-  id: string;
-}
 
 const DashboardPage = () => {
   return (
@@ -71,9 +61,7 @@ export default DashboardPage;
 export const SearchInputAndCategory = () => {
   const navigate = useNavigate();
   const { data: categories } = categoriesApiQuery();
-  const { user } = useAuth() as { user: UserT | null };
   const { mutateAsync: search, isPending } = useAiSearch();
-
   const [value, setValue] = useState("");
 
   const handleSearch = async () => {
@@ -81,20 +69,14 @@ export const SearchInputAndCategory = () => {
 
     try {
       const response = await search({
-        query: value,
-        latitude: user?.latitude ?? 0,
-        longitude: user?.longitude ?? 0,
-        radius: 5, // Start with a 5km radius
-        maxRadius: 50, // Expand up to 50km if needed
-        maxRetries: 3
+        message: value
       });
 
       // Navigate to results page with the search results
       navigate(`/dashboard/discount?discount=${encodeURIComponent(value)}`, {
         state: { 
-          results: response.results,
+          searchResults: response.results,
           message: response.message,
-          searchRadius: response.searchRadius,
           attempts: response.attempts
         }
       });

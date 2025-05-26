@@ -1,7 +1,8 @@
-import axios from "axios";
+import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import Cookies from "js-cookie";
 import { tokenRefresh } from "@/api/authApi";
 import { queryClient } from "@/providers/queryclientProvider";
+import { toast } from "sonner";
 
 // Base URL for the API
 const apiUrl = import.meta.env.VITE_API_URL;
@@ -11,9 +12,23 @@ const api = axios.create({
   baseURL: apiUrl,
 });
 
+// Queue for storing requests that need to be retried after token refresh
+let refreshSubscribers: ((token: string) => void)[] = [];
+
+// Function to execute all queued requests with the new token
+const onRefreshed = (token: string) => {
+  refreshSubscribers.forEach((callback) => callback(token));
+  refreshSubscribers = [];
+};
+
+// Function to add a request to the queue
+const addRefreshSubscriber = (callback: (token: string) => void) => {
+  refreshSubscribers.push(callback);
+};
+
 // Request interceptor to add the Authorization header with the access token
 api.interceptors.request.use(
-  (config) => {
+  (config: InternalAxiosRequestConfig) => {
     const accessToken = Cookies.get("access");
     if (accessToken) {
       config.headers.Authorization = `Bearer ${accessToken}`;
@@ -21,11 +36,17 @@ api.interceptors.request.use(
     return config;
   },
   (error) => {
-    return Promise.reject(error.response);
+    return Promise.reject(error);
   }
 );
 
 let isRefreshing = false;
+
+// Define error response type
+interface ErrorResponse {
+  message: string;
+  [key: string]: any;
+}
 
 // Response interceptor to handle token refresh and error responses
 api.interceptors.response.use(
@@ -41,15 +62,27 @@ api.interceptors.response.use(
     }
     return response;
   },
-  async (error) => {
-    const originalRequest = error.config;
+  async (error: AxiosError<ErrorResponse>) => {
+    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
     // If the response status is 401 (Unauthorized) and the request has not been retried yet
     if (error?.response?.status === 401 && !originalRequest._retry) {
       const refresh = Cookies.get("refresh");
+      
+      // If no refresh token or already refreshing, reject
       if (!refresh || isRefreshing) {
+        // If already refreshing, queue this request
+        if (isRefreshing) {
+          return new Promise((resolve) => {
+            addRefreshSubscriber((token: string) => {
+              originalRequest.headers.Authorization = `Bearer ${token}`;
+              resolve(api(originalRequest));
+            });
+          });
+        }
         return Promise.reject(error);
       }
+
       originalRequest._retry = true;
       isRefreshing = true;
 
@@ -67,21 +100,33 @@ api.interceptors.response.use(
             path: "/",
           });
           queryClient.invalidateQueries({ queryKey: ["userInfo"] });
-          originalRequest.headers[
-            "Authorization"
-          ] = `Bearer ${response?.data?.access}`;
+          
+          // Execute all queued requests with the new token
+          onRefreshed(response.data.access);
+          
+          // Retry the original request
+          originalRequest.headers.Authorization = `Bearer ${response.data.access}`;
           return api(originalRequest);
         }
       } catch (refreshError) {
-        // If the token refresh fails, clear the cookies and log a warning
+        // If the token refresh fails, clear the cookies and notify user
         Cookies.remove("access", { path: "/" });
         Cookies.remove("refresh", { path: "/" });
-        console.warn("Token refresh failed, clearing up now. Try again.");
+        toast.error("Your session has expired. Please log in again.");
+        
+        // Redirect to login page if not already there
+        if (!window.location.pathname.includes('/auth')) {
+          window.location.href = '/auth/login';
+        }
       } finally {
         isRefreshing = false;
       }
     }
-    // Return the error response with additional error information
+
+    // Handle other errors
+    const errorMessage = error.response?.data?.message || error.message || 'An error occurred';
+    toast.error(errorMessage);
+
     return Promise.reject(error.response);
   }
 );
