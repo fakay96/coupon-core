@@ -393,29 +393,15 @@ class ConversationalDiscountView(APIView):
     def _handle_search_query(self, message: ConversationMessage, conversation: Conversation, context: Dict) -> Dict:
         """Handle search-related queries."""
         try:
-            # Get user location
-            lat = message.conversation.last_location.y if message.conversation.last_location else None
-            lon = message.conversation.last_location.x if message.conversation.last_location else None
-            radius = message.conversation.last_radius or 5000
-
-            if not lat or not lon:
-                return {
-                    "type": "error",
-                    "message": "Location information is required for search. Please share your location.",
-                    "conversation_id": str(conversation.id)
-                }
-
             # Enhance search query
             enhanced = self.gemini_client.generate_content(
                 f"Enhance this search query: {message.content}"
             )
 
-            # Create search request
+            # Create search request without location
             search_request = SearchRequest.objects.create(
                 conversation=conversation,
                 query=enhanced.text,
-                location=Point(lon, lat),
-                radius=radius,
                 search_context={
                     **context,
                     'enhanced_query': enhanced.text,

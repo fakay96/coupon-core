@@ -534,12 +534,10 @@ class EnhancedSearchService:
         Analyze search query using Gemini to extract detailed context.
         
         Returns a dictionary with:
-        - location_required: bool
         - category: str
         - price_range: Dict[str, float]
         - brand_preferences: List[str]
         - search_type: str
-        - search_radius: float
         - attributes: List[str]
         """
         try:
@@ -550,18 +548,15 @@ class EnhancedSearchService:
                 Query: "{query}"
                 
                 Return a JSON object with:
-                - location_required: boolean (whether location is needed)
                 - category: string (main category)
                 - price_range: {{"min": float, "max": float}} or null
                 - brand_preferences: string[] (brand names)
-                - search_type: string (general/specific/category/location)
-                - search_radius: float (in km) or null
+                - search_type: string (general/specific/category)
                 - attributes: string[] (features like color, size)
                 """,
                 response_schema={
                     'type': 'OBJECT',
                     'properties': {
-                        'location_required': {'type': 'BOOLEAN'},
                         'category': {'type': 'STRING'},
                         'price_range': {
                             'type': ['OBJECT', 'NULL'],
@@ -576,17 +571,14 @@ class EnhancedSearchService:
                         },
                         'search_type': {
                             'type': 'STRING',
-                            'enum': ['general', 'specific', 'category', 'location']
-                        },
-                        'search_radius': {
-                            'type': ['NUMBER', 'NULL']
+                            'enum': ['general', 'specific', 'category']
                         },
                         'attributes': {
                             'type': 'ARRAY',
                             'items': {'type': 'STRING'}
                         }
                     },
-                    'required': ['location_required', 'category', 'search_type']
+                    'required': ['category', 'search_type']
                 }
             )
             
@@ -615,8 +607,6 @@ class EnhancedSearchService:
                 confidence_score=confidence,
                 is_ambiguous=confidence < 0.7,
                 price_range=context.get('price_range'),
-                location_required=context['location_required'],
-                search_radius=context.get('search_radius'),
                 brand_preferences=context.get('brand_preferences', []),
                 attributes=context.get('attributes', []),
                 search_type=context['search_type'],
@@ -653,8 +643,6 @@ class EnhancedSearchService:
             strategies.extend(['semantic_search', 'basic_text'])
         elif context['search_type'] == 'category':
             strategies.extend(['category_only', 'related_categories'])
-        elif context['search_type'] == 'location':
-            strategies.extend(['location_only', 'basic_text'])
             
         if context.get('brand_preferences'):
             strategies.append('brand_filter')
@@ -693,8 +681,6 @@ class EnhancedSearchService:
                     results = self._basic_text_search(req)
                 elif strategy == 'category_only':
                     results = self._category_only_search(req)
-                elif strategy == 'location_only' and req.location:
-                    results = self._location_only_search(req)
                 elif strategy == 'semantic_search':
                     results = self._find_similar_by_embedding(req.query, [], threshold=0.6)
                 elif strategy == 'related_categories':
@@ -744,14 +730,8 @@ class EnhancedSearchService:
         if error_type == 'TimeoutError':
             suggestions.extend([
                 "Try a more specific search",
-                "Narrow down your location",
-                "Specify a category"
-            ])
-        elif error_type == 'LocationError':
-            suggestions.extend([
-                "Please provide your location",
-                "Try searching without location",
-                "Specify a smaller search radius"
+                "Specify a category",
+                "Try a different search term"
             ])
         elif error_type == 'CategoryError':
             suggestions.extend([
@@ -820,20 +800,6 @@ class EnhancedSearchService:
             geo_structured_logger.error(geo_logger, "Category search error", "search_service", e)
             return []
 
-    def _location_only_search(self, req: SearchRequest) -> List[Dict]:
-        """Search only by location."""
-        try:
-            qs = Discount.objects.using('geodiscounts_db').filter(
-                is_active=True,
-                valid_until__gt=timezone.now(),
-                location__distance_lte=(req.location, Distance(m=req.radius))
-            ).order_by('-created_at')
-            
-            return [self._serialize(d) for d in qs[:5]]
-        except Exception as e:
-            geo_structured_logger.error(geo_logger, "Location search error", "search_service", e)
-            return []
-
     def _find_similar_by_embedding(self, query: str, results: List[Dict], threshold: float = 0.7) -> List[Dict]:
         """Find similar discounts using embedding similarity."""
         try:
@@ -870,10 +836,6 @@ class EnhancedSearchService:
             'discount_value': float(discount.discount_value) if discount.discount_value else None,
             'discount_percentage': float(discount.discount_percentage) if discount.discount_percentage else None,
             'embedding': discount.embedding,
-            'location': {
-                'lat': discount.location.y,
-                'lng': discount.location.x
-            } if discount.location else None,
             'brand': discount.brand,
             'valid_until': discount.valid_until.isoformat() if discount.valid_until else None,
             'store_name': discount.store_name,
