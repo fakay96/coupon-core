@@ -18,18 +18,6 @@ interface UserT extends UserLocation {
   id: string;
 }
 
-interface SearchResult {
-  id: string;
-  title: string;
-  description: string;
-  original_price: number;
-  discounted_price: number;
-  retailer: {
-    name: string;
-    location: string;
-  };
-}
-
 const DashboardPage = () => {
   return (
     <div className="">

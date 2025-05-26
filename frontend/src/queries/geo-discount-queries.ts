@@ -1,4 +1,4 @@
-import { categoriesApi, discountApi, nearbyApi, specificRetailerApi, aiSearchApi, refineSearchApi } from "@/api/geoDiscountApi";
+import { categoriesApi, nearbyApi, specificRetailerApi, aiSearchApi, refineSearchApi } from "@/api/geoDiscountApi";
 import { useQuery, useMutation } from "@tanstack/react-query";
 
 /**
