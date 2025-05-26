@@ -6,14 +6,36 @@ import { toast } from 'sonner';
 import { useAuth } from '@/context/authContext';
 import { SearchResults } from './SearchResults';
 
+interface SearchResult {
+  id: string;
+  title: string;
+  description: string;
+  original_price: number;
+  discounted_price: number;
+  retailer: {
+    name: string;
+    location: string;
+  };
+}
+
 interface Message {
   id: string;
   content: string;
   role: 'user' | 'assistant';
   timestamp: Date;
   hasResults?: boolean;
-  results?: any[];
+  results?: SearchResult[];
   conversation_id?: string;
+}
+
+interface UserLocation {
+  latitude: number;
+  longitude: number;
+}
+
+interface UserT extends UserLocation {
+  id: string;
+  // Add other user fields as needed
 }
 
 export const ChatInterface: React.FC = () => {
@@ -21,7 +43,7 @@ export const ChatInterface: React.FC = () => {
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { user } = useAuth();
+  const { user } = useAuth() as { user: UserT | null };
   const { mutateAsync: search } = useAiSearch();
   const { mutateAsync: refineSearch } = useRefineSearch();
 
@@ -40,7 +62,7 @@ export const ChatInterface: React.FC = () => {
     
     // Extract filters from previous results
     const filters = messages
-      .filter(m => m.role === 'assistant' && m.results?.length > 0)
+      .filter(m => m.role === 'assistant' && Array.isArray(m.results) && m.results.length > 0)
       .reduce((acc, message) => {
         const result = message.results?.[0];
         if (result) {
@@ -49,7 +71,7 @@ export const ChatInterface: React.FC = () => {
               min: Math.min(acc.price_range?.min || Infinity, result.original_price),
               max: Math.max(acc.price_range?.max || 0, result.original_price)
             },
-            categories: [...new Set([...(acc.categories || []), result.category])]
+            retailers: [...new Set([...(acc.retailers || []), result.retailer.name])]
           };
         }
         return acc;
@@ -91,8 +113,8 @@ export const ChatInterface: React.FC = () => {
         // New search
         response = await search({
           query: input,
-          latitude: user?.latitude || 0,
-          longitude: user?.longitude || 0,
+          latitude: user?.latitude ?? 0,
+          longitude: user?.longitude ?? 0,
         });
       }
 
@@ -101,7 +123,7 @@ export const ChatInterface: React.FC = () => {
         content: response.message || 'I found some results for you!',
         role: 'assistant',
         timestamp: new Date(),
-        hasResults: response.results?.length > 0,
+        hasResults: Array.isArray(response.results) && response.results.length > 0,
         results: response.results,
         conversation_id: response.conversation_id
       };

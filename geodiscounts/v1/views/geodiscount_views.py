@@ -62,6 +62,7 @@ from django.utils import timezone
 import logging
 from django.db.models import Prefetch
 
+
 # Module-level singleton for Gemini client
 _gemini_client = None
 
@@ -822,83 +823,102 @@ class ConversationalDiscountView(APIView):
         }
     )
     def refine_search(self, request):
-        """
-        Refine search based on conversation context.
-        
-        Args:
-            request: The HTTP request containing:
-                - conversation_id: ID of the conversation to refine
-                - query: New search query
-                - context: Optional context including previous queries and filters
-                
-        Returns:
-            Response containing:
-                - results: List of matching discounts
-                - conversation_id: ID of the conversation
-                - message: Natural language response
-        """
+        """Refine search based on conversation context."""
         try:
+            # Validate required parameters
             conversation_id = request.data.get('conversation_id')
             query = request.data.get('query')
-            context = request.data.get('context', {})
-            
             if not conversation_id or not query:
                 return Response(
                     {'error': 'conversation_id and query are required'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-            
-            # Get the active conversation
-            try:
-                conversation = Conversation.objects.get(
-                    id=conversation_id,
-                    user=request.user,
-                    status='active'
-                )
-            except Conversation.DoesNotExist:
+
+            # Get conversation using conversation service
+            conversation = self._safe_service_call(
+                'conversation_service',
+                'get_conversation',
+                conversation_id=conversation_id,
+                user=request.user
+            )
+            if not conversation:
                 return Response(
                     {'error': 'Conversation not found'},
                     status=status.HTTP_404_NOT_FOUND
                 )
-            
-            # Create search request with context
-            search_request = self._create_search_request(
-                query=query,
-                user=request.user,
-                context=context
-            )
-            
-            # Process the search request
-            results = self._process_search_request(search_request)
-            
-            # Generate response message
-            response_message = self._generate_response(results)
-            
-            # Update conversation with new message
-            ConversationMessage.objects.create(
+
+            # Create user message and extract preferences
+            user_message = ConversationMessage.objects.create(
                 conversation=conversation,
+                role=ConversationMessage.MessageRole.USER,
                 content=query,
-                role='user'
+                message_type=ConversationMessage.MessageType.SEARCH_QUERY
             )
-            
-            ConversationMessage.objects.create(
+            self._safe_service_call(
+                'conversation_service',
+                'extract_user_preferences',
+                user_message
+            )
+
+            # Get enhanced context
+            enhanced_context = self._safe_service_call(
+                'conversation_service',
+                'get_conversation_context',
+                conversation
+            )
+            if request.data.get('context'):
+                enhanced_context.update(request.data['context'])
+
+            # Create and process search request
+            search_request = SearchRequest.objects.create(
+                query=query,
                 conversation=conversation,
-                content=response_message,
-                role='assistant',
-                results=results if results else None
+                user=request.user,
+                location=Point(0, 0),
+                radius=5000,
+                status='pending'
             )
-            
+
+            # Perform search using search service
+            search_results = self._safe_service_call(
+                'search_service',
+                'search',
+                query=query,
+                context=enhanced_context,
+                search_request=search_request
+            )
+
+            # Create assistant message
+            assistant_message = ConversationMessage.objects.create(
+                conversation=conversation,
+                role=ConversationMessage.MessageRole.ASSISTANT,
+                content=search_results.get('message', 'Here are the results I found:'),
+                message_type=ConversationMessage.MessageType.SEARCH_RESULTS,
+                metadata={
+                    'search_id': str(search_request.id),
+                    'results_count': len(search_results.get('results', []))
+                },
+                search_request=search_request
+            )
+
+            # Update search request status
+            search_request.status = 'completed'
+            search_request.save()
+
             return Response({
-                'results': results,
-                'conversation_id': conversation.id,
-                'message': response_message
+                'results': search_results.get('results', []),
+                'conversation_id': str(conversation.id),
+                'message': search_results.get('message', 'Here are the results I found:'),
+                'message_id': str(assistant_message.id)
             })
-            
+
         except Exception as e:
-            logger.error(
+            geo_structured_logger.error(
+                geo_logger,
                 "Error in refine_search",
-                extra={
-                    'error': str(e),
+                "search_refinement",
+                error=str(e),
+                context={
                     'conversation_id': request.data.get('conversation_id'),
                     'query': request.data.get('query')
                 }
@@ -907,94 +927,3 @@ class ConversationalDiscountView(APIView):
                 {'error': 'An error occurred while processing your request'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-    
-    def _create_search_request(self, query: str, user: User, context: Dict = None) -> SearchRequest:
-        """
-        Create a search request with context.
-        
-        Args:
-            query: The search query
-            user: The user making the request
-            context: Optional context including previous queries and filters
-            
-        Returns:
-            SearchRequest object
-        """
-        # Get user location
-        location = self._get_user_location(user)
-        
-        # Create base request
-        request = SearchRequest(
-            query=query,
-            location=location,
-            user=user
-        )
-        
-        # Add context if provided
-        if context:
-            if 'previous_queries' in context:
-                request.previous_queries = context['previous_queries']
-            
-            if 'filters' in context:
-                filters = context['filters']
-                if 'price_range' in filters:
-                    request.min_price = filters['price_range'].get('min')
-                    request.max_price = filters['price_range'].get('max')
-                if 'categories' in filters:
-                    request.categories = filters['categories']
-                if 'distance' in filters:
-                    request.radius = filters['distance']
-        
-        return request
-    
-    def _generate_response(self, results: List[Dict]) -> str:
-        """
-        Generate a natural language response based on search results.
-        
-        Args:
-            results: List of search results
-            
-        Returns:
-            str: Natural language response
-        """
-        if not results:
-            return "I couldn't find any discounts matching your criteria. Would you like to try a different search?"
-        
-        count = len(results)
-        if count == 1:
-            return f"I found 1 discount that matches your search. Here it is!"
-        else:
-            return f"I found {count} discounts that match your search. Here they are!"
-    
-    def _format_results(self, results: List[Dict]) -> List[Dict]:
-        """
-        Format search results for the response.
-        
-        Args:
-            results: List of raw search results
-            
-        Returns:
-            List of formatted results
-        """
-        formatted_results = []
-        for result in results:
-            formatted_result = {
-                'id': result.id,
-                'title': result.title or result.description,
-                'description': result.description,
-                'retailer': {
-                    'name': result.retailer.name,
-                    'location': {
-                        'latitude': result.retailer.location.y if result.retailer.location else None,
-                        'longitude': result.retailer.location.x if result.retailer.location else None
-                    }
-                },
-                'discount': {
-                    'value': float(result.discount_value),
-                    'percentage': float(result.discount_percentage) if result.discount_percentage else None
-                },
-                'valid_until': result.expiration_date.isoformat() if result.expiration_date else None
-            }
-            formatted_results.append(formatted_result)
-        
-        return formatted_results

@@ -1,11 +1,34 @@
 import SearchInputNavbar from "@/components/globals/searchInputNavbar";
 import { Button } from "@/components/ui/button";
 import { imgGrid } from "@/constants";
-import { categoriesApiQuery } from "@/queries/geo-discount-queries";
+import { categoriesApiQuery, useAiSearch } from "@/queries/geo-discount-queries";
 import { categoriesT } from "@/types";
 import { useState } from "react";
 import { BsFillSendFill } from "react-icons/bs";
 import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/context/authContext";
+import { toast } from "sonner";
+
+interface UserLocation {
+  latitude: number;
+  longitude: number;
+}
+
+interface UserT extends UserLocation {
+  id: string;
+}
+
+interface SearchResult {
+  id: string;
+  title: string;
+  description: string;
+  original_price: number;
+  discounted_price: number;
+  retailer: {
+    name: string;
+    location: string;
+  };
+}
 
 const DashboardPage = () => {
   return (
@@ -60,8 +83,37 @@ export default DashboardPage;
 export const SearchInputAndCategory = () => {
   const navigate = useNavigate();
   const { data: categories } = categoriesApiQuery();
+  const { user } = useAuth() as { user: UserT | null };
+  const { mutateAsync: search, isPending } = useAiSearch();
 
   const [value, setValue] = useState("");
+
+  const handleSearch = async () => {
+    if (!value.trim()) return;
+
+    try {
+      const response = await search({
+        query: value,
+        latitude: user?.latitude ?? 0,
+        longitude: user?.longitude ?? 0,
+        radius: 5, // Start with a 5km radius
+        maxRadius: 50, // Expand up to 50km if needed
+        maxRetries: 3
+      });
+
+      // Navigate to results page with the search results
+      navigate(`/dashboard/discount?discount=${encodeURIComponent(value)}`, {
+        state: { 
+          results: response.results,
+          message: response.message,
+          searchRadius: response.searchRadius,
+          attempts: response.attempts
+        }
+      });
+    } catch (error) {
+      toast.error('Failed to search for discounts. Please try again.');
+    }
+  };
 
   return (
     <div className="max-sm:mt-2 space-y-4 sm:space-y-8">
@@ -76,19 +128,20 @@ export const SearchInputAndCategory = () => {
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
-              navigate(`/dashboard/discount?discount=${value}`);
+              handleSearch();
             }
           }}
           placeholder="Deals Near Me"
           className="bg-transparent w-full outline-none focus:outline-none max-sm:text-[12px]"
         />
         <Button
-          onClick={() => {
-            navigate(`/dashboard/discount?discount=${value}`);
-          }}
+          onClick={handleSearch}
+          disabled={isPending || !value.trim()}
           className="ml-auto rounded-full py-0 p-1.5 h-auto sm:h-11 sm:-mr-1.5 sm:p-4 bg-vividOrange"
         >
-          <span className="hidden sm:flex">Find Deals </span>{" "}
+          <span className="hidden sm:flex">
+            {isPending ? 'Searching...' : 'Find Deals'}
+          </span>
           <BsFillSendFill className="!size-3 sm:size-4" />
         </Button>
       </div>

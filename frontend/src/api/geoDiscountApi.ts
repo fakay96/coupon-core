@@ -153,3 +153,41 @@ export const specificRetailerApi = async (id: string) => {
     throw error;
   }
 };
+
+/**
+ * Refines search based on conversation context
+ * @param {Object} params - Refinement parameters
+ * @param {string} params.conversation_id - The conversation ID to refine
+ * @param {string} params.query - The refinement query
+ * @param {Object} params.context - Optional context for refinement
+ * @param {string[]} params.context.previous_queries - Previous search queries
+ * @param {Object} params.context.filters - Optional filters to apply
+ * @param {Object} params.context.filters.price_range - Price range filter
+ * @param {string[]} params.context.filters.categories - Category filters
+ * @param {number} params.context.filters.distance - Distance filter
+ * @returns Promise containing refined search results
+ * @throws {ApiError} Backend API error response
+ */
+export const refineSearchApi = async (params: {
+  conversation_id: string;
+  query: string;
+  context?: {
+    previous_queries?: string[];
+    filters?: {
+      price_range?: { min: number; max: number };
+      categories?: string[];
+      distance?: number;
+    };
+  };
+}) => {
+  try {
+    const response = await axiosInstance.post("/api/geodiscounts/v1/discounts/refine/", params);
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response?.data) {
+      console.error('Refine Search API Error:', error.response.data);
+      throw error.response.data;
+    }
+    throw error;
+  }
+};

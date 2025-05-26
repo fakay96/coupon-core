@@ -2,7 +2,7 @@ import { categoriesApi, discountApi, nearbyApi, specificRetailerApi, aiSearchApi
 import { useQuery, useMutation } from "@tanstack/react-query";
 
 /**
- * Custom hook to fetch all available discounts
+ * Custom hook to fetch all available discounts using AI search
  * @returns {UseQueryResult} Query result containing all discount data
  * @throws {Error} If discount fetch fails
  * @example
@@ -11,7 +11,17 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 export const discountApiQuery = () => {
   return useQuery({
     queryKey: ["discountApi"],
-    queryFn: async () => await discountApi(),
+    queryFn: async () => {
+      const response = await aiSearchApi({
+        query: "Show me all available discounts",
+        latitude: 0,
+        longitude: 0,
+        radius: 50, // Use a large radius to get all discounts
+        maxRadius: 50,
+        maxRetries: 1
+      });
+      return response.results;
+    },
   });
 };
 
