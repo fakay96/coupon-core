@@ -27,25 +27,27 @@ const DiscountPage = () => {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const discount = searchParams.get("discount");
-  const { data: allDiscounts } = discountApiQuery();
+  const { data: allDiscounts, isLoading } = discountApiQuery();
   const { mutate: search, data: searchData, isPending: isSearching } = useAiSearch();
 
   // Get search results from location state or search data
-  const searchResults = location.state?.searchResults || searchData?.results || [];
+  const searchResults = useMemo(() => {
+    const results = location.state?.searchResults || searchData?.results;
+    return Array.isArray(results) ? results : [];
+  }, [location.state?.searchResults, searchData?.results]);
+
   const searchMessage = location.state?.message || searchData?.message;
 
   // Filter discounts based on search results or all discounts
   const filteredDiscounts = useMemo(() => {
-    if (Array.isArray(searchResults) && searchResults.length > 0) {
-      // If we have AI search results, use those
+    if (searchResults.length > 0) {
       return searchResults;
     } else if (discount) {
-      // If we have a specific discount query, filter all discounts
-      return Array.isArray(allDiscounts) ? allDiscounts.filter((item: DiscountItemT) =>
+      const discounts = Array.isArray(allDiscounts) ? allDiscounts : [];
+      return discounts.filter((item: DiscountItemT) =>
         item.title.toLowerCase().includes(discount.toLowerCase())
-      ) : [];
+      );
     }
-    // Otherwise show all discounts
     return Array.isArray(allDiscounts) ? allDiscounts : [];
   }, [searchResults, discount, allDiscounts]);
 
@@ -55,6 +57,14 @@ const DiscountPage = () => {
       search({ message: location.state.query });
     }
   }, [location.state?.query, search, searchData]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-vividOrange"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="">
@@ -84,15 +94,15 @@ const DiscountPage = () => {
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full max-w-screen-xl">
-                {filteredDiscounts.map((item: any) => (
+                {Array.isArray(filteredDiscounts) && filteredDiscounts.map((item: any) => (
                   <div
-                    key={item.id}
+                    key={item.id || Math.random().toString()}
                     className="bg-white rounded-lg shadow-md overflow-hidden"
                   >
                     <div className="relative">
                       <img
                         src={item.image_url || "/images/placeholder.png"}
-                        alt={item.name}
+                        alt={item.name || "Product"}
                         className="w-full h-48 object-cover"
                       />
                       <div className="absolute top-2 right-2">
@@ -103,11 +113,11 @@ const DiscountPage = () => {
                       <div className="flex items-center gap-2 mb-2">
                         <IoLocationSharp className="text-vividOrange" />
                         <span className="text-sm text-gray-600">
-                          {item.retailer_name}
+                          {item.retailer_name || "Unknown Retailer"}
                         </span>
                       </div>
-                      <h3 className="font-semibold text-lg mb-2">{item.name}</h3>
-                      <p className="text-gray-600 text-sm mb-4">{item.description}</p>
+                      <h3 className="font-semibold text-lg mb-2">{item.name || "Unnamed Product"}</h3>
+                      <p className="text-gray-600 text-sm mb-4">{item.description || "No description available"}</p>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1">
                           <MdOutlineStar className="text-yellow-400" />
@@ -115,16 +125,18 @@ const DiscountPage = () => {
                         </div>
                         <div className="text-right">
                           <p className="text-vividOrange font-semibold">
-                            {item.discount_value}% OFF
+                            {item.discount_value ? `${item.discount_value}% OFF` : "Special Offer"}
                           </p>
-                          <a 
-                            href={item.product_url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-sm text-vividOrange hover:underline"
-                          >
-                            View Deal
-                          </a>
+                          {item.product_url && (
+                            <a 
+                              href={item.product_url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-sm text-vividOrange hover:underline"
+                            >
+                              View Deal
+                            </a>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -132,7 +144,7 @@ const DiscountPage = () => {
                 ))}
               </div>
             )}
-            {filteredDiscounts.length === 0 && !isSearching && (
+            {(!Array.isArray(filteredDiscounts) || filteredDiscounts.length === 0) && !isSearching && (
               <div className="text-center mt-8">
                 <p className="text-gray-600">No deals found. Try a different search term.</p>
               </div>

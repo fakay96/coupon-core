@@ -1,6 +1,14 @@
 import { categoriesApi, nearbyApi, specificRetailerApi, aiSearchApi, refineSearchApi } from "@/api/geoDiscountApi";
 import { useQuery, useMutation } from "@tanstack/react-query";
 
+interface SearchResponse {
+  results: any[];
+  message: string;
+  conversation_id?: string;
+  type?: string;
+  metadata?: any;
+}
+
 /**
  * Custom hook to fetch all available discounts using AI search
  * @returns {UseQueryResult} Query result containing all discount data
@@ -16,13 +24,35 @@ export const discountApiQuery = () => {
         const response = await aiSearchApi({
           message: "Show me all available discounts"
         });
-        // Ensure we always return an array, even if the response is malformed
-        return Array.isArray(response?.results) ? response.results : [];
+        
+        // Validate response structure
+        if (!response || typeof response !== 'object') {
+          console.error('Invalid response structure:', response);
+          return [];
+        }
+
+        // Ensure results is an array
+        const results = response.results;
+        if (!Array.isArray(results)) {
+          console.error('Results is not an array:', results);
+          return [];
+        }
+
+        // Validate each item in results
+        return results.filter(item => {
+          if (!item || typeof item !== 'object') {
+            console.error('Invalid item in results:', item);
+            return false;
+          }
+          return true;
+        });
       } catch (error) {
         console.error('Failed to fetch discounts:', error);
-        return []; // Return empty array on error
+        return [];
       }
     },
+    retry: 2, // Retry failed requests twice
+    staleTime: 5 * 60 * 1000, // Consider data stale after 5 minutes
   });
 };
 
@@ -82,7 +112,26 @@ export const useAiSearch = () => {
   return useMutation({
     mutationFn: async (params: {
       message: string;
-    }) => await aiSearchApi(params),
+    }) => {
+      try {
+        const response = await aiSearchApi(params);
+        
+        // Validate response structure
+        if (!response || typeof response !== 'object') {
+          throw new Error('Invalid response structure');
+        }
+
+        // Ensure results is an array
+        if (!Array.isArray(response.results)) {
+          response.results = [];
+        }
+
+        return response as SearchResponse;
+      } catch (error) {
+        console.error('Search failed:', error);
+        throw error;
+      }
+    },
   });
 };
 
