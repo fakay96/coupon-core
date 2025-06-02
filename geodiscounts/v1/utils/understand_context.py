@@ -19,9 +19,11 @@ import json
 import time
 import hashlib
 import logging
+import asyncio
 from typing import Tuple, Optional, List, Dict, Any
 from functools import lru_cache
 from pathlib import Path
+from types import SimpleNamespace
 from datetime import datetime, timedelta
 
 import numpy as np
@@ -178,6 +180,55 @@ class GeminiEmbeddingClient:
                     raise GeminiAPIError(f"Failed to get embedding after {self.max_retries} attempts: {str(e)}") from e
                 time.sleep(2 ** attempt)  # Exponential backoff
 
+    async def async_get_embedding(self, text: str) -> List[float]:
+        """
+        Get embedding for text with caching and retries (asynchronous).
+        
+        Args:
+            text: Text to get embedding for.
+            
+        Returns:
+            List of floats representing the embedding.
+            
+        Raises:
+            GeminiAPIError: If embedding fails after retries.
+        """
+        # Check cache first
+        cache_key = f"embedding_{hash(text)}"
+        cached_embedding = cache.get(cache_key)
+        if cached_embedding:
+            return cached_embedding
+            
+        for attempt in range(self.max_retries):
+            try:
+                # Rate limiting should ideally be async-aware, but for now,
+                # it will block the current thread from to_thread.
+                self.rate_limiter.wait_if_needed()
+                
+                # Get embedding from API
+                response = await asyncio.to_thread(
+                    self.client.models.embed_content,
+                    model=self.embedding_model_name,
+                    contents=text,
+                )
+                
+                if not response or not hasattr(response, 'embeddings'):
+                    raise GeminiAPIError("Invalid embedding response")
+                    
+                embedding = response.embeddings[0].values
+                
+                # Cache the embedding
+                if self.cache_dir:
+                    # Django cache operations are generally thread-safe
+                    cache.set(cache_key, embedding, timeout=3600)  # Cache for 1 hour
+                    
+                return embedding
+                
+            except Exception as e:
+                if attempt == self.max_retries - 1:
+                    raise GeminiAPIError(f"Failed to get embedding after {self.max_retries} attempts: {str(e)}") from e
+                await asyncio.sleep(2 ** attempt)  # Exponential backoff
+
     def generate_content(
         self,
         prompt: str,
@@ -278,6 +329,133 @@ class GeminiEmbeddingClient:
                     raise GeminiAPIError(f"Failed to generate content after {self.max_retries} attempts: {str(e)}") from e
                 time.sleep(2 ** attempt)  # Exponential backoff
 
+    async def async_generate_content(
+        self,
+        prompt: str,
+        response_schema: Optional[Dict] = None,
+        temperature: float = 0.7,
+        max_tokens: int = 2048
+    ) -> types.GenerateContentResponse: # Keep original type hint, but return SimpleNamespace for cache hits
+        """
+        Generate content using the Gemini model (asynchronous).
+        
+        Args:
+            prompt: The prompt to generate content from.
+            response_schema: Optional JSON schema for response validation.
+            temperature: Sampling temperature (0-1).
+            max_tokens: Maximum number of tokens to generate.
+            
+        Returns:
+            GenerateContentResponse object or SimpleNamespace mimicking it for cached text.
+            
+        Raises:
+            GeminiAPIError: If content generation fails.
+        """
+        cache_key_parts = {
+            "prompt": prompt,
+            "response_schema": response_schema, # Serialized further down
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "method": "async_generate_content"
+        }
+        # Serialize response_schema if it's a dict
+        if response_schema and isinstance(response_schema, dict):
+            try:
+                cache_key_parts["response_schema"] = json.dumps(response_schema, sort_keys=True)
+            except TypeError: # Not serializable
+                pass # Keep original dict, might lead to different hash but better than error
+        
+        cache_key_string = json.dumps(cache_key_parts, sort_keys=True)
+        cache_key = f"gemini_content_{hashlib.md5(cache_key_string.encode()).hexdigest()}"
+        
+        cached_text = cache.get(cache_key)
+        if cached_text is not None:
+            # Return a SimpleNamespace object that mimics GenerateContentResponse for the .text attribute
+            return SimpleNamespace(text=cached_text)
+
+        for attempt in range(self.max_retries):
+            try:
+                self.rate_limiter.wait_if_needed() # Will block current thread from to_thread
+                
+                current_prompt = prompt
+                # Add JSON formatting instructions if schema is provided
+                if response_schema:
+                    current_prompt = f"""
+                    {prompt}
+                    
+                    IMPORTANT: Your response must be a valid JSON object. Do not include any other text or explanation.
+                    """
+                
+                # Generate content
+                response = await asyncio.to_thread(
+                    self.client.models.generate_content,
+                    model=self.model_name,
+                    contents=current_prompt,
+                    config={
+                        'temperature': temperature,
+                        'max_output_tokens': max_tokens,
+                        'top_p': 0.8,
+                        'top_k': 40
+                    }
+                )
+                
+                if not response or not response.text:
+                    raise GeminiAPIError("Empty response from model")
+                
+                # Clean the response text
+                text_response = response.text.strip()
+                if not text_response:
+                    raise GeminiAPIError("Empty response text")
+                    
+                # Validate against schema if provided
+                if response_schema:
+                    try:
+                        # Try to find JSON in the response
+                        json_start = text_response.find('{')
+                        json_end = text_response.rfind('}') + 1
+                        if json_start >= 0 and json_end > json_start:
+                            json_str = text_response[json_start:json_end]
+                            # This is just parsing, not modifying response object directly
+                            json.loads(json_str) 
+                        else:
+                            raise GeminiAPIError("No JSON object found in response")
+                            
+                        # TODO: Add schema validation (as in synchronous version)
+                        cache.set(cache_key, response.text, timeout=3600) # Cache the text part
+                        return response # Return original response object
+                        
+                    except json.JSONDecodeError as e:
+                        geo_structured_logger.error(
+                            geo_logger,
+                            "Invalid JSON response",
+                            "async_content_generation",
+                            {
+                                'error': str(e),
+                                'context': {
+                                    'prompt': current_prompt,
+                                    'response': text_response
+                                }
+                            }
+                        )
+                        raise GeminiAPIError(f"Invalid JSON response: {str(e)}")
+                
+                cache.set(cache_key, response.text, timeout=3600) # Cache the text part for non-schema cases
+                return response
+                
+            except Exception as e:
+                if attempt == self.max_retries - 1:
+                    geo_structured_logger.error(
+                        geo_logger,
+                        "Async content generation failed",
+                        "async_content_generation",
+                        {
+                            'error': str(e),
+                            'context': {'prompt': prompt}
+                        }
+                    )
+                    raise GeminiAPIError(f"Failed to generate content after {self.max_retries} attempts: {str(e)}") from e
+                await asyncio.sleep(2 ** attempt)  # Exponential backoff
+
     def extract_structured_signals(self, text: str) -> Dict[str, Any]:
         """
         Extract structured signals from text using Gemini.
@@ -364,6 +542,103 @@ class GeminiEmbeddingClient:
             )
             return {}
 
+    async def async_extract_structured_signals(self, text: str) -> Dict[str, Any]:
+        """
+        Extract structured signals from text using Gemini (asynchronous).
+        
+        Args:
+            text: Text to extract signals from.
+            
+        Returns:
+            Dictionary of extracted signals.
+            
+        Raises:
+            GeminiAPIError: If signal extraction fails.
+        """
+        cache_key_string = json.dumps({"text": text, "method": "async_extract_structured_signals"}, sort_keys=True)
+        cache_key = f"gemini_signals_{hashlib.md5(cache_key_string.encode()).hexdigest()}"
+        
+        cached_signals = cache.get(cache_key)
+        if cached_signals is not None:
+            return cached_signals
+
+        try:
+            # The actual call to async_generate_content will use its own caching for its part.
+            # This caching here is for the final processed dictionary.
+            response = await self.async_generate_content(
+                prompt=f"""
+                Extract structured signals from this text:
+                {text}
+                
+                Return a JSON object with these exact fields:
+                {{
+                    "intent": "search/browse/compare",
+                    "categories": ["category1", "category2"],
+                    "price_range": {{
+                        "min": 0,
+                        "max": 1000
+                    }},
+                    "location": "location string",
+                    "brands": ["brand1", "brand2"],
+                    "attributes": ["attribute1", "attribute2"]
+                }}
+                
+                IMPORTANT: Return ONLY the JSON object, no other text.
+                """,
+                response_schema={
+                    'type': 'OBJECT',
+                    'properties': {
+                        'intent': {'type': 'STRING'},
+                        'categories': {
+                            'type': 'ARRAY',
+                            'items': {'type': 'STRING'}
+                        },
+                        'price_range': {
+                            'type': 'OBJECT',
+                            'properties': {
+                                'min': {'type': 'NUMBER'},
+                                'max': {'type': 'NUMBER'}
+                            }
+                        },
+                        'location': {'type': 'STRING'},
+                        'brands': {
+                            'type': 'ARRAY',
+                            'items': {'type': 'STRING'}
+                        },
+                        'attributes': {
+                            'type': 'ARRAY',
+                            'items': {'type': 'STRING'}
+                        }
+                    }
+                }
+            )
+            
+            if not response or not response.text:
+                return {}
+                
+            # Extract JSON from response
+            text_response = response.text.strip()
+            json_start = text_response.find('{')
+            json_end = text_response.rfind('}') + 1
+            if json_start >= 0 and json_end > json_start:
+                json_str = text_response[json_start:json_end]
+                result_dict = json.loads(json_str)
+                cache.set(cache_key, result_dict, timeout=3600) # Cache the resulting dictionary
+                return result_dict
+            return {}
+            
+        except Exception as e:
+            geo_structured_logger.error(
+                geo_logger,
+                "Async signal extraction failed",
+                "async_signal_extraction",
+                {
+                    'error': str(e),
+                    'context': {'text': text}
+                }
+            )
+            return {}
+
 
 # Example usage:
 if __name__ == "__main__":
@@ -377,3 +652,15 @@ if __name__ == "__main__":
     # Test structured extraction with caching
     signals = client.extract_structured_signals("red Nike Air Max shoes size 10")
     print(f"Extracted signals: {signals}")
+
+    # Async example
+    async def main_async():
+        # Test async embedding
+        async_embedding = await client.async_get_embedding("blue Adidas sneakers")
+        print(f"Async embedding length: {len(async_embedding) if async_embedding is not None else 'None'}")
+
+        # Test async structured extraction
+        async_signals = await client.async_extract_structured_signals("blue Adidas running shoes size 9")
+        print(f"Async extracted signals: {async_signals}")
+
+    asyncio.run(main_async())
