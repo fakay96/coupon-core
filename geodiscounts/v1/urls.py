@@ -11,6 +11,7 @@ Endpoints:
     - v1/retailers/<id>/     : Fetch details of a specific retailer by ID.
     - v1/shared-discounts/   : List all shared discounts.
     - v1/shared-discounts/<id>/ : Fetch details of a specific shared discount by ID.
+    - v1/discounts/refine/   : Refine search based on conversation context.
 
 Author: Your Name
 Date: YYYY-MM-DD
@@ -39,5 +40,6 @@ urlpatterns = [
 
     path('discounts/categories/',CategoryView.as_view(), name='category-view'),
     path('discounts/search/', ConversationalDiscountView.as_view(), name='nearby-discounts'),
+    path('discounts/refine/', ConversationalDiscountView.as_view(), name='refine-search'),
     path('discounts/publish/',ImportDiscountsAPIView.as_view(), name='publish-discounts')
 ]

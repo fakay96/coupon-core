@@ -1,4 +1,5 @@
-name: CI/CD Pipeline
+name: CI Pipeline
+
 on:
   push:
     branches: [ main, develop ]
@@ -7,225 +8,51 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Environment to deploy to'
+        description: 'Target environment'
         required: true
         type: choice
         options:
           - staging
           - production
-      version:
-        description: 'Specific version to deploy (optional)'
-        required: false
-        type: string
-
-env:
-  DOCKER_REGISTRY: fakay96
-  SERVICES: coupon-core,coupon-celery,coupon-crawler,coupon-inference,coupon-frontend,coupon-frontend-staging
 
 jobs:
+
+
   build:
-    runs-on: ubuntu-latest
-    outputs:
-      version_tag: ${{ steps.get_version.outputs.version_tag }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
+ 
+    uses: ./.github/workflows/build.yml
+    with:
+      tag: ""
+    secrets:
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Choose image tag
-        id: get_version
-        run: |
-          if [ -n "${{ inputs.version }}" ]; then
-            TAG=${{ inputs.version }}
-          else
-            TAG=$(date +%Y%m%d)-$(echo "${GITHUB_SHA}" | cut -c1-7)
-          fi
-          echo "VERSION_TAG=$TAG" >> $GITHUB_ENV
-          echo "version_tag=$TAG" >> $GITHUB_OUTPUT
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      # Build backend services
-      - name: Build and push backend services
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          file: ./docker/Dockerfile.core
-          push: true
-          tags: |
-            ${{ env.DOCKER_REGISTRY }}/coupon-core:${{ env.VERSION_TAG }}
-            ${{ env.DOCKER_REGISTRY }}/coupon-celery:${{ env.VERSION_TAG }}
-            ${{ env.DOCKER_REGISTRY }}/coupon-crawler:${{ env.VERSION_TAG }}
-            ${{ env.DOCKER_REGISTRY }}/coupon-inference:${{ env.VERSION_TAG }}
-          labels: |
-            org.opencontainers.image.version=${{ env.VERSION_TAG }}
-            org.opencontainers.image.created=${{ github.event.repository.updated_at }}
-            org.opencontainers.image.revision=${{ github.sha }}
-          cache-from: type=registry,ref=${{ env.DOCKER_REGISTRY }}/coupon-core:buildcache
-          cache-to: type=registry,ref=${{ env.DOCKER_REGISTRY }}/coupon-core:buildcache,mode=max
-
-      # Build frontend services
-      - name: Build and push frontend services
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          file: ./docker/Dockerfile.frontend
-          push: true
-          tags: |
-            ${{ env.DOCKER_REGISTRY }}/coupon-frontend:${{ env.VERSION_TAG }}
-            ${{ env.DOCKER_REGISTRY }}/coupon-frontend-staging:${{ env.VERSION_TAG }}
-          labels: |
-            org.opencontainers.image.version=${{ env.VERSION_TAG }}
-            org.opencontainers.image.created=${{ github.event.repository.updated_at }}
-            org.opencontainers.image.revision=${{ github.sha }}
-          cache-from: type=registry,ref=${{ env.DOCKER_REGISTRY }}/coupon-frontend:buildcache
-          cache-to: type=registry,ref=${{ env.DOCKER_REGISTRY }}/coupon-frontend:buildcache,mode=max
-
-      - name: Save version metadata
-        run: |
-          echo "{
-            \"version\": \"${{ env.VERSION_TAG }}\",
-            \"commit\": \"${{ github.sha }}\",
-            \"branch\": \"${{ github.ref }}\",
-            \"timestamp\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\",
-            \"actor\": \"${{ github.actor }}\",
-            \"environment\": \"${{ inputs.environment || 'staging' }}\"
-          }" > version-metadata.json
-
-      - name: Upload version metadata
-        uses: actions/upload-artifact@v4
-        with:
-          name: version-metadata
-          path: version-metadata.json
-          retention-days: 5
-
-  deploy:
+  deploy-staging:
     needs: build
-    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    uses: ./.github/workflows/deploy.yml
+    with:
+      version_tag: ${{ needs.build.outputs.version_tag }}
+      environment: "staging"
+    secrets:
+      KUBECONFIG_CONTENT: ${{ secrets.KUBECONFIG_CONTENT }}
+      KUBERNETES_SECRETS: ${{ secrets.KUBERNETES_SECRETS }}
+
+  deploy-production:
+    needs: deploy-staging
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    uses: ./.github/workflows/deploy.yml
+    with:
+      version_tag: ${{ needs.build.outputs.version_tag }}
+      environment: "production"
+    secrets:
+      KUBECONFIG_CONTENT: ${{ secrets.KUBECONFIG_CONTENT }}
+      KUBERNETES_SECRETS: ${{ secrets.KUBERNETES_SECRETS }}
+
+  notify_failure:
     runs-on: ubuntu-latest
-    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || (github.ref == 'refs/heads/develop' && 'staging' || (github.ref == 'refs/heads/main' && 'production')) }}
-    env:
-      NAMESPACE: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || (github.ref == 'refs/heads/develop' && 'staging' || (github.ref == 'refs/heads/main' && 'production')) }}
+    if: failure()
     steps:
-      - name: Download version metadata
-        uses: actions/download-artifact@v4
-        with:
-          name: version-metadata
-          path: .
-          pattern: version-metadata.json
-          merge-multiple: false
-
-      - name: Configure kubectl for DigitalOcean
+      - name: Notify about failure
         run: |
-          mkdir -p ~/.kube
-          echo "${{ secrets.KUBECONFIG_CONTENT }}" > ~/.kube/config
-          chmod 600 ~/.kube/config
-
-      - name: Verify kubeconfig access
-        run: kubectl get nodes
-
-      - name: Validate Namespace
-        run: |
-          if [ -z "$NAMESPACE" ]; then
-            echo "Error: NAMESPACE is not set"
-            exit 1
-          fi
-          if [[ "$NAMESPACE" != "staging" && "$NAMESPACE" != "production" ]]; then
-            echo "Error: Invalid NAMESPACE value: $NAMESPACE"
-            exit 1
-          fi
-
-      - name: Ensure namespace exists
-        run: |
-          kubectl get namespace $NAMESPACE || kubectl create namespace $NAMESPACE
-
-      - name: Select frontend repo
-        run: |
-          if [ "$NAMESPACE" = "staging" ]; then
-            echo "FRONTEND_REPO=fakay96/coupon-frontend-staging" >> $GITHUB_ENV
-          else
-            echo "FRONTEND_REPO=fakay96/coupon-frontend" >> $GITHUB_ENV
-          fi
-
-      - name: Deploy Backend & Celery
-        run: |
-          helm upgrade --install coupon-service ./k8s/backend \
-            --set backend.image.repository=fakay96/coupon-core \
-            --set backend.image.tag=${{ env.VERSION_TAG }} \
-            --set celery.image.repository=fakay96/coupon-celery \
-            --set celery.image.tag=${{ env.VERSION_TAG }} \
-            --namespace $NAMESPACE --create-namespace \
-            -f ./k8s/backend/values/$NAMESPACE-values.yaml \
-            --atomic --force --cleanup-on-fail --history-max 5 \
-            --timeout 8m0s
-
-      - name: Deploy Frontend
-        run: |
-          helm upgrade --install frontend ./k8s/frontend \
-            --set frontend.image.repository=$FRONTEND_REPO \
-            --set frontend.image.tag=${{ env.VERSION_TAG }} \
-            --namespace $NAMESPACE --create-namespace \
-            -f ./k8s/frontend/values/$NAMESPACE-values.yaml \
-            --atomic --force --cleanup-on-fail --history-max 5 \
-            --timeout 5m0s
-
-      - name: Deploy Inference Service
-        run: |
-          helm upgrade --install inference ./k8s/backend \
-            --set inference.enabled=true \
-            --set inference.image.repository=fakay96/coupon-inference \
-            --set inference.image.tag=${{ env.VERSION_TAG }} \
-            --namespace $NAMESPACE --create-namespace \
-            -f ./k8s/backend/values/$NAMESPACE-values.yaml \
-            --atomic --force --cleanup-on-fail --history-max 5 \
-            --timeout 5m0s
-
-      - name: Deploy Crawler
-        run: |
-          helm upgrade --install crawler ./k8s/crawler \
-            --set crawler.image.repository=fakay96/discount-crawler \
-            --set crawler.image.tag=${{ env.VERSION_TAG }} \
-            --set crawler.operator.image.repository=fakay96/crawler-resource-operator \
-            --set crawler.operator.image.tag=${{ env.VERSION_TAG }} \
-            --namespace $NAMESPACE --create-namespace \
-            -f ./k8s/crawler/values/$NAMESPACE-values.yaml \
-            --atomic --force --cleanup-on-fail --history-max 5 \
-            --timeout 5m0s
-
-      - name: Verify service endpoints
-        run: |
-          kubectl get endpoints coupon-service -n $NAMESPACE || echo "Backend service endpoint not found!"
-          kubectl get endpoints frontend -n $NAMESPACE || echo "Frontend service endpoint not found!"
-          kubectl get endpoints inference -n $NAMESPACE || echo "Inference service endpoint not found!"
-          kubectl get endpoints crawler -n $NAMESPACE || echo "Crawler service endpoint not found!"
-
-      - name: Debug pod logs on failure
-        if: failure()
-        run: |
-          echo "Fetching logs for failed pods..."
-          kubectl logs -l app=backend -n $NAMESPACE || echo "No logs found for backend"
-          kubectl logs -l app=frontend -n $NAMESPACE || echo "No logs found for frontend"
-          kubectl logs -l app=inference -n $NAMESPACE || echo "No logs found for inference"
-          kubectl logs -l app=crawler -n $NAMESPACE || echo "No logs found for crawler"
-
-      - name: Rollback on failure
-        if: failure()
-        run: |
-          echo "Rolling back deployments..."
-          LAST_BACKEND_REVISION=$(helm history coupon-service -n $NAMESPACE | tail -n 2 | head -n 1 | awk '{print $1}')
-          LAST_FRONTEND_REVISION=$(helm history frontend -n $NAMESPACE | tail -n 2 | head -n 1 | awk '{print $1}')
-          LAST_INFERENCE_REVISION=$(helm history inference -n $NAMESPACE | tail -n 2 | head -n 1 | awk '{print $1}')
-          LAST_CRAWLER_REVISION=$(helm history crawler -n $NAMESPACE | tail -n 2 | head -n 1 | awk '{print $1}')
-          
-          helm rollback coupon-service $LAST_BACKEND_REVISION -n $NAMESPACE || echo "Failed to rollback backend"
-          helm rollback frontend $LAST_FRONTEND_REVISION -n $NAMESPACE || echo "Failed to rollback frontend"
-          helm rollback inference $LAST_INFERENCE_REVISION -n $NAMESPACE || echo "Failed to rollback inference"
-          helm rollback crawler $LAST_CRAWLER_REVISION -n $NAMESPACE || echo "Failed to rollback crawler"
+          echo "CI Pipeline failed. Check logs for more details."
+          echo "Test coverage must be at least 90% to proceed with build and deployment."

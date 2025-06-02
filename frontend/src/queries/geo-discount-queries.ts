@@ -1,5 +1,14 @@
-import { categoriesApi, discountApi, nearbyApi, specificRetailerApi, aiSearchApi } from "@/api/geoDiscountApi";
+import { categoriesApi, nearbyApi, specificRetailerApi, aiSearchApi, refineSearchApi, discountApi } from "@/api/geoDiscountApi";
 import { useQuery, useMutation } from "@tanstack/react-query";
+
+interface SearchResponse {
+  results: any[];
+  message: string;
+  conversation_id?: string;
+  type?: string;
+  metadata?: any;
+  attempts?: number;
+}
 
 /**
  * Custom hook to fetch all available discounts
@@ -11,7 +20,39 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 export const discountApiQuery = () => {
   return useQuery({
     queryKey: ["discountApi"],
-    queryFn: async () => await discountApi(),
+    queryFn: async () => {
+      try {
+        // Use the regular discountApi for initial load
+        const response = await discountApi();
+        
+        // Validate response structure
+        if (!response || typeof response !== 'object') {
+          console.error('Invalid response structure:', response);
+          return [];
+        }
+
+        // Ensure results is an array
+        const results = Array.isArray(response) ? response : response.results;
+        if (!Array.isArray(results)) {
+          console.error('Results is not an array:', results);
+          return [];
+        }
+
+        // Validate each item in results
+        return results.filter(item => {
+          if (!item || typeof item !== 'object') {
+            console.error('Invalid item in results:', item);
+            return false;
+          }
+          return true;
+        });
+      } catch (error) {
+        console.error('Failed to fetch discounts:', error);
+        return [];
+      }
+    },
+    retry: 2, // Retry failed requests twice
+    staleTime: 5 * 60 * 1000, // Consider data stale after 5 minutes
   });
 };
 
@@ -61,12 +102,7 @@ export const specificRetailerQuery = (id: string) => {
 /**
  * Custom hook to perform AI-powered discount search
  * @param {Object} params - Search parameters
- * @param {string} params.query - The search query
- * @param {number} params.latitude - User's latitude
- * @param {number} params.longitude - User's longitude
- * @param {number} params.radius - Initial search radius in kilometers
- * @param {number} params.maxRadius - Maximum search radius in kilometers
- * @param {number} params.maxRetries - Maximum number of retry attempts
+ * @param {string} params.message - The search message
  * @returns {UseMutationResult} Mutation result containing search results
  * @throws {Error} If search fails
  * @example
@@ -75,12 +111,58 @@ export const specificRetailerQuery = (id: string) => {
 export const useAiSearch = () => {
   return useMutation({
     mutationFn: async (params: {
+      message: string;
+    }) => {
+      try {
+        const response = await aiSearchApi(params);
+        
+        // Validate response structure
+        if (!response || typeof response !== 'object') {
+          throw new Error('Invalid response structure');
+        }
+
+        // Ensure results is an array
+        if (!Array.isArray(response.results)) {
+          response.results = [];
+        }
+
+        return response as SearchResponse;
+      } catch (error) {
+        console.error('Search failed:', error);
+        throw error;
+      }
+    },
+  });
+};
+
+/**
+ * Custom hook to refine search based on conversation context
+ * @returns {UseMutationResult} Mutation result for refined search
+ * @throws {Error} If search refinement fails
+ * @example
+ * const { mutate: refineSearch, data: refinedResults } = useRefineSearch();
+ * refineSearch({
+ *   conversation_id: '123',
+ *   query: 'Show me more options',
+ *   context: {
+ *     previous_queries: ['Show me food discounts'],
+ *     filters: { price_range: { min: 0, max: 50 } }
+ *   }
+ * });
+ */
+export const useRefineSearch = () => {
+  return useMutation({
+    mutationFn: async (params: {
+      conversation_id: string;
       query: string;
-      latitude: number;
-      longitude: number;
-      radius?: number;
-      maxRadius?: number;
-      maxRetries?: number;
-    }) => await aiSearchApi(params),
+      context?: {
+        previous_queries?: string[];
+        filters?: {
+          price_range?: { min: number; max: number };
+          categories?: string[];
+          distance?: number;
+        };
+      };
+    }) => await refineSearchApi(params),
   });
 };

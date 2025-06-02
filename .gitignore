@@ -1,6 +1,6 @@
 .venv
 
-poetry.lock
+
 .DS_Store
 .env
 static/
@@ -15,8 +15,8 @@ node_modules
 **.csv
 
 node_modules
-env
-env/*
+
+
 
 
 **.csv

@@ -9,15 +9,7 @@ import { useNavigate } from "react-router-dom";
 export const SearchInput = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [value, setValue] = useState(searchQuery);
-  const [searchStatus, setSearchStatus] = useState<{
-    isSearching: boolean;
-    currentRadius: number;
-    attempts: number;
-  }>({
-    isSearching: false,
-    currentRadius: 0,
-    attempts: 0
-  });
+  const [isSearching, setIsSearching] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { mutate: performSearch, isPending } = useAiSearch();
@@ -31,11 +23,7 @@ export const SearchInput = () => {
   const handleClear = () => {
     setValue("");
     setSearchQuery("");
-    setSearchStatus({
-      isSearching: false,
-      currentRadius: 0,
-      attempts: 0
-    });
+    setIsSearching(false);
     inputRef.current?.blur();
   };
 
@@ -43,75 +31,60 @@ export const SearchInput = () => {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSearchQuery(value);
-    setSearchStatus({
-      isSearching: true,
-      currentRadius: 5.0,
-      attempts: 0
-    });
+    setIsSearching(true);
     inputRef.current?.blur();
 
-    // Get user's location
     try {
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject);
-      });
-
-      // Perform AI search with progressive radius
+      // Perform AI search
       performSearch({
-        query: value,
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-        radius: 5.0, // Start with 5km radius
-        maxRadius: 50.0, // Expand up to 50km
-        maxRetries: 3 // Try up to 3 times
+        message: value
       }, {
         onSuccess: (data: any) => {
-          setSearchStatus({
-            isSearching: false,
-            currentRadius: data.searchRadius,
-            attempts: data.attempts
-          });
+          setIsSearching(false);
           
-          // Navigate to results page with search results
+          // If no results, navigate to chat interface
+          if (!data.results || data.results.length === 0) {
+            navigate('/dashboard/chat', {
+              state: {
+                initialMessage: value,
+                conversation_id: data.conversation_id
+              }
+            });
+            return;
+          }
+          
+          // If results found, navigate to results page
           navigate('/dashboard/discount', {
             state: {
-              searchResults: data,
+              searchResults: data.results,
               query: value,
-              searchRadius: data.searchRadius,
-              attempts: data.attempts
+              message: data.message,
+              conversation_id: data.conversation_id
             }
           });
         },
         onError: (error: Error) => {
           console.error('Search failed:', error);
-          setSearchStatus({
-            isSearching: false,
-            currentRadius: 0,
-            attempts: 0
-          });
+          setIsSearching(false);
           
-          // Navigate to results page with error state
-          navigate('/dashboard/discount', {
+          // On error, navigate to chat interface
+          navigate('/dashboard/chat', {
             state: {
-              error: 'Search failed. Please try again.',
-              query: value
+              initialMessage: value,
+              error: 'Search failed. Please try rephrasing your question.'
             }
           });
         }
       });
     } catch (error) {
-      console.error('Location error:', error);
-      setSearchStatus({
-        isSearching: false,
-        currentRadius: 0,
-        attempts: 0
-      });
+      console.error('Search error:', error);
+      setIsSearching(false);
       
-      // Navigate to results page with location error
-      navigate('/dashboard/discount', {
+      // On error, navigate to chat interface
+      navigate('/dashboard/chat', {
         state: {
-          error: 'Please enable location services to search for nearby deals.',
-          query: value
+          initialMessage: value,
+          error: 'Search failed. Please try rephrasing your question.'
         }
       });
     }
@@ -124,11 +97,11 @@ export const SearchInput = () => {
           value={value}
           onChange={handleChange}
           ref={inputRef}
-          placeholder={searchStatus.isSearching 
-            ? `Searching within ${searchStatus.currentRadius}km radius...` 
-            : "Search for deals near you"}
+          placeholder={isSearching 
+            ? "Searching for deals..." 
+            : "Search for deals"}
           className="md:text-base placeholder:max-sm:text-[12px] placeholder:text-neutral-800 px-4 w-full border-none focus-visible:shadow-[0_1px_1px_0_rgba(65,69,73,0.3),0_1px_3px_1px_rgba(65,69,73,0.15)] bg-[#f0f4f8] rounded-full h-[38px] focus-visible:ring-0 focus:bg-white"
-          disabled={isPending || searchStatus.isSearching}
+          disabled={isPending || isSearching}
         />
 
         {!value && (
@@ -137,7 +110,7 @@ export const SearchInput = () => {
             variant={"ghost"}
             size={"icon"}
             className="absolute right-3 top-1/2 -translate-y-1/2 [&_svg]:size-5 rounded-full"
-            disabled={isPending || searchStatus.isSearching}
+            disabled={isPending || isSearching}
           >
             <SearchIcon />
           </Button>
@@ -149,7 +122,7 @@ export const SearchInput = () => {
             variant={"ghost"}
             size={"icon"}
             className="absolute right-3 top-1/2 -translate-y-1/2 [&_svg]:size-5 rounded-full"
-            disabled={isPending || searchStatus.isSearching}
+            disabled={isPending || isSearching}
           >
             <XIcon />
           </Button>

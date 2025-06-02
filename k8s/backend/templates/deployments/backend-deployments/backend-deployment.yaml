@@ -4,7 +4,7 @@ metadata:
   name: backend
   namespace: {{ .Values.namespace }}
 spec:
-  replicas: {{ .Values.backend.replicaCount | default 1 }}
+  replicas: {{ .Values.backend.replicas| default 1 }}
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -127,5 +127,9 @@ spec:
               key: CELERY_DB
         - name: SERVICE_TYPE
           value: "backend"
-
-        
+        - name: GEMINI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: GEMINI_API_KEY
+      
