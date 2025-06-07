@@ -1,6 +1,9 @@
 name: Deploy to Kubernetes
 
 on:
+  push:
+    branches:
+      - develop
   workflow_dispatch:
     inputs:
       version_tag:
@@ -14,7 +17,7 @@ on:
         options:
           - staging
           - production
-  
+
   workflow_call:
     inputs:
       version_tag:
@@ -28,14 +31,25 @@ on:
         required: true
       KUBERNETES_SECRETS:
         required: true
+      DOCKER_USERNAME:
+        required: true
+      DOCKER_PASSWORD:
+        required: true
 
 jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+    secrets:
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+
   deploy:
+    needs: build
     runs-on: ubuntu-latest
     environment:
-      name: ${{ inputs.environment }}
+      name: ${{ github.event_name == 'push' && 'staging' || inputs.environment }}
     env:
-      NAMESPACE: ${{ inputs.environment }}
+      NAMESPACE: ${{ github.event_name == 'push' && 'staging' || inputs.environment }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
