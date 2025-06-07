@@ -16,7 +16,7 @@ Run the backend and frontend test suites:
 
 ```bash
 pytest -q
-npm run test --prefix frontend -- --run
+npm run test --prefix frontend
 ```
 Pytest automatically uses the `coupon_core.settings.test` configuration, which
 relies on in-memory SQLite databases so no additional services are required.

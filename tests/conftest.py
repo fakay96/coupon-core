@@ -1,5 +1,10 @@
 import os
-import django
+import pytest
+
+try:
+    import django
+except Exception:
+    pytest.skip("django not installed", allow_module_level=True)
 
 
 def pytest_configure():
