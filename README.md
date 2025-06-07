@@ -18,6 +18,8 @@ Run the backend and frontend test suites:
 pytest -q
 npm run test --prefix frontend
 ```
+If Django or Vitest are unavailable, the affected tests are automatically
+skipped so the suite can still complete.
 Pytest automatically uses the `coupon_core.settings.test` configuration, which
 relies on in-memory SQLite databases so no additional services are required.
 To run tests against PostgreSQL instead, start the containers with
