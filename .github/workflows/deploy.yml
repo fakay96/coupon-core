@@ -9,7 +9,8 @@ on:
         type: string
       environment:
         description: 'Target environment'
-        required: true
+        required: false
+        default: staging
         type: choice
         options:
           - staging
@@ -33,9 +34,9 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment:
-      name: ${{ inputs.environment }}
+      name: ${{ inputs.environment || 'staging' }}
     env:
-      NAMESPACE: ${{ inputs.environment }}
+      NAMESPACE: ${{ inputs.environment || 'staging' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3

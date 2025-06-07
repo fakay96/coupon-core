@@ -281,15 +281,8 @@ class ConversationalDiscountView(APIView):
 
         except Exception as e:
             geo_structured_logger.error(
-                geo_logger,"Error processing conversational message",
-                "conversational_discount",e,{'user_id':request.user.id}
-            )
-            return Response({"error":"Internal server error"},status=HTTP_500_INTERNAL_SERVER_ERROR)
-            
-        except Exception as e:
-            geo_structured_logger.error(
                 geo_logger,
-                "Error in conversational message processing",
+                "Error processing conversational message",
                 "conversational_discount",
                 e,
                 {'user_id': request.user.id}
@@ -330,8 +323,9 @@ class ConversationalDiscountView(APIView):
     ) -> Dict[str, Any]:
         """Process message and generate appropriate response (async)."""
         
-        # Get conversation context (now async)
+        # Get conversation context and recent message history (now async)
         context = await self.conversation_service.async_get_context(conversation)
+        history = await self.conversation_service.async_get_recent_messages(conversation)
         
         # Handle different message types (calling async helpers)
         if message.message_type == ConversationMessage.MessageType.GREETING:
@@ -339,11 +333,11 @@ class ConversationalDiscountView(APIView):
         
         elif message.message_type == ConversationMessage.MessageType.SEARCH_QUERY:
             return await self._handle_search_query(
-                message, conversation, request, radius, location_data, context
+                message, conversation, request, radius, location_data, context, history
             )
         
         else: # General conversation
-            return await self._handle_general_conversation(message, context)
+            return await self._handle_general_conversation(message, context, history)
     
     async def _handle_greeting(self, context: Dict) -> Dict[str, Any]: # Now async, though no async calls within yet
         """Handle greeting messages (async)."""
@@ -374,15 +368,18 @@ class ConversationalDiscountView(APIView):
             'metadata': {'greeting_type': stage}
         }
     
-    async def _enhance_search_query(self, query: str, context: Dict) -> Dict[str, Any]: # Now async
+    async def _enhance_search_query(self, query: str, context: Dict, history: List[str]) -> Dict[str, Any]: # Now async
         """Enhance search query using Gemini for better understanding (async)."""
         try:
             # Use Gemini to analyze and enhance the query (now async)
             enhanced_response = await self.gemini_client.async_generate_content(
                 prompt=f"""
-                Analyze this search query and determine the most relevant category and search terms:
+                Analyze this search query and determine the most relevant category and search terms.
                 Query: "{query}"
                 Context: {json.dumps(context)}
+                History: {json.dumps(history)}
+                Recent Searches: {json.dumps(context.get('search_history', []))}
+                Last Known Location: {json.dumps(context.get('last_location'))}
                 
                 Return a JSON object with these exact fields:
                 {{
@@ -458,7 +455,16 @@ class ConversationalDiscountView(APIView):
             json_end = text.rfind('}') + 1
             if json_start >= 0 and json_end > json_start:
                 json_str = text[json_start:json_end]
-                result = json.loads(json_str)
+                try:
+                    result = json.loads(json_str)
+                except json.JSONDecodeError:
+                    geo_structured_logger.error(
+                        geo_logger,
+                        "Query enhancement JSON decode failed",
+                        "query_enhancement",
+                        {'response': enhanced_response.text},
+                    )
+                    result = {}
                 
                 # Validate category
                 valid_categories = ['fashion', 'grocery', 'electronics', 'home', 'beauty', 'sports', 'entertainment', 'other']
@@ -535,11 +541,12 @@ class ConversationalDiscountView(APIView):
         self,
         message: ConversationMessage,
         conversation: Conversation,
-        request: Request, # Keep request for now, but client_latitude/longitude might need specific handling in async views
+        request: Request,  # Keep request for now, but client_latitude/longitude might need specific handling in async views
         radius: float,
-        location_data: Dict, # Passed from post()
-        context: Dict # Passed from _process_message
-    ) -> Dict[str, Any]: # Now async
+        location_data: Dict,  # Passed from post()
+        context: Dict,  # Passed from _process_message
+        history: List[str],
+    ) -> Dict[str, Any]:  # Now async
         """Handle search query messages (async)."""
         
         # Get user location (remains synchronous as it reads from request attributes)
@@ -558,7 +565,7 @@ class ConversationalDiscountView(APIView):
             }
         
         # Enhance the query using Gemini (now async)
-        query_enhancement = await self._enhance_search_query(message.content, context)
+        query_enhancement = await self._enhance_search_query(message.content, context, history)
         
         # Create search request with enhanced query (now async)
         search_request = await SearchRequest.objects.acreate(
@@ -727,34 +734,49 @@ class ConversationalDiscountView(APIView):
             geo_structured_logger.error(geo_logger, "Failed to get all categories (async)", "category_list", {'error': str(e)})
             return []
     
-    async def _handle_general_conversation(self, message: ConversationMessage, context: Dict) -> Dict[str, Any]: # Now async
+    async def _handle_general_conversation(
+        self, message: ConversationMessage, context: Dict, history: List[str]
+    ) -> Dict[str, Any]:
         """Handle general conversation messages (async)."""
         
         # Extract preferences from conversation (now async)
         await self.conversation_service.async_extract_preferences(message)
         
         # Generate contextual response using Gemini (now async)
-        response = await self._generate_contextual_response(message.content, context)
-        return {
-            'response': response,
-            'message_type': ConversationMessage.MessageType.CONVERSATION,
-            'context': context,
-            'suggestions': [
+        result = await self._generate_contextual_response(
+            message.content, context, history
+        )
+
+        suggestions = result.get(
+            "suggestions",
+            [
                 "Search for discounts near me",
-                "Find specific deals", 
-                "What's available in my area?"
-            ]
+                "Find specific deals",
+                "What's available in my area?",
+            ],
+        )
+
+        return {
+            "response": result.get("response"),
+            "message_type": ConversationMessage.MessageType.CONVERSATION,
+            "context": context,
+            "suggestions": suggestions,
         }
     
-    async def _generate_contextual_response(self, content: str, context: Dict) -> str: # Now async
-        """Generate contextual response using Gemini (async)."""
+    async def _generate_contextual_response(
+        self, content: str, context: Dict, history: List[str]
+    ) -> Dict[str, Any]:
+        """Generate contextual response and suggestions using Gemini (async)."""
         try:
             gemini_response_obj = await self.gemini_client.async_generate_content(
                 prompt=f"""
-                Generate a helpful response for this user message:
+                Generate a helpful response for this user message using the provided context.
                 Message: "{content}"
                 Context: {json.dumps(context)}
-                
+                History: {json.dumps(history)}
+                Recent Searches: {json.dumps(context.get('search_history', []))}
+                Last Known Location: {json.dumps(context.get('last_location'))}
+
                 The response should be:
                 - Natural and conversational
                 - Relevant to the user's query
@@ -774,14 +796,36 @@ class ConversationalDiscountView(APIView):
             )
             
             if not gemini_response_obj or not gemini_response_obj.text:
-                return "I understand you're looking for deals. Could you tell me more about what you're interested in?"
-                
-            result = json.loads(gemini_response_obj.text.strip()) # Assuming result is JSON string
-            return result.get('response', "I understand. Could you provide more details on what you're looking for?")
+                return {
+                    "response": "I understand you're looking for deals. Could you tell me more about what you're interested in?",
+                    "suggestions": [],
+                }
+
+            try:
+                result = json.loads(gemini_response_obj.text.strip())
+            except json.JSONDecodeError:
+                geo_structured_logger.error(
+                    geo_logger,
+                    "Contextual response JSON decode failed",
+                    "response_generation",
+                    {'response': gemini_response_obj.text},
+                )
+                return {"response": gemini_response_obj.text.strip(), "suggestions": []}
+
+            return {
+                "response": result.get(
+                    "response",
+                    "I understand. Could you provide more details on what you're looking for?",
+                ),
+                "suggestions": result.get("suggestions", []),
+            }
             
         except Exception as e:
             geo_structured_logger.error(geo_logger, "Response generation failed (async)", "response_generation", error=str(e), content=content)
-            return "I understand. Could you tell me more about what you're looking for?"
+            return {
+                "response": "I understand. Could you tell me more about what you're looking for?",
+                "suggestions": [],
+            }
     
     async def _generate_search_suggestions(self, results: List[Dict]) -> List[str]: # Now async
         """Generate search suggestions using Gemini (async)."""
