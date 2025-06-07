@@ -27,6 +27,10 @@ To run tests against PostgreSQL instead, start the containers with
 The `test` workflow fails if backend coverage drops below **90%**. Tests use
 SQLite databases by default so they can run locally without PostgreSQL.
 
+You can also run the tests inside containers using `run_tests.sh` which relies
+on `docker-compose`. This script starts the required services with dummy data,
+runs migrations and executes the full test suite with coverage.
+
 ## Continuous Integration
 
 All pull requests trigger the `test` workflow which runs the Python and

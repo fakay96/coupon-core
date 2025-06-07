@@ -863,7 +863,17 @@ class ConversationalDiscountView(APIView):
             if not gemini_response_obj or not gemini_response_obj.text:
                 return [] # No suggestions if Gemini fails
                 
-            suggestions = json.loads(gemini_response_obj.text.strip()) # Assuming suggestions is JSON array string
+            try:
+                suggestions = json.loads(gemini_response_obj.text.strip())
+            except json.JSONDecodeError:
+                geo_structured_logger.error(
+                    geo_logger,
+                    "Suggestion JSON decode failed",
+                    "suggestion_generation",
+                    {"response": gemini_response_obj.text},
+                )
+                return []
+
             return suggestions[:5]  # Limit to 5 suggestions
             
         except Exception as e:
