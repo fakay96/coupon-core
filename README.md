@@ -18,6 +18,11 @@ Run the backend and frontend test suites:
 pytest -q
 npm run test --prefix frontend -- --run
 ```
+Pytest automatically uses the `coupon_core.settings.test` configuration, which
+relies on in-memory SQLite databases so no additional services are required.
+To run tests against PostgreSQL instead, start the containers with
+`docker-compose up postgres` and set
+`DJANGO_SETTINGS_MODULE=coupon_core.settings` before running `pytest`.
 
 The `test` workflow fails if backend coverage drops below **90%**. Tests use
 SQLite databases by default so they can run locally without PostgreSQL.
