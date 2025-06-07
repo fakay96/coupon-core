@@ -19,6 +19,9 @@ pytest -q
 npm run test --prefix frontend -- --run
 ```
 
+The `test` workflow fails if backend coverage drops below **90%**. Tests use
+SQLite databases by default so they can run locally without PostgreSQL.
+
 ## Continuous Integration
 
 All pull requests trigger the `test` workflow which runs the Python and
