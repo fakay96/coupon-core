@@ -3,11 +3,11 @@ import pytest
 
 
 def pytest_configure():
-    """Initialize Django or skip the entire suite if it's unavailable."""
+    """Initialize Django if available."""
     try:
         import django
     except Exception:
-        pytest.skip("django not installed", allow_module_level=True)
+        # Django isn't installed; individual tests will skip themselves
         return
 
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "coupon_core.settings.test")
