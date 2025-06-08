@@ -20,11 +20,6 @@ def pytest_configure():
         raise
 
 
-@pytest.hookimpl(hookwrapper=True, tryfirst=True)
-def pytest_runtest_makereport(item, call):
-    """Mark failing tests as skipped so they don't cause a failure."""
-    outcome = yield
-    rep = outcome.get_result()
-    if rep.when == "call" and rep.failed:
-        rep.outcome = "skipped"
-        rep.wasxfail = "auto-skipped on failure"
+# Remove the previous behaviour that turned failures into skips so that
+# failing tests are reported properly during CI runs.
+

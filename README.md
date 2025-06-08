@@ -5,7 +5,7 @@ The backend is built with Django while the frontend uses Vite and TypeScript.
 
 ## Running tests
 
-Install Python and Node dependencies:
+Install Python and Node dependencies (including the `pytest-cov` plugin):
 
 ```bash
 pip install -r req.txt
