@@ -13,9 +13,11 @@ def pytest_configure():
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "coupon_core.settings.test")
     try:
         django.setup()
+        from django.core.management import call_command
+        call_command("migrate", run_syncdb=True, verbosity=0)
     except OSError as exc:
-        if "libgdal" in str(exc):
-            pytest.skip("GDAL library missing", allow_module_level=True)
+        if "libgdal" in str(exc) or "spatial" in str(exc).lower():
+            pytest.skip("Spatial libraries missing", allow_module_level=True)
             return
         raise
 

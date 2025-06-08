@@ -5,7 +5,8 @@ The backend is built with Django while the frontend uses Vite and TypeScript.
 
 ## Running tests
 
-Install Python and Node dependencies (including the `pytest-cov` plugin):
+Install Python and Node dependencies (including the `pytest-cov` and
+`pytest-django` plugins):
 
 ```bash
 pip install -r req.txt
@@ -22,6 +23,8 @@ If Django or GDAL is missing, or if Vitest isn't installed, the affected tests
 are automatically skipped so the suite can still complete.
 Pytest automatically uses the `coupon_core.settings.test` configuration, which
 relies on in-memory SQLite databases so no additional services are required.
+Migrations are applied automatically when the tests start so the tables exist
+in the temporary database.
 GeoDjango looks for the GDAL library at `/usr/lib/x86_64-linux-gnu/libgdal.so`.
 If it isn't available system-wide, set `GDAL_LIBRARY_PATH` to that file and
 prepend `/usr/lib/x86_64-linux-gnu` to `LD_LIBRARY_PATH` before running tests.
