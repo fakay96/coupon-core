@@ -9,6 +9,13 @@ import os
 from datetime import timedelta
 from .base import *  # Import base settings first
 
+# Ensure GeoDjango can locate the GDAL library during tests
+os.environ.setdefault("GDAL_LIBRARY_PATH", "/usr/lib/x86_64-linux-gnu/libgdal.so")
+os.environ.setdefault(
+    "LD_LIBRARY_PATH",
+    f"/usr/lib/x86_64-linux-gnu:{os.environ.get('LD_LIBRARY_PATH', '')}"
+)
+
 # Test Database Router
 class TestRouter:
     """

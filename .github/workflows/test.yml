@@ -29,6 +29,7 @@ jobs:
         sudo apt-get install -y gdal-bin libgdal-dev libproj-dev
         echo "GDAL version:" && gdalinfo --version
         echo "GDAL_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/libgdal.so" >> $GITHUB_ENV
+        echo "LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH" >> $GITHUB_ENV
         sudo ln -s /usr/lib/x86_64-linux-gnu/libgdal.so /usr/lib/libgdal.so || true
 
     - name: Install Python dependencies
