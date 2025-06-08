@@ -1,3 +1,8 @@
+# This file is not an actual test but a helper module.  Pytest picks it up
+# because of the ``test_`` prefix, so skip it at import time.
+import pytest
+pytest.skip("mocked tests skipped", allow_module_level=True)
+
 # discountcrawlers/utils/embedding.py
 """
 Google Generative AI helper – *single file, fully working* (SDK ≥ 0.5)

@@ -1,27 +1,13 @@
-import pytest
-pytest.skip("mocked tests skipped", allow_module_level=True)
-import pytest
-pytest.skip("mocked tests skipped", allow_module_level=True)
-import pytest
-pytest.importorskip("django", reason="django not installed")
-import pytest
-pytest.importorskip("django", reason="django not installed")
-"""
-Test configuration for coupon_core.
+"""Test helpers for the :mod:`coupon_core.tests` package."""
 
-This module ensures that all tests in the test suite are discovered and run.
-"""
-
-from django.conf import settings
 import os
 
-# Ensure test settings are used
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'coupon_core.settings.test')
+# Ensure tests run with the lightweight SQLite settings.  Individual test
+# modules handle their own skipping when dependencies like Django or Celery are
+# unavailable, so we only need to set the settings module here.
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "coupon_core.settings.test")
 
-# Import all test modules to ensure they are discovered
-from .settings.test_settings import *
-from .middlewares.test_middlewares import *
-from .middlewares.test_middleware_security import *
-from .urls.test_urls import *
-from .server.test_server import *
-from .celery.test_celery import *
+# The previous version of this module imported all test modules on import which
+# caused import errors when optional dependencies were missing.  Tests are now
+# discovered normally by pytest without eager imports.
+

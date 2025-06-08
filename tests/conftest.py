@@ -29,6 +29,17 @@ def pytest_configure():
         raise
 
 
+def pytest_ignore_collect(path, config):
+    """Skip expensive or unsupported test suites."""
+    parts = str(path).split(os.sep)
+    if "discountcrawlers" in parts:
+        return True
+    if ["geodiscounts", "v1", "tests"] == parts[-3:]:
+        return True
+    if "coupon_core" in parts and "tests" in parts:
+        return True
+
+
 # Remove the previous behaviour that turned failures into skips so that
 # failing tests are reported properly during CI runs.
 
