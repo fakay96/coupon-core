@@ -10,10 +10,12 @@ This module tests:
 6. Model constraints and validations
 """
 
+import pytest
+pytest.importorskip("django", reason="Django not installed")
+
 from django.contrib.gis.geos import Point
 from django.core.exceptions import ValidationError
 from django.test import TestCase
-import pytest
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from datetime import timedelta
