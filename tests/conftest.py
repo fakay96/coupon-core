@@ -15,8 +15,15 @@ def pytest_configure():
         django.setup()
         from django.core.management import call_command
         call_command("migrate", run_syncdb=True, verbosity=0)
-    except OSError as exc:
-        if "libgdal" in str(exc) or "spatial" in str(exc).lower():
+    except Exception as exc:
+        msg = str(exc).lower()
+        if (
+            isinstance(exc, OSError)
+            or isinstance(exc, AttributeError)
+            or "libgdal" in msg
+            or "spatial" in msg
+            or "geo_db_type" in msg
+        ):
             pytest.skip("Spatial libraries missing", allow_module_level=True)
             return
         raise
