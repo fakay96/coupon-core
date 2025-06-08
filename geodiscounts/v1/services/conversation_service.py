@@ -205,15 +205,14 @@ class EmbeddingBasedPreferenceExtractor:
         return prefs
 
     def _map_type(self, key: str) -> str:
-            for key, iemb in self._indicators.items():
-                sim = float(np.dot(emb, iemb)/(np.linalg.norm(emb)*np.linalg.norm(iemb)+1e-8))
-                if sim > 0.6:
-        return {
+        """Map indicator keys to ``UserPreference`` types."""
+        mapping = {
             'price_sensitive': UserPreference.PreferenceType.PRICE_RANGE,
             'premium': UserPreference.PreferenceType.PRICE_RANGE,
             'location': UserPreference.PreferenceType.LOCATION,
-            'quality': UserPreference.PreferenceType.QUALITY
-        }.get(key, UserPreference.PreferenceType.OTHER)
+            'quality': UserPreference.PreferenceType.QUALITY,
+        }
+        return mapping.get(key, UserPreference.PreferenceType.OTHER)
 
 
 class ConversationService:
@@ -405,15 +404,43 @@ class ConversationService:
                 ctx = await ConversationContext.objects.using('geodiscounts_db').acreate(conversation=conv)
             
             message_count = await conv.messages.acount()
+            last_location = None
+            if conv.last_location:
+                last_location = {
+                    'latitude': conv.last_location.y,
+                    'longitude': conv.last_location.x,
+                }
+
             return {
                 'stage': ctx.stage,
                 'topics': ctx.topics_discussed,
                 'intent': ctx.user_intent,
-                'count': message_count
+                'count': message_count,
+                'search_history': ctx.search_history,
+                'last_location': last_location,
+                'last_radius': conv.last_radius,
             }
         except Exception as e:
             geo_structured_logger.error(geo_logger, "Async Get context error", "conversation_service", e)
             return {}
+
+    async def async_get_recent_messages(self, conv: Conversation, limit: int = 5) -> List[str]:
+        """Return the most recent conversation messages for additional context."""
+        try:
+            messages_qs = conv.messages.order_by('-created_at')[:limit]
+            messages: List[str] = []
+            async for m in messages_qs:
+                messages.append(m.content)
+            messages.reverse()  # Oldest first for readability
+            return messages
+        except Exception as e:
+            geo_structured_logger.error(
+                geo_logger,
+                "Async Get recent messages error",
+                "conversation_service",
+                e,
+            )
+            return []
 
     # --- Maintaining legacy sync methods for now, but they call the new async ones (not ideal for true sync path) ---
     # Option 1: Keep them as sync but internally run async (can cause issues if not handled by an async runner)

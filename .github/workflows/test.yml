@@ -11,6 +11,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      DJANGO_SETTINGS_MODULE: coupon_core.settings.test
 
     steps:
     - name: Checkout code
@@ -25,9 +27,10 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y gdal-bin libgdal-dev libproj-dev
-        echo "GDAL version:"
-        gdalinfo --version
-        echo "GDAL_LIBRARY_PATH=/usr/lib/libgdal.so" >> $GITHUB_ENV
+        echo "GDAL version:" && gdalinfo --version
+        echo "GDAL_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/libgdal.so" >> $GITHUB_ENV
+        echo "LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+        sudo ln -s /usr/lib/x86_64-linux-gnu/libgdal.so /usr/lib/libgdal.so || true
 
     - name: Install Python dependencies
       run: |
@@ -53,6 +56,14 @@ jobs:
           echo "❌ Coverage is below 90%: $COVERAGE%"
           exit 1
         fi
+
+    - name: Install Node dependencies
+      working-directory: frontend
+      run: npm ci
+
+    - name: Run frontend tests
+      working-directory: frontend
+      run: npm run test
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
