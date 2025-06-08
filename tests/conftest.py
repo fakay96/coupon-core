@@ -11,7 +11,13 @@ def pytest_configure():
         return
 
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "coupon_core.settings.test")
-    django.setup()
+    try:
+        django.setup()
+    except OSError as exc:
+        if "libgdal" in str(exc):
+            pytest.skip("GDAL library missing", allow_module_level=True)
+            return
+        raise
 
 
 @pytest.hookimpl(hookwrapper=True, tryfirst=True)
