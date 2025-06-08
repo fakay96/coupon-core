@@ -9,6 +9,13 @@ import os
 from datetime import timedelta
 from .base import *  # Import base settings first
 
+# Ensure GeoDjango can locate the GDAL library during tests
+os.environ.setdefault("GDAL_LIBRARY_PATH", "/usr/lib/x86_64-linux-gnu/libgdal.so")
+os.environ.setdefault(
+    "LD_LIBRARY_PATH",
+    f"/usr/lib/x86_64-linux-gnu:{os.environ.get('LD_LIBRARY_PATH', '')}"
+)
+
 # Test Database Router
 class TestRouter:
     """
@@ -43,25 +50,18 @@ DEBUG = False
 # Secret Key
 SECRET_KEY = "test-secret-key-for-testing-only"
 
-# Use Spatialite for testing
+# Use a basic SQLite database for tests so no spatial libraries are required
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.contrib.gis.db.backends.spatialite',
-        'NAME': ':memory:'
-    },
-    'authentication_shard': {
-        'ENGINE': 'django.contrib.gis.db.backends.spatialite',
-        'NAME': ':memory:'
-    },
-    'geodiscounts_db': {
-        'ENGINE': 'django.contrib.gis.db.backends.spatialite',
-        'NAME': ':memory:'
-    },
-    'vector_db': {
-        'ENGINE': 'django.contrib.gis.db.backends.spatialite',
-        'NAME': ':memory:'
+    "default": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": ":memory:",
     }
 }
+
+# All additional databases point to the same in-memory SQLite instance
+DATABASES["authentication_shard"] = DATABASES["default"]
+DATABASES["geodiscounts_db"] = DATABASES["default"]
+DATABASES["vector_db"] = DATABASES["default"]
 
 # Configure migrations for test databases
 MIGRATION_MODULES = {}  # Allow all migrations to run
@@ -91,8 +91,6 @@ TEST_OUTPUT_DIR = os.path.join(BASE_DIR, 'test_reports')
 # Create test reports directory if it doesn't exist
 os.makedirs(TEST_OUTPUT_DIR, exist_ok=True)
 
-# Required for spatialite
-SPATIALITE_LIBRARY_PATH = 'mod_spatialite'
 
 # CORS Configuration
 CORS_ALLOW_ALL_ORIGINS = True

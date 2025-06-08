@@ -615,7 +615,9 @@ class ConversationalDiscountView(APIView):
                 
                 # Generate suggestions based on the results (now async)
                 try:
-                    suggestions = await self._generate_search_suggestions(search_results['results'])
+                    suggestions = await self._generate_search_suggestions(
+                        search_results['results'], context, history
+                    )
                 except Exception as e:
                     geo_structured_logger.error(geo_logger, "Failed to generate suggestions (async)", "suggestion_generation", error=str(e))
                     suggestions = ["Try a different search term", "Browse all categories", "Expand your search area"]
@@ -827,20 +829,28 @@ class ConversationalDiscountView(APIView):
                 "suggestions": [],
             }
     
-    async def _generate_search_suggestions(self, results: List[Dict]) -> List[str]: # Now async
-        """Generate search suggestions using Gemini (async)."""
+    async def _generate_search_suggestions(
+        self,
+        results: List[Dict],
+        context: Dict,
+        history: List[str],
+    ) -> List[str]:
+        """Generate search suggestions using Gemini with additional context."""
         try:
             if not results:
                 return [] # No suggestions if no results
                 
             gemini_response_obj = await self.gemini_client.async_generate_content(
                 prompt=f"""
-                Generate helpful search suggestions based on these results:
+                Generate helpful search suggestions based on these results.
                 Results: {json.dumps(results)}
-                
+                Context: {json.dumps(context)}
+                History: {json.dumps(history)}
+
                 Return a JSON array of suggestion strings that:
                 - Are relevant to the search results
                 - Help users refine their search
+                - Reference recent conversation history when helpful
                 - Are natural and conversational
                 - Are specific and actionable
                 """,
@@ -853,7 +863,17 @@ class ConversationalDiscountView(APIView):
             if not gemini_response_obj or not gemini_response_obj.text:
                 return [] # No suggestions if Gemini fails
                 
-            suggestions = json.loads(gemini_response_obj.text.strip()) # Assuming suggestions is JSON array string
+            try:
+                suggestions = json.loads(gemini_response_obj.text.strip())
+            except json.JSONDecodeError:
+                geo_structured_logger.error(
+                    geo_logger,
+                    "Suggestion JSON decode failed",
+                    "suggestion_generation",
+                    {"response": gemini_response_obj.text},
+                )
+                return []
+
             return suggestions[:5]  # Limit to 5 suggestions
             
         except Exception as e:

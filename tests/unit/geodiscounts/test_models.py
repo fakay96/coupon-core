@@ -1,11 +1,13 @@
 """
 Tests for the Geodiscount models.
 """
+import pytest
+pytest.importorskip("django", reason="Django not installed")
+
 from django.test import TestCase
 from django.contrib.gis.geos import Point
 from django.utils import timezone
 from django.core.exceptions import ValidationError
-import pytest
 from datetime import timedelta
 
 from geodiscounts.models import Retailer, Discount, SharedDiscount
