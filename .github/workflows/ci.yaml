@@ -123,6 +123,9 @@ jobs:
           pattern: version-metadata.json
           merge-multiple: false
 
+      - name: Install Helm
+        uses: azure/setup-helm@v3
+
       - name: Configure kubectl for DigitalOcean
         run: |
           mkdir -p ~/.kube

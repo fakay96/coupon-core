@@ -73,6 +73,9 @@ jobs:
       - name: Verify kubeconfig access
         run: kubectl get nodes
 
+      - name: Install Helm
+        uses: azure/setup-helm@v3
+
       - name: Validate Namespace
         run: |
           if [ -z "$NAMESPACE" ]; then
