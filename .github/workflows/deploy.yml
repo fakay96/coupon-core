@@ -73,6 +73,11 @@ jobs:
       - name: Verify kubeconfig access
         run: kubectl get nodes
 
+      - name: Install Helm
+        uses: azure/setup-helm@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Validate Namespace
         run: |
           if [ -z "$NAMESPACE" ]; then
@@ -97,6 +102,7 @@ jobs:
           fi
 
       - name: Deploy Backend & Celery
+        working-directory: ${{ github.workspace }}
         run: |
           helm upgrade --install coupon-service ./k8s/backend \
             --set backend.image.repository=fakay96/coupon-core \
@@ -109,6 +115,7 @@ jobs:
             --timeout 8m0s
 
       - name: Deploy Frontend
+        working-directory: ${{ github.workspace }}
         run: |
           helm upgrade --install frontend ./k8s/frontend \
             --set frontend.image.repository=$FRONTEND_REPO \

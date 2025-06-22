@@ -123,6 +123,19 @@ jobs:
           pattern: version-metadata.json
           merge-multiple: false
 
+      - name: Set version from metadata
+        run: |
+          VERSION_TAG=$(jq -r '.version' version-metadata.json)
+          echo "VERSION_TAG=$VERSION_TAG" >> $GITHUB_ENV
+
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install Helm
+        uses: azure/setup-helm@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Configure kubectl for DigitalOcean
         run: |
           mkdir -p ~/.kube
@@ -156,6 +169,7 @@ jobs:
           fi
 
       - name: Deploy Backend & Celery
+        working-directory: ${{ github.workspace }}
         run: |
           helm upgrade --install coupon-service ./k8s/backend \
             --set backend.image.repository=fakay96/coupon-core \
@@ -168,6 +182,7 @@ jobs:
             --timeout 8m0s
 
       - name: Deploy Frontend
+        working-directory: ${{ github.workspace }}
         run: |
           helm upgrade --install frontend ./k8s/frontend \
             --set frontend.image.repository=$FRONTEND_REPO \
@@ -178,6 +193,7 @@ jobs:
             --timeout 5m0s
 
       - name: Deploy Inference Service
+        working-directory: ${{ github.workspace }}
         run: |
           helm upgrade --install inference ./k8s/backend \
             --set inference.enabled=true \
@@ -189,6 +205,7 @@ jobs:
             --timeout 5m0s
 
       - name: Deploy Crawler
+        working-directory: ${{ github.workspace }}
         run: |
           helm upgrade --install crawler ./k8s/crawler \
             --set crawler.image.repository=fakay96/discount-crawler \
