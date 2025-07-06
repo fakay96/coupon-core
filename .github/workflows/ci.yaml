@@ -125,6 +125,8 @@ jobs:
 
       - name: Install Helm
         uses: azure/setup-helm@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Configure kubectl for DigitalOcean
         run: |
