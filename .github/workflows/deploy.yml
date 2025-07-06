@@ -119,6 +119,9 @@ jobs:
           echo "=== Git log (last 3 commits) ==="
           git log --oneline -3
 
+
+          
+
       - name: Deploy Backend & Celery
         run: |
           # Try to find the k8s/backend directory
