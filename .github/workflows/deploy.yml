@@ -9,8 +9,7 @@ on:
         type: string
       environment:
         description: 'Target environment'
-        required: false
-        default: staging
+        required: true
         type: choice
         options:
           - staging
@@ -34,15 +33,12 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment:
-      name: ${{ inputs.environment || 'staging' }}
+      name: ${{ inputs.environment }}
     env:
-      NAMESPACE: ${{ inputs.environment || 'staging' }}
+      NAMESPACE: ${{ inputs.environment }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download version artifact if version_tag not provided
         if: ${{ inputs.version_tag == null || inputs.version_tag == '' }}
@@ -76,11 +72,6 @@ jobs:
       - name: Verify kubeconfig access
         run: kubectl get nodes
 
-      - name: Install Helm
-        uses: azure/setup-helm@v3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Validate Namespace
         run: |
           if [ -z "$NAMESPACE" ]; then
@@ -104,62 +95,17 @@ jobs:
             echo "FRONTEND_REPO=fakay96/coupon-frontend" >> $GITHUB_ENV
           fi
 
-      - name: List files for debug
-        run: |
-          echo "=== Current working directory ==="
-          pwd
-          echo "=== Root directory contents ==="
-          ls -la
-          echo "=== k8s directory contents ==="
-          ls -la ./k8s || echo "k8s directory not found!"
-          echo "=== k8s/backend directory contents ==="
-          ls -la ./k8s/backend || echo "k8s/backend directory not found!"
-          echo "=== Git status ==="
-          git status
-          echo "=== Git log (last 3 commits) ==="
-          git log --oneline -3
-
       - name: Deploy Backend & Celery
         run: |
-          # Try to find the k8s/backend directory
-          if [ -d "./k8s/backend" ]; then
-            echo "Found k8s/backend directory using relative path"
-            HELM_CHART_PATH="./k8s/backend"
-          elif [ -d "$GITHUB_WORKSPACE/k8s/backend" ]; then
-            echo "Found k8s/backend directory using absolute path"
-            HELM_CHART_PATH="$GITHUB_WORKSPACE/k8s/backend"
-          else
-            echo "Error: k8s/backend directory not found in any expected location"
-            echo "Current directory: $(pwd)"
-            echo "GITHUB_WORKSPACE: $GITHUB_WORKSPACE"
-            ls -la
-            exit 1
-          fi
-          
-          helm upgrade --install coupon-service $HELM_CHART_PATH \
+          helm upgrade --install coupon-service ./k8s/backend \
             --set backend.image.repository=fakay96/coupon-core \
             --set backend.image.tag=$VERSION_TAG \
             --set celery.image.repository=fakay96/coupon-celery \
             --set celery.image.tag=$VERSION_TAG \
             --namespace $NAMESPACE --create-namespace \
-            -f $HELM_CHART_PATH/values/$NAMESPACE-values.yaml \
+            -f ./k8s/backend/values/$NAMESPACE-values.yaml \
             --atomic --force --cleanup-on-fail --history-max 5 \
             --timeout 8m0s
-
-      - name: Debug before Frontend deployment
-        run: |
-          echo "=== Debug before Frontend deployment ==="
-          echo "Current directory: $(pwd)"
-          echo "=== Root directory contents ==="
-          ls -la
-          echo "=== k8s directory contents ==="
-          ls -la ./k8s || echo "k8s directory not found!"
-          echo "=== k8s/frontend directory contents ==="
-          ls -la ./k8s/frontend || echo "k8s/frontend directory not found!"
-          echo "=== Environment variables ==="
-          echo "NAMESPACE: $NAMESPACE"
-          echo "VERSION_TAG: $VERSION_TAG"
-          echo "FRONTEND_REPO: $FRONTEND_REPO"
 
       - name: Deploy Frontend
         run: |
@@ -171,54 +117,14 @@ jobs:
             --atomic --force --cleanup-on-fail --history-max 5 \
             --timeout 5m0s
 
-      - name: Debug before Inference deployment
-        run: |
-          echo "=== Debug before Inference deployment ==="
-          echo "Current directory: $(pwd)"
-          echo "=== k8s/backend directory contents ==="
-          ls -la ./k8s/backend || echo "k8s/backend directory not found!"
-          echo "=== Environment variables ==="
-          echo "NAMESPACE: $NAMESPACE"
-          echo "VERSION_TAG: $VERSION_TAG"
+    
 
-      - name: Deploy Inference Service
-        run: |
-          helm upgrade --install inference ./k8s/backend \
-            --set inference.enabled=true \
-            --set inference.image.repository=fakay96/coupon-inference \
-            --set inference.image.tag=$VERSION_TAG \
-            --namespace $NAMESPACE --create-namespace \
-            -f ./k8s/backend/values/$NAMESPACE-values.yaml \
-            --atomic --force --cleanup-on-fail --history-max 5 \
-            --timeout 5m0s
-
-      - name: Debug before Crawler deployment
-        run: |
-          echo "=== Debug before Crawler deployment ==="
-          echo "Current directory: $(pwd)"
-          echo "=== k8s/crawler directory contents ==="
-          ls -la ./k8s/crawler || echo "k8s/crawler directory not found!"
-          echo "=== Environment variables ==="
-          echo "NAMESPACE: $NAMESPACE"
-          echo "VERSION_TAG: $VERSION_TAG"
-
-      - name: Deploy Crawler
-        run: |
-          helm upgrade --install crawler ./k8s/crawler \
-            --set crawler.image.repository=fakay96/discount-crawler \
-            --set crawler.image.tag=$VERSION_TAG \
-            --set crawler.operator.image.repository=fakay96/crawler-resource-operator \
-            --set crawler.operator.image.tag=$VERSION_TAG \
-            --namespace $NAMESPACE --create-namespace \
-            -f ./k8s/crawler/values/$NAMESPACE-values.yaml \
-            --atomic --force --cleanup-on-fail --history-max 5 \
-            --timeout 5m0s
+   
 
       - name: Verify service endpoints
         run: |
           kubectl get endpoints coupon-service -n $NAMESPACE || echo "Backend service endpoint not found!"
           kubectl get endpoints frontend -n $NAMESPACE || echo "Frontend service endpoint not found!"
-       
 
       - name: Debug pod logs on failure
         if: failure()
@@ -226,7 +132,7 @@ jobs:
           echo "Fetching logs for failed pods..."
           kubectl logs -l app=backend -n $NAMESPACE || echo "No logs found for backend"
           kubectl logs -l app=frontend -n $NAMESPACE || echo "No logs found for frontend"
-    
+          kubectl logs -l app=crawler -n $NAMESPACE || echo "No logs found for crawler"
 
       - name: Rollback on failure
         if: failure()
@@ -237,4 +143,3 @@ jobs:
           
           helm rollback coupon-service $LAST_BACKEND_REVISION -n $NAMESPACE || echo "Failed to rollback backend"
           helm rollback frontend $LAST_FRONTEND_REVISION -n $NAMESPACE || echo "Failed to rollback frontend"
-        
