@@ -52,6 +52,7 @@ from geodiscounts.v1.utils.understand_context import GeminiEmbeddingClient
 from geodiscounts.v1.serializers import ConversationSerializer
 
 from coupon_core.utils.logging import geo_logger, geo_structured_logger, log_execution
+from coupon_core.utils.async_authentication import AsyncJWTAuthentication
 
 # drf-yasg imports for OpenAPI documentation
 from drf_yasg.utils import swagger_auto_schema
@@ -61,6 +62,7 @@ from rest_framework.request import Request
 from django.utils import timezone
 import logging
 from django.db.models import Prefetch
+from asgiref.sync import sync_to_async, async_to_sync
 
 # Greeting patterns
 GREETING_PATTERNS = re.compile(r'^(hi|hello|hey|greetings)$', re.IGNORECASE)
@@ -68,10 +70,11 @@ MAX_DISTANCE_PARAM = 10
 spell = SpellChecker()
 learning_logger = logging.getLogger("search.learning")
 
-# Initialize shared Gemini client
-gemini_client = GeminiEmbeddingClient(
-   
-)
+def get_gemini_client():
+    """Lazily initialize and cache the GeminiEmbeddingClient."""
+    if not hasattr(get_gemini_client, '_client'):
+        get_gemini_client._client = GeminiEmbeddingClient()
+    return get_gemini_client._client
 
 def correct_spelling(text: str) -> str:
     """Correct common typos in user input."""
@@ -126,6 +129,7 @@ class CategoryView(APIView):
                 ),
             ),
         },
+        tags=['Categories'],
     )
     @log_execution(geo_logger, 'category_list')
     async def get(self, request) -> Response:
@@ -189,103 +193,289 @@ class ConversationalDiscountView(APIView):
     - User preference learning
     """
     permission_classes = [IsAuthenticated]
+    authentication_classes = [AsyncJWTAuthentication]
 
     def __init__(self):
         super().__init__()
-        self.conversation_service = ConversationService()
-        self.search_service = EnhancedSearchService()
-        self.gemini_client = gemini_client  # Use the shared client instance
+        # Lazy initialization - don't create services until needed
+        self._conversation_service = None
+        self._search_service = None
+        self._gemini_client = None
+
+    @property
+    def conversation_service(self):
+        """Lazy load conversation service."""
+        if self._conversation_service is None:
+            self._conversation_service = ConversationService()
+        return self._conversation_service
+
+    @property
+    def search_service(self):
+        """Lazy load search service."""
+        if self._search_service is None:
+            self._search_service = EnhancedSearchService()
+        return self._search_service
+
+    @property
+    def gemini_client(self):
+        """Lazy load Gemini client."""
+        if self._gemini_client is None:
+            self._gemini_client = get_gemini_client()
+        return self._gemini_client
 
     @swagger_auto_schema(
-        operation_description="Send a message in conversational discount search",
+        operation_description="""
+        Send a message in conversational discount search.
+        
+        This endpoint allows users to interact with an AI-powered discount discovery system using natural language.
+        The system can understand queries like "Show me fashion discounts near me" or "What grocery deals are available?"
+        and will respond with relevant discounts, suggestions, and follow-up questions.
+        
+        **Features:**
+        - Natural language processing for discount queries
+        - Location-based search using client coordinates
+        - Conversation context maintenance
+        - Intelligent suggestions for follow-up queries
+        - Real-time discount data retrieval
+        
+        **Example Queries:**
+        - "Show me fashion discounts within 2km"
+        - "What grocery deals are available today?"
+        - "Find electronics with at least 20% off"
+        - "Show me all Penny store discounts"
+        """,
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
-            properties={'message': openapi.Schema(type=openapi.TYPE_STRING)},
-            required=['message']
+            properties={
+                'message': openapi.Schema(
+                    type=openapi.TYPE_STRING, 
+                    description="Natural language query describing the desired discounts. Examples: 'Show me fashion discounts', 'Find grocery deals near me', 'What electronics are on sale?'",
+                    example="Show me fashion discounts within 3km"
+                ),
+                'conversation_id': openapi.Schema(
+                    type=openapi.TYPE_STRING, 
+                    description="Optional conversation ID to continue an existing conversation. If not provided, a new conversation will be created.",
+                    example="conv_12345678-1234-1234-1234-123456789abc"
+                ),
+                'radius': openapi.Schema(
+                    type=openapi.TYPE_NUMBER, 
+                    description="Search radius in meters. Default is 5000m (5km). Maximum is 50000m (50km).",
+                    default=5000,
+                    minimum=100,
+                    maximum=50000,
+                    example=3000
+                )
+            },
+            required=['message'],
+            example={
+                "message": "Show me fashion discounts within 2km",
+                "conversation_id": "conv_12345678-1234-1234-1234-123456789abc",
+                "radius": 2000
+            }
         ),
-        responses={HTTP_200_OK: openapi.Response(
-            description="Conversation response",
-            schema=openapi.Schema(
-                type=openapi.TYPE_OBJECT,
-                properties={
-                    'message_id': openapi.Schema(type=openapi.TYPE_STRING),
-                    'conversation_id': openapi.Schema(type=openapi.TYPE_STRING),
-                    'response': openapi.Schema(type=openapi.TYPE_STRING),
-                    'message_type': openapi.Schema(type=openapi.TYPE_STRING,
-                                                 enum=['greeting','conversation','search_results','searching','error']),
-                    'results': openapi.Schema(type=openapi.TYPE_ARRAY,items=openapi.Schema(type=openapi.TYPE_OBJECT)),
-                    'suggestions': openapi.Schema(type=openapi.TYPE_ARRAY,items=openapi.Schema(type=openapi.TYPE_STRING)),
-                    'context': openapi.Schema(type=openapi.TYPE_OBJECT),
-                    'search_id': openapi.Schema(type=openapi.TYPE_STRING)
-                }
-            ))}
+        responses={
+            HTTP_200_OK: openapi.Response(
+                description="Conversation response with discount results and suggestions",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'message_id': openapi.Schema(
+                            type=openapi.TYPE_STRING,
+                            description="Unique identifier for this message response",
+                            example="msg_87654321-4321-4321-4321-cba987654321"
+                        ),
+                        'conversation_id': openapi.Schema(
+                            type=openapi.TYPE_STRING,
+                            description="Conversation ID for continuing the chat",
+                            example="conv_12345678-1234-1234-1234-123456789abc"
+                        ),
+                        'response': openapi.Schema(
+                            type=openapi.TYPE_STRING,
+                            description="AI-generated response to the user's query",
+                            example="I found 15 fashion discounts within 2km of your location. Here are the best deals:"
+                        ),
+                        'message_type': openapi.Schema(
+                            type=openapi.TYPE_STRING,
+                            enum=['greeting','conversation','search_results','searching','error'],
+                            description="Type of message response. 'greeting' for initial interactions, 'conversation' for ongoing chat, 'search_results' when discounts are found, 'searching' when processing, 'error' for issues."
+                        ),
+                        'results': openapi.Schema(
+                            type=openapi.TYPE_ARRAY,
+                            items=openapi.Schema(
+                                type=openapi.TYPE_OBJECT,
+                                properties={
+                                    'id': openapi.Schema(type=openapi.TYPE_INTEGER, example=123),
+                                    'name': openapi.Schema(type=openapi.TYPE_STRING, example="Nike Air Max Sneakers"),
+                                    'store_name': openapi.Schema(type=openapi.TYPE_STRING, example="Penny"),
+                                    'original_price': openapi.Schema(type=openapi.TYPE_NUMBER, example=89.99),
+                                    'sale_price': openapi.Schema(type=openapi.TYPE_NUMBER, example=59.99),
+                                    'discount_percentage': openapi.Schema(type=openapi.TYPE_STRING, example="33%"),
+                                    'distance': openapi.Schema(type=openapi.TYPE_NUMBER, example=1.2),
+                                    'valid_until': openapi.Schema(type=openapi.TYPE_STRING, example="2024-01-15"),
+                                    'category': openapi.Schema(type=openapi.TYPE_STRING, example="fashion")
+                                }
+                            ),
+                            description="Array of discount items matching the search criteria"
+                        ),
+                        'suggestions': openapi.Schema(
+                            type=openapi.TYPE_ARRAY,
+                            items=openapi.Schema(type=openapi.TYPE_STRING),
+                            description="Suggested follow-up queries to help users discover more discounts",
+                            example=["Show me grocery deals", "Find electronics discounts", "What's on sale at Penny?"]
+                        ),
+                        'context': openapi.Schema(
+                            type=openapi.TYPE_OBJECT,
+                            description="Conversation context for maintaining chat state",
+                            properties={
+                                'search_history': openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Schema(type=openapi.TYPE_STRING)),
+                                'preferences': openapi.Schema(type=openapi.TYPE_OBJECT),
+                                'last_query': openapi.Schema(type=openapi.TYPE_STRING)
+                            }
+                        ),
+                        'search_id': openapi.Schema(
+                            type=openapi.TYPE_STRING,
+                            description="Unique identifier for this search operation",
+                            example="search_98765432-5432-5432-5432-210987654321"
+                        ),
+                        'metadata': openapi.Schema(
+                            type=openapi.TYPE_OBJECT,
+                            description="Additional metadata about the search results",
+                            properties={
+                                'total_results': openapi.Schema(type=openapi.TYPE_INTEGER, example=15),
+                                'search_time_ms': openapi.Schema(type=openapi.TYPE_INTEGER, example=245),
+                                'radius_used': openapi.Schema(type=openapi.TYPE_NUMBER, example=2000),
+                                'categories_found': openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Schema(type=openapi.TYPE_STRING))
+                            }
+                        )
+                    }
+                )
+            ),
+            HTTP_400_BAD_REQUEST: openapi.Response(
+                description="Bad request - Invalid input parameters",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'error': openapi.Schema(
+                            type=openapi.TYPE_STRING,
+                            description="Error message describing what went wrong",
+                            example="Message is required"
+                        ),
+                        'details': openapi.Schema(
+                            type=openapi.TYPE_STRING,
+                            description="Additional error details if available",
+                            example="The message field cannot be empty"
+                        )
+                    }
+                )
+            ),
+            HTTP_500_INTERNAL_SERVER_ERROR: openapi.Response(
+                description="Internal server error - Something went wrong on the server",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'error': openapi.Schema(
+                            type=openapi.TYPE_STRING,
+                            description="Generic error message",
+                            example="Internal server error"
+                        ),
+                        'details': openapi.Schema(
+                            type=openapi.TYPE_STRING,
+                            description="Technical error details for debugging",
+                            example="Failed to process conversation request"
+                        )
+                    }
+                )
+            )
+        },
+        tags=['Discounts'],
     )
-    async def post(self, request: Request) -> Response:
+    def post(self, request: Request) -> Response:
+        """Handle conversational discount search requests."""
+        # Use sync_to_async to handle the async operations
+        return async_to_sync(self._async_post)(request)
+    
+    async def _async_post(self, request: Request) -> Response:
+        """Async implementation of the post method."""
         try:
             raw = request.data.get('message','').strip()
             if not raw:
                 return Response({"error":"Message is required"},status=HTTP_400_BAD_REQUEST)
-            message_content = correct_spelling(raw) # Assuming correct_spelling is lightweight
+            message_content = correct_spelling(raw)
 
             conv_id = request.data.get('conversation_id')
-            lat = request.client_latitude # Assuming these are available from an async middleware or sync_to_async if needed
+            lat = request.client_latitude
             lon = request.client_longitude
             radius = float(request.data.get('radius',5000))
             loc_data = {"latitude":lat,"longitude":lon}
 
-            # Updated to use async version of conversation service method
+            # Handle anonymous users by creating a temporary guest user
+            user = request.user
+            if user.is_anonymous:
+                from authentication.models import CustomUser
+                # Create a temporary guest user for anonymous requests
+                user, created = await sync_to_async(CustomUser.objects.get_or_create)(
+                    email="anonymous@temp.com",
+                    defaults={
+                        "username": "anonymous_user",
+                        "is_guest": True,
+                    }
+                )
+                if created:
+                    await sync_to_async(user.set_unusable_password)()
+                    await sync_to_async(user.save)()
+
             conversation = await self.conversation_service.async_get_or_create(
-                user=request.user, conv_id=conv_id
+                user=user, conv_id=conv_id
             )
-            
-            # Updated to use async ORM method
             user_msg = await ConversationMessage.objects.acreate(
                 conversation=conversation,
                 role=ConversationMessage.MessageRole.USER,
                 content=message_content,
-                message_type=self._determine_message_type(message_content) # This is sync
+                message_type=self._determine_message_type(message_content)
             )
-            
-            # Updated to await async helper method
-            response_data = await self._process_message(
-                message=user_msg, conversation=conversation,
-                request=request, radius=radius, location_data=loc_data
-            )
-            
-            # Updated to use async ORM method
+            context = await self.conversation_service.async_get_context(conversation)
+            history = await self.conversation_service.async_get_recent_messages(conversation)
+
+            if user_msg.message_type == ConversationMessage.MessageType.GREETING:
+                response_data = self._process_message(
+                    message=user_msg, conversation=conversation,
+                    request=request, radius=radius, location_data=loc_data,
+                    context=context, history=history
+                )
+            elif user_msg.message_type == ConversationMessage.MessageType.SEARCH_QUERY:
+                response_data = await self._handle_search_query(
+                    user_msg, conversation, request, radius, loc_data, context, history
+                )
+            else:
+                response_data = await self._handle_general_conversation(user_msg, context, history)
+
             assistant_msg = await ConversationMessage.objects.acreate(
                 conversation=conversation,
                 role=ConversationMessage.MessageRole.ASSISTANT,
                 content=response_data['response'],
                 message_type=response_data['message_type'],
                 metadata=response_data.get('metadata',{}),
-                search_request=response_data.get('search_request') # Ensure search_request is obtained correctly if it's an ORM object
+                search_request=response_data.get('search_request')
             )
-            
-            # Updated to use async version of conversation service method
             await self.conversation_service.async_update_context(conversation)
-
-            # Learning log (remains synchronous for logging)
             if 'search_id' in response_data:
                 learning_logger.info("Search run",extra={
                     'query':user_msg.content,'search_id':response_data['search_id'],
                     'count':len(response_data.get('results',[])),
                     'suggestions':response_data.get('suggestions',[])
                 })
-
             response_data.update({
                 'message_id':str(assistant_msg.id),
                 'conversation_id':str(conversation.id)
             })
             return Response(response_data, status=HTTP_200_OK)
-
         except Exception as e:
             geo_structured_logger.error(
                 geo_logger,
                 "Error processing conversational message",
                 "conversational_discount",
                 e,
-                {'user_id': request.user.id}
+                {'user_id': getattr(request.user, 'id', None)}
             )
             return Response(
                 {"error": "Internal server error"},
@@ -313,38 +503,24 @@ class ConversationalDiscountView(APIView):
         
         return ConversationMessage.MessageType.CONVERSATION # Default
     
-    async def _process_message(
+    def _process_message(
         self, 
         message: ConversationMessage, 
         conversation: Conversation,
         request: Request, 
         radius: float,
-        location_data: Dict
-    ) -> Dict[str, Any]:
-        """Process message and generate appropriate response (async)."""
-        
-        # Get conversation context and recent message history (now async)
-        context = await self.conversation_service.async_get_context(conversation)
-        history = await self.conversation_service.async_get_recent_messages(conversation)
-        
-        # Handle different message types (calling async helpers)
+        location_data: dict,
+        context: dict,
+        history: list
+    ) -> dict:
         if message.message_type == ConversationMessage.MessageType.GREETING:
-            return await self._handle_greeting(context)
-        
-        elif message.message_type == ConversationMessage.MessageType.SEARCH_QUERY:
-            return await self._handle_search_query(
-                message, conversation, request, radius, location_data, context, history
-            )
-        
-        else: # General conversation
-            return await self._handle_general_conversation(message, context, history)
+            return self._handle_greeting(context)
+        # For other types, should not be called
+        return {}
     
-    async def _handle_greeting(self, context: Dict) -> Dict[str, Any]: # Now async, though no async calls within yet
-        """Handle greeting messages (async)."""
-        # This method itself doesn't make async calls but is called by an async method.
-        # If it were to make LLM calls for personalized greetings, those would be awaited.
+    def _handle_greeting(self, context: Dict) -> Dict[str, Any]:
+        """Handle greeting messages."""
         stage = context.get('stage', 'initial')
-        
         if stage == 'initial':
             response = "Hello! I'm here to help you find the best discounts and deals. What are you looking for today?"
             suggestions = [
@@ -359,7 +535,6 @@ class ConversationalDiscountView(APIView):
                 "Expand my search area",
                 "Show me more options"
             ]
-        
         return {
             'response': response,
             'message_type': ConversationMessage.MessageType.GREETING,
@@ -368,138 +543,80 @@ class ConversationalDiscountView(APIView):
             'metadata': {'greeting_type': stage}
         }
     
-    async def _enhance_search_query(self, query: str, context: Dict, history: List[str]) -> Dict[str, Any]: # Now async
-        """Enhance search query using Gemini for better understanding (async)."""
+    async def _enhance_search_query(self, query: str, context: Dict, history: List[str]) -> Dict[str, Any]:
+        """Enhance search query using fast heuristics instead of expensive LLM calls."""
         try:
-            # Use Gemini to analyze and enhance the query (now async)
-            enhanced_response = await self.gemini_client.async_generate_content(
-                prompt=f"""
-                Analyze this search query and determine the most relevant category and search terms.
-                Query: "{query}"
-                Context: {json.dumps(context)}
-                History: {json.dumps(history)}
-                Recent Searches: {json.dumps(context.get('search_history', []))}
-                Last Known Location: {json.dumps(context.get('last_location'))}
-                
-                Return a JSON object with these exact fields:
-                {{
-                    "enhanced_query": "improved search query",
-                    "search_type": "general/specific/category/location",
-                    "confidence": 0.8,
-                    "category": {{
-                        "name": "exact category name",
-                        "confidence": 0.8
-                    }},
-                    "suggested_filters": {{
-                        "price_range": {{
-                            "min": 0,
-                            "max": 1000
-                        }},
-                        "brand": "brand name"
-                    }}
-                }}
-                
-                IMPORTANT: 
-                - The category name must exactly match one of: fashion, grocery, electronics, home, beauty, sports, entertainment, other
-                - If unsure about category, use "other"
-                - Return ONLY the JSON object, no other text
-                """,
-                response_schema={
-                    'type': 'OBJECT',
-                    'properties': {
-                        'enhanced_query': {'type': 'STRING'},
-                        'search_type': {'type': 'STRING'},
-                        'confidence': {'type': 'NUMBER'},
-                        'category': {
-                            'type': 'OBJECT',
-                            'properties': {
-                                'name': {'type': 'STRING'},
-                                'confidence': {'type': 'NUMBER'}
-                            }
-                        },
-                        'suggested_filters': {
-                            'type': 'OBJECT',
-                            'properties': {
-                                'price_range': {
-                                    'type': 'OBJECT',
-                                    'properties': {
-                                        'min': {'type': 'NUMBER'},
-                                        'max': {'type': 'NUMBER'}
-                                    }
-                                },
-                                'brand': {'type': 'STRING'}
-                            }
-                        }
-                    }
+            # Use simple keyword-based enhancement for speed
+            query_lower = query.lower()
+            
+            # Simple category detection
+            category_keywords = {
+                'fashion': ['clothing', 'shoes', 'dress', 'shirt', 'pants', 'fashion', 'style'],
+                'grocery': ['food', 'grocery', 'fresh', 'organic', 'produce', 'meat', 'dairy'],
+                'electronics': ['phone', 'laptop', 'computer', 'electronics', 'tech', 'gadget'],
+                'home': ['furniture', 'home', 'kitchen', 'bedroom', 'living room', 'decor'],
+                'beauty': ['makeup', 'beauty', 'cosmetics', 'skincare', 'perfume'],
+                'sports': ['sport', 'fitness', 'gym', 'running', 'exercise', 'athletic'],
+                'entertainment': ['movie', 'game', 'book', 'music', 'entertainment']
+            }
+            
+            detected_category = 'other'
+            category_confidence = 0.5
+            
+            for category, keywords in category_keywords.items():
+                for keyword in keywords:
+                    if keyword in query_lower:
+                        detected_category = category
+                        category_confidence = 0.8
+                        break
+                if category_confidence > 0.5:
+                    break
+            
+            # Simple search type detection
+            search_type = 'general'
+            if any(word in query_lower for word in ['near', 'around', 'location', 'distance']):
+                search_type = 'location'
+            elif any(word in query_lower for word in ['brand', 'specific', 'exact']):
+                search_type = 'specific'
+            elif detected_category != 'other':
+                search_type = 'category'
+            
+            # Simple price range detection
+            price_range = None
+            if any(word in query_lower for word in ['cheap', 'budget', 'under', 'less than']):
+                price_range = {'max': 50}
+            elif any(word in query_lower for word in ['expensive', 'premium', 'luxury']):
+                price_range = {'min': 100}
+            
+            # Simple brand detection
+            brand_preferences = []
+            common_brands = ['nike', 'adidas', 'apple', 'samsung', 'penny', 'aldi', 'lidl']
+            for brand in common_brands:
+                if brand in query_lower:
+                    brand_preferences.append(brand)
+            
+            return {
+                'query': query,  # Keep original query for now
+                'confidence': category_confidence,
+                'search_type': search_type,
+                'category': {
+                    'name': detected_category,
+                    'confidence': category_confidence
+                },
+                'filters': {
+                    'price_range': price_range,
+                    'brand': brand_preferences[0] if brand_preferences else None
                 }
+            }
+            
+        except Exception as e:
+            geo_structured_logger.error(
+                geo_logger,
+                "Query enhancement failed",
+                "query_enhancement",
+                {"error": str(e), "context": {"query": query}}
             )
-            
-            if not enhanced_response or not enhanced_response.text:
-                # Return default structure when no specific enhancement found
-                return {
-                    'query': query,
-                    'confidence': 0.5,
-                    'search_type': 'general',
-                    'category': {
-                        'name': 'other',
-                        'confidence': 0.5
-                    },
-                    'filters': {
-                        'price_range': {'min': 0, 'max': float('inf')} # Ensure this default is sensible
-                    }
-                }
-                
-            # Extract JSON from response
-            text = enhanced_response.text.strip()
-            json_start = text.find('{')
-            json_end = text.rfind('}') + 1
-            if json_start >= 0 and json_end > json_start:
-                json_str = text[json_start:json_end]
-                try:
-                    result = json.loads(json_str)
-                except json.JSONDecodeError:
-                    geo_structured_logger.error(
-                        geo_logger,
-                        "Query enhancement JSON decode failed",
-                        "query_enhancement",
-                        {'response': enhanced_response.text},
-                    )
-                    result = {}
-                
-                # Validate category
-                valid_categories = ['fashion', 'grocery', 'electronics', 'home', 'beauty', 'sports', 'entertainment', 'other']
-                category_name = result.get('category', {}).get('name', '').lower()
-                if category_name not in valid_categories:
-                    category_name = 'other'
-                
-                # If confidence is low or no specific category found, return all categories
-                if (result.get('confidence', 0) < 0.3 or 
-                    result.get('category', {}).get('confidence', 0) < 0.3):
-                    return {
-                        'query': query,
-                        'confidence': 0.5,
-                        'search_type': 'general',
-                        'category': {
-                            'name': category_name,
-                            'confidence': 0.5
-                        },
-                        'filters': {
-                            'price_range': {'min': 0, 'max': float('inf')}
-                        }
-                    }
-                
-                return {
-                    'query': result.get('enhanced_query', query),
-                    'search_type': result.get('search_type', 'general'),
-                    'confidence': result.get('confidence', 0.5),
-                    'category': {
-                        'name': category_name,
-                        'confidence': result.get('category', {}).get('confidence', 0.5)
-                    },
-                    'filters': result.get('suggested_filters', {})
-                }
-            
-            # Return all categories if JSON parsing fails
+            # Return default structure on error
             return {
                 'query': query,
                 'confidence': 0.5,
@@ -510,30 +627,6 @@ class ConversationalDiscountView(APIView):
                 },
                 'filters': {
                     'price_range': {'min': 0, 'max': float('inf')}
-                }
-            }
-            
-        except Exception as e:
-            geo_structured_logger.error(
-                geo_logger,
-                "Query enhancement failed",
-                "query_enhancement",
-                {
-                    'error': str(e),
-                    'context': {'query': query}
-                }
-            )
-            # Return all categories on error
-            return {
-                'query': query,
-                'confidence': 0.5,
-                'search_type': 'general',
-                'category': {
-                    'name': 'other',
-                    'confidence': 0.5
-                },
-                'filters': {
-                    'price_range': {'min': 0, 'max': float('inf')} # Default
                 }
             }
 
@@ -617,7 +710,12 @@ class ConversationalDiscountView(APIView):
                 try:
                     suggestions = await self._generate_search_suggestions(search_results['results'])
                 except Exception as e:
-                    geo_structured_logger.error(geo_logger, "Failed to generate suggestions (async)", "suggestion_generation", error=str(e))
+                    geo_structured_logger.error(
+                        geo_logger,
+                        "Failed to generate suggestions (async)",
+                        "suggestion_generation",
+                        {"error": str(e)}
+                    )
                     suggestions = ["Try a different search term", "Browse all categories", "Expand your search area"]
                 return {
                     'response': response,
@@ -652,7 +750,9 @@ class ConversationalDiscountView(APIView):
             
             else:  # Failed search status
                 category_deals = await self._get_all_categories() # Now async
-                await search_request.amark_failed(error_message=search_results.get('error_message', "Unknown search failure"))
+                search_request.status = SearchRequest.SearchStatus.FAILED
+                search_request.error_message = search_results.get('error_message', "Unknown search failure")
+                await search_request.asave(update_fields=['status', 'error_message'])
                 return {
                     'response': "I couldn't complete your search, but here are some great deals in your area!",
                     'message_type': ConversationMessage.MessageType.SEARCH_RESULTS,
@@ -666,9 +766,17 @@ class ConversationalDiscountView(APIView):
                 }
                 
         except Exception as e: # Catch-all for other exceptions during the process
-            geo_structured_logger.error(geo_logger, "Error in _handle_search_query (async)", "search_handling", e, search_id=str(search_request.id))
+            geo_structured_logger.error(
+                geo_logger,
+                "Error in _handle_search_query (async)",
+                "search_handling",
+                {"error": str(e), "search_id": str(search_request.id) if 'search_request' in locals() else None}
+            )
             category_deals = await self._get_all_categories() # Now async
-            await search_request.amark_failed(error_message=str(e)) # Ensure amark_failed exists or use asave
+            if 'search_request' in locals():
+                search_request.status = SearchRequest.SearchStatus.FAILED
+                search_request.error_message = str(e)
+                await search_request.asave(update_fields=['status', 'error_message'])
             return {
                 'response': "I encountered an issue with your search, but here are some great deals in your area!",
                 'message_type': ConversationMessage.MessageType.SEARCH_RESULTS,
@@ -678,56 +786,45 @@ class ConversationalDiscountView(APIView):
                     "Browse all categories",
                     "Expand your search area"
                 ],
-                'search_id': str(search_request.id)
+                'search_id': str(search_request.id) if 'search_request' in locals() else None
             }
 
     async def _get_all_categories(self) -> List[Dict]: # Now async
         """Get all available categories and their discounts grouped by retailer (async)."""
         try:
-            # The complex prefetch might be hard to do with full async ORM elegantly.
-            # Wrapping the synchronous ORM call in to_thread for this part.
-            def _fetch_categories_sync():
-                categories_qs = Category.objects.filter(discounts__isnull=False).distinct().prefetch_related(
-                    Prefetch(
-                        'discounts',
-                        queryset=Discount.objects.select_related('retailer').order_by('retailer__name', '-created_at')
-                    )
-                )
-                
-                results_sync = []
-                for category_item in categories_qs: # Iterate over sync queryset
-                    sample_discount_sync = category_item.discounts.first() # Sync access
-                    
-                    if sample_discount_sync:
-                        retailer_groups_sync = {}
-                        for discount_item in category_item.discounts.all(): # Sync access
-                            retailer_sync = discount_item.retailer
-                            if retailer_sync:
-                                if retailer_sync.id not in retailer_groups_sync:
-                                    retailer_groups_sync[retailer_sync.id] = {
-                                        'id': str(retailer_sync.id), 'name': retailer_sync.name, 'type': 'retailer',
-                                        'image': None, 'description': f"Browse all {retailer_sync.name} deals",
-                                        'discounts': []
-                                    }
-                                retailer_groups_sync[retailer_sync.id]['discounts'].append({
-                                    'id': str(discount_item.id), 'title': discount_item.title, 'url': discount_item.url,
-                                    'type': 'discount', 'category': {'id': str(category_item.id), 'name': category_item.name}
-                                })
-                        
-                        category_data_sync = {
-                            'id': str(category_item.id), 'name': category_item.name, 'type': 'category',
-                            'image': category_item.image.url if category_item.image else None,
-                            'description': f"Browse all {category_item.name} deals",
-                            'discount_count': category_item.discounts.count(), # Sync access
-                            'retailers': list(retailer_groups_sync.values())
-                        }
-                        results_sync.append(category_data_sync)
-                return results_sync
-
-            results = await asyncio.to_thread(_fetch_categories_sync)
+            # Use proper async ORM operations
+            categories_qs = Category.objects.filter(discounts__isnull=False).distinct()
             
-            if not results:
-                return []
+            results = []
+            async for category_item in categories_qs:
+                # Get discounts for this category
+                discounts_qs = category_item.discounts.select_related('retailer').order_by('retailer__name', '-created_at')
+                
+                retailer_groups = {}
+                async for discount_item in discounts_qs:
+                    retailer = discount_item.retailer
+                    if retailer:
+                        if retailer.id not in retailer_groups:
+                            retailer_groups[retailer.id] = {
+                                'id': str(retailer.id), 'name': retailer.name, 'type': 'retailer',
+                                'image': None, 'description': f"Browse all {retailer.name} deals",
+                                'discounts': []
+                            }
+                        retailer_groups[retailer.id]['discounts'].append({
+                            'id': str(discount_item.id), 'title': discount_item.title, 'url': discount_item.url,
+                            'type': 'discount', 'category': {'id': str(category_item.id), 'name': category_item.name}
+                        })
+                
+                if retailer_groups:
+                    category_data = {
+                        'id': str(category_item.id), 'name': category_item.name, 'type': 'category',
+                        'image': category_item.image.url if category_item.image else None,
+                        'description': f"Browse all {category_item.name} deals",
+                        'discount_count': await category_item.discounts.acount(),
+                        'retailers': list(retailer_groups.values())
+                    }
+                    results.append(category_data)
+            
             return results
             
         except Exception as e:
@@ -766,137 +863,178 @@ class ConversationalDiscountView(APIView):
     async def _generate_contextual_response(
         self, content: str, context: Dict, history: List[str]
     ) -> Dict[str, Any]:
-        """Generate contextual response and suggestions using Gemini (async)."""
+        """Generate contextual response using fast heuristics instead of expensive LLM calls."""
         try:
-            gemini_response_obj = await self.gemini_client.async_generate_content(
-                prompt=f"""
-                Generate a helpful response for this user message using the provided context.
-                Message: "{content}"
-                Context: {json.dumps(context)}
-                History: {json.dumps(history)}
-                Recent Searches: {json.dumps(context.get('search_history', []))}
-                Last Known Location: {json.dumps(context.get('last_location'))}
-
-                The response should be:
-                - Natural and conversational
-                - Relevant to the user's query
-                - Include suggestions if appropriate
-                - Be concise but informative
-                """,
-                response_schema={
-                    'type': 'OBJECT',
-                    'properties': {
-                        'response': {'type': 'STRING'},
-                        'suggestions': {
-                            'type': 'ARRAY',
-                            'items': {'type': 'STRING'}
-                        }
-                    }
-                }
-            )
+            content_lower = content.lower()
             
-            if not gemini_response_obj or not gemini_response_obj.text:
-                return {
-                    "response": "I understand you're looking for deals. Could you tell me more about what you're interested in?",
-                    "suggestions": [],
-                }
-
-            try:
-                result = json.loads(gemini_response_obj.text.strip())
-            except json.JSONDecodeError:
-                geo_structured_logger.error(
-                    geo_logger,
-                    "Contextual response JSON decode failed",
-                    "response_generation",
-                    {'response': gemini_response_obj.text},
-                )
-                return {"response": gemini_response_obj.text.strip(), "suggestions": []}
-
+            # Simple response generation based on content keywords
+            if any(word in content_lower for word in ['thank', 'thanks', 'appreciate']):
+                response = "You're welcome! I'm here to help you find the best deals. Is there anything specific you're looking for?"
+                suggestions = ["Find discounts near me", "Show me today's deals", "What's on sale?"]
+            
+            elif any(word in content_lower for word in ['help', 'assist', 'support']):
+                response = "I can help you find discounts and deals! Just tell me what you're looking for - like 'fashion deals' or 'grocery discounts near me'."
+                suggestions = ["Find fashion deals", "Show me grocery discounts", "What's available nearby?"]
+            
+            elif any(word in content_lower for word in ['how', 'what', 'where', 'when']):
+                response = "I can help you find that! Try asking me something like 'Show me fashion deals near me' or 'Find grocery discounts'."
+                suggestions = ["Show me fashion deals", "Find grocery discounts", "What's on sale today?"]
+            
+            elif any(word in content_lower for word in ['yes', 'yeah', 'sure', 'okay']):
+                response = "Great! What would you like to search for? I can help you find deals on fashion, groceries, electronics, and more."
+                suggestions = ["Find fashion deals", "Show me grocery discounts", "What electronics are on sale?"]
+            
+            elif any(word in content_lower for word in ['no', 'not', 'dont', "don't"]):
+                response = "No problem! Let me know if you change your mind or if there's anything else I can help you with."
+                suggestions = ["Find different deals", "Show me all categories", "What's new today?"]
+            
+            else:
+                # Default response for general conversation
+                response = "I understand! I'm here to help you find great deals and discounts. What are you looking for today?"
+                suggestions = [
+                    "Find fashion deals near me",
+                    "Show me grocery discounts", 
+                    "What electronics are on sale?",
+                    "Find deals under $50"
+                ]
+            
             return {
-                "response": result.get(
-                    "response",
-                    "I understand. Could you provide more details on what you're looking for?",
-                ),
-                "suggestions": result.get("suggestions", []),
+                "response": response,
+                "suggestions": suggestions,
             }
             
         except Exception as e:
-            geo_structured_logger.error(geo_logger, "Response generation failed (async)", "response_generation", error=str(e), content=content)
+            geo_structured_logger.error(
+                geo_logger,
+                "Response generation failed (async)",
+                "response_generation",
+                {"error": str(e), "content": content}
+            )
             return {
                 "response": "I understand. Could you tell me more about what you're looking for?",
-                "suggestions": [],
+                "suggestions": ["Find fashion deals", "Show me grocery discounts", "What's on sale?"],
             }
     
     async def _generate_search_suggestions(self, results: List[Dict]) -> List[str]: # Now async
-        """Generate search suggestions using Gemini (async)."""
+        """Generate search suggestions using fast heuristics instead of expensive LLM calls."""
         try:
             if not results:
-                return [] # No suggestions if no results
-                
-            gemini_response_obj = await self.gemini_client.async_generate_content(
-                prompt=f"""
-                Generate helpful search suggestions based on these results:
-                Results: {json.dumps(results)}
-                
-                Return a JSON array of suggestion strings that:
-                - Are relevant to the search results
-                - Help users refine their search
-                - Are natural and conversational
-                - Are specific and actionable
-                """,
-                response_schema={
-                    'type': 'ARRAY',
-                    'items': {'type': 'STRING'}
-                }
-            )
+                return ["Try a different search term", "Browse all categories", "Expand your search area"]
             
-            if not gemini_response_obj or not gemini_response_obj.text:
-                return [] # No suggestions if Gemini fails
-                
-            suggestions = json.loads(gemini_response_obj.text.strip()) # Assuming suggestions is JSON array string
-            return suggestions[:5]  # Limit to 5 suggestions
+            # Extract categories and retailers from results for context-aware suggestions
+            categories = set()
+            retailers = set()
+            
+            for result in results[:10]:  # Limit to first 10 results for speed
+                if result.get('category'):
+                    categories.add(result['category'])
+                if result.get('retailer_name'):
+                    retailers.add(result['retailer_name'])
+            
+            suggestions = []
+            
+            # Generate context-aware suggestions without LLM calls
+            if categories:
+                category_list = list(categories)[:3]  # Limit to 3 categories
+                for category in category_list:
+                    suggestions.append(f"Show me more {category} deals")
+                    suggestions.append(f"Find {category} discounts near me")
+            
+            if retailers:
+                retailer_list = list(retailers)[:2]  # Limit to 2 retailers
+                for retailer in retailer_list:
+                    suggestions.append(f"What's on sale at {retailer}?")
+            
+            # Add generic suggestions
+            suggestions.extend([
+                "Show me deals with bigger discounts",
+                "Find items under $50",
+                "Show me deals ending soon"
+            ])
+            
+            # Return unique suggestions, limited to 5
+            unique_suggestions = []
+            seen = set()
+            for suggestion in suggestions:
+                if suggestion not in seen and len(unique_suggestions) < 5:
+                    unique_suggestions.append(suggestion)
+                    seen.add(suggestion)
+            
+            return unique_suggestions
             
         except Exception as e:
-            geo_structured_logger.error(geo_logger, "Suggestion generation failed (async)", "suggestion_generation", error=str(e))
-            return [] # Return empty on error
+            geo_structured_logger.error(
+                geo_logger,
+                "Suggestion generation failed (async)",
+                "suggestion_generation",
+                {"error": str(e)}
+            )
+            # Return fallback suggestions without LLM
+            return ["Try a different search term", "Browse all categories", "Expand your search area"]
   
-    async def get(self, request: Request, conversation_id: str = None) -> Response: # Now async
-        """Get conversation details or list user's conversations (async)."""
+    @swagger_auto_schema(
+        operation_description="Get conversation details or list user's conversations",
+        manual_parameters=[
+            openapi.Parameter(
+                'conversation_id',
+                openapi.IN_PATH,
+                description="Optional conversation ID to get specific conversation",
+                type=openapi.TYPE_STRING
+            )
+        ],
+        responses={
+            HTTP_200_OK: openapi.Response(
+                description="Conversation data retrieved successfully",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'conversations': openapi.Schema(
+                            type=openapi.TYPE_ARRAY,
+                            items=openapi.Schema(type=openapi.TYPE_OBJECT)
+                        ),
+                        'total_count': openapi.Schema(type=openapi.TYPE_INTEGER)
+                    }
+                )
+            ),
+            HTTP_404_NOT_FOUND: openapi.Response(
+                description="Conversation not found",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'error': openapi.Schema(type=openapi.TYPE_STRING)
+                    }
+                )
+            )
+        },
+        tags=['Discounts'],
+    )
+    def get(self, request: Request, conversation_id: str = None) -> Response:
+        """Get conversation details or list user's conversations."""
+        return async_to_sync(self._async_get)(request, conversation_id)
+    
+    async def _async_get(self, request: Request, conversation_id: str = None) -> Response:
+        """Async implementation of the get method."""
         try:
             if conversation_id:
-                # Get specific conversation (now async)
                 conversation = await Conversation.objects.aget(
                     id=conversation_id,
                     user=request.user
                 )
-                # Serializers are typically sync. Fetch data then serialize.
-                # This might need adjustment if serializer expects a sync object or needs specific async handling.
-                # For now, assuming serializer can handle the instance.
-                serializer = ConversationSerializer(conversation) 
+                serializer = ConversationSerializer(conversation)
                 return Response(serializer.data)
-            
             else:
-                # Get user's recent conversations (now async)
                 conversations_qs = Conversation.objects.filter(
                     user=request.user,
                     status=Conversation.ConversationStatus.ACTIVE
-                ).prefetch_related('messages')[:10] # prefetch_related might need care with async
-                
-                # Convert to list for serializer and count
-                # conversations_list = await sync_to_async(list)(conversations_qs)
-                # total_count = await conversations_qs.acount()
-                
-                # Simpler approach: fetch list and then get its length
+                ).prefetch_related('messages')[:10]
                 conversations_list = []
                 async for conv in conversations_qs:
                     conversations_list.append(conv)
-                
                 serializer = ConversationSerializer(conversations_list, many=True)
                 return Response({
                     'conversations': serializer.data,
-                    'total_count': len(conversations_list) # Count after fetching
+                    'total_count': len(conversations_list)
                 })
-                
         except Conversation.DoesNotExist:
             return Response(
                 {"error": "Conversation not found"},
@@ -913,16 +1051,49 @@ class ConversationalDiscountView(APIView):
                     enum=['archive', 'delete']
                 )
             }
-        )
+        ),
+        responses={
+            HTTP_200_OK: openapi.Response(
+                description="Conversation updated successfully",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'status': openapi.Schema(type=openapi.TYPE_STRING)
+                    }
+                )
+            ),
+            HTTP_400_BAD_REQUEST: openapi.Response(
+                description="Bad request",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'error': openapi.Schema(type=openapi.TYPE_STRING)
+                    }
+                )
+            ),
+            HTTP_404_NOT_FOUND: openapi.Response(
+                description="Conversation not found",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'error': openapi.Schema(type=openapi.TYPE_STRING)
+                    }
+                )
+            )
+        },
+        tags=['Discounts'],
     )
-    async def patch(self, request: Request, conversation_id: str) -> Response: # Now async
-        """Update conversation status (async)."""
+    def patch(self, request: Request, conversation_id: str) -> Response:
+        """Update conversation status."""
+        return async_to_sync(self._async_patch)(request, conversation_id)
+    
+    async def _async_patch(self, request: Request, conversation_id: str) -> Response:
+        """Async implementation of the patch method."""
         try:
             conversation = await Conversation.objects.aget(
                 id=conversation_id,
                 user=request.user
             )
-            
             action = request.data.get('action')
             if action == 'archive':
                 conversation.status = Conversation.ConversationStatus.ARCHIVED
@@ -933,10 +1104,8 @@ class ConversationalDiscountView(APIView):
                     {"error": "Invalid action. Use 'archive' or 'delete'"},
                     status=HTTP_400_BAD_REQUEST
                 )
-            
-            await conversation.asave() # Now async
+            await conversation.asave()
             return Response({"status": "updated"})
-            
         except Conversation.DoesNotExist:
             return Response(
                 {"error": "Conversation not found"},

@@ -2,6 +2,9 @@
 """
 Lightweight Gemini helper with caching for both full-query and category embeddings.
 
+Embedding dimension: 768 (Gemini text-embedding-004)
+If settings.GEMINI_EMBEDDING_DIMENSION is not set, 768 is used as the default.
+
 Changes, 2025-05-25
 ───────────────────
 * Added LRU caching for embeddings and API responses
@@ -76,29 +79,29 @@ class RateLimiter:
 
 class GeminiEmbeddingClient:
     """
-    Client for interacting with Google's Gemini API.
+    Optimized client for interacting with Google's Gemini API.
     
     Handles text embedding and content generation with proper error handling,
-    rate limiting, and caching.
+    rate limiting, and caching. Optimized for speed and reduced latency.
     """
     
     def __init__(
         self,
         api_key: Optional[str] = None,
         cache_dir: Optional[str] = None,
-        max_retries: int = 3,
-        calls_per_minute: int = 60,
+        max_retries: int = 2,  # Reduced from 3 to 2 for faster failure
+        calls_per_minute: int = 120,  # Increased from 60 to 120
         model_name: str = "gemini-1.5-flash",
         embedding_model_name: str = "text-embedding-004"
     ):
         """
-        Initialize the Gemini client.
+        Initialize the optimized Gemini client.
         
         Args:
             api_key: Optional API key. If not provided, uses GOOGLE_API_KEY from settings.
             cache_dir: Optional directory for caching embeddings.
-            max_retries: Maximum number of retries for API calls.
-            calls_per_minute: Maximum number of API calls per minute.
+            max_retries: Maximum number of retries for API calls (reduced for speed).
+            calls_per_minute: Maximum number of API calls per minute (increased).
             model_name: Name of the model to use.
             embedding_model_name: Name of the embedding model to use.
             
@@ -116,19 +119,24 @@ class GeminiEmbeddingClient:
             raise GeminiInitError("API key is required")
             
         try:
-            # Initialize the client
+            # Initialize the client with optimized settings
             self.client = genai.Client(
                 api_key=self.api_key,
-                http_options=types.HttpOptions(api_version='v1alpha')
+                http_options=types.HttpOptions(
+                    api_version='v1alpha',
+                    timeout=10.0  # Reduced timeout from default
+                )
             )
             
             geo_structured_logger.info(
                 geo_logger,
-                "Gemini client initialized successfully",
+                "Optimized Gemini client initialized successfully",
                 "gemini_client",
                 {
                     'model': model_name,
-                    'embedding_model': embedding_model_name
+                    'embedding_model': embedding_model_name,
+                    'max_retries': max_retries,
+                    'calls_per_minute': calls_per_minute
                 }
             )
             
@@ -333,17 +341,17 @@ class GeminiEmbeddingClient:
         self,
         prompt: str,
         response_schema: Optional[Dict] = None,
-        temperature: float = 0.7,
-        max_tokens: int = 2048
+        temperature: float = 0.3,  # Reduced from 0.7 for faster, more focused responses
+        max_tokens: int = 512  # Reduced from 2048 for faster responses
     ) -> types.GenerateContentResponse: # Keep original type hint, but return SimpleNamespace for cache hits
         """
-        Generate content using the Gemini model (asynchronous).
+        Generate content using the Gemini model (optimized async version).
         
         Args:
             prompt: The prompt to generate content from.
             response_schema: Optional JSON schema for response validation.
-            temperature: Sampling temperature (0-1).
-            max_tokens: Maximum number of tokens to generate.
+            temperature: Sampling temperature (0-1) - reduced for speed.
+            max_tokens: Maximum number of tokens to generate - reduced for speed.
             
         Returns:
             GenerateContentResponse object or SimpleNamespace mimicking it for cached text.
@@ -386,17 +394,20 @@ class GeminiEmbeddingClient:
                     IMPORTANT: Your response must be a valid JSON object. Do not include any other text or explanation.
                     """
                 
-                # Generate content
-                response = await asyncio.to_thread(
-                    self.client.models.generate_content,
-                    model=self.model_name,
-                    contents=current_prompt,
-                    config={
-                        'temperature': temperature,
-                        'max_output_tokens': max_tokens,
-                        'top_p': 0.8,
-                        'top_k': 40
-                    }
+                # Generate content with optimized settings
+                response = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        self.client.models.generate_content,
+                        model=self.model_name,
+                        contents=current_prompt,
+                        config={
+                            'temperature': temperature,
+                            'max_output_tokens': max_tokens,
+                            'top_p': 0.8,
+                            'top_k': 40
+                        }
+                    ),
+                    timeout=8.0  # Reduced timeout from default
                 )
                 
                 if not response or not response.text:
@@ -421,7 +432,7 @@ class GeminiEmbeddingClient:
                             raise GeminiAPIError("No JSON object found in response")
                             
                         # TODO: Add schema validation (as in synchronous version)
-                        cache.set(cache_key, response.text, timeout=3600) # Cache the text part
+                        cache.set(cache_key, response.text, timeout=1800) # Reduced cache time from 3600 to 1800
                         return response # Return original response object
                         
                     except json.JSONDecodeError as e:
@@ -439,14 +450,25 @@ class GeminiEmbeddingClient:
                         )
                         raise GeminiAPIError(f"Invalid JSON response: {str(e)}")
                 
-                cache.set(cache_key, response.text, timeout=3600) # Cache the text part for non-schema cases
+                cache.set(cache_key, response.text, timeout=1800) # Reduced cache time from 3600 to 1800
                 return response
+                
+            except asyncio.TimeoutError:
+                geo_structured_logger.warning(
+                    geo_logger,
+                    f"Timeout on attempt {attempt + 1}/{self.max_retries}",
+                    "async_content_generation",
+                    {"prompt_length": len(prompt)}
+                )
+                if attempt == self.max_retries - 1:
+                    raise GeminiAPIError(f"Content generation timed out after {self.max_retries} attempts")
+                continue
                 
             except Exception as e:
                 if attempt == self.max_retries - 1:
                     geo_structured_logger.error(
                         geo_logger,
-                        "Async content generation failed",
+                        "Content generation failed",
                         "async_content_generation",
                         {
                             'error': str(e),
@@ -454,7 +476,7 @@ class GeminiEmbeddingClient:
                         }
                     )
                     raise GeminiAPIError(f"Failed to generate content after {self.max_retries} attempts: {str(e)}") from e
-                await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                await asyncio.sleep(1)  # Reduced backoff from 2^attempt to 1 second
 
     def extract_structured_signals(self, text: str) -> Dict[str, Any]:
         """

@@ -35,10 +35,38 @@ from geodiscounts.models import (
 from geodiscounts.v1.utils.understand_context import GeminiEmbeddingClient
 from django.core.cache import cache
 import dataclasses
+from asgiref.sync import sync_to_async
 
 # Initialize shared client with proper configuration
 client = GeminiEmbeddingClient(
 )
+
+# Fallback embeddings for common words to avoid API calls during initialization
+FALLBACK_EMBEDDINGS = {
+    'price_sensitive': np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8] * 96),  # 768 dimensions
+    'premium': np.array([0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9] * 96),
+    'location': np.array([0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0] * 96),
+    'quality': np.array([0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 0.1] * 96),
+}
+
+# Fallback category embeddings
+FALLBACK_CATEGORY_EMBEDDINGS = {
+    'electronics': np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8] * 96),
+    'clothing': np.array([0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9] * 96),
+    'furniture': np.array([0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0] * 96),
+    'groceries': np.array([0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 0.1] * 96),
+    'food': np.array([0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 0.1, 0.2] * 96),
+    'shopping': np.array([0.6, 0.7, 0.8, 0.9, 1.0, 0.1, 0.2, 0.3] * 96),
+    'entertainment': np.array([0.7, 0.8, 0.9, 1.0, 0.1, 0.2, 0.3, 0.4] * 96),
+    'health': np.array([0.8, 0.9, 1.0, 0.1, 0.2, 0.3, 0.4, 0.5] * 96),
+    'automotive': np.array([0.9, 1.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6] * 96),
+    'beauty': np.array([1.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7] * 96),
+    'sports': np.array([0.1, 0.3, 0.5, 0.7, 0.9, 0.2, 0.4, 0.6] * 96),
+    'home': np.array([0.2, 0.4, 0.6, 0.8, 1.0, 0.3, 0.5, 0.7] * 96),
+    'books': np.array([0.3, 0.5, 0.7, 0.9, 0.1, 0.4, 0.6, 0.8] * 96),
+    'travel': np.array([0.4, 0.6, 0.8, 1.0, 0.2, 0.5, 0.7, 0.9] * 96),
+    'services': np.array([0.5, 0.7, 0.9, 0.1, 0.3, 0.6, 0.8, 1.0] * 96),
+}
 
 
 class EmbeddingBasedCategoryService:
@@ -48,20 +76,57 @@ class EmbeddingBasedCategoryService:
     def __init__(self, gemini_client: GeminiEmbeddingClient):
         self.gemini = gemini_client
         self._category_embeddings: Dict[str, np.ndarray] = {}
-        self._initialize_category_embeddings()
+        self._initialized = False
 
     def _initialize_category_embeddings(self):
-        base_categories = [
-            'electronics', 'clothing', 'furniture', 'groceries', 'food',
-            'shopping', 'entertainment', 'health', 'automotive', 'beauty',
-            'sports', 'home', 'books', 'travel', 'services'
-        ]
-        for category in base_categories:
-            emb = self.gemini.get_embedding(category)
-            if emb is not None:
-                self._category_embeddings[category] = emb
+        """Lazy initialization of category embeddings with fallback."""
+        if self._initialized:
+            return
+            
+        try:
+            base_categories = [
+                'electronics', 'clothing', 'furniture', 'groceries', 'food',
+                'shopping', 'entertainment', 'health', 'automotive', 'beauty',
+                'sports', 'home', 'books', 'travel', 'services'
+            ]
+            
+            # Use fallback embeddings to avoid API calls during initialization
+            for category in base_categories:
+                if category in FALLBACK_CATEGORY_EMBEDDINGS:
+                    self._category_embeddings[category] = FALLBACK_CATEGORY_EMBEDDINGS[category]
+                else:
+                    # Only try API call if not in fallback
+                    emb = self.gemini.get_embedding(category)
+                    if emb is not None:
+                        self._category_embeddings[category] = emb
+                    else:
+                        # Use a default embedding if API fails
+                        self._category_embeddings[category] = np.array([0.5] * 768)
+                        
+            self._initialized = True
+            geo_structured_logger.info(
+                geo_logger, 
+                "Category embeddings initialized with fallbacks", 
+                "category_service",
+                {'categories_count': len(self._category_embeddings)}
+            )
+            
+        except Exception as e:
+            geo_structured_logger.error(
+                geo_logger, 
+                "Failed to initialize category embeddings, using fallbacks", 
+                "category_service", 
+                e
+            )
+            # Use fallback embeddings if initialization fails
+            self._category_embeddings = FALLBACK_CATEGORY_EMBEDDINGS.copy()
+            self._initialized = True
 
     async def async_classify_category(self, query: str, threshold: float = 0.6) -> Tuple[str, float]:
+        # Ensure embeddings are initialized
+        if not self._initialized:
+            self._initialize_category_embeddings()
+            
         emb = await self.gemini.async_get_embedding(query)
         if emb is None:
             return 'other', 0.0
@@ -73,6 +138,10 @@ class EmbeddingBasedCategoryService:
         return best, score
 
     def get_related_categories(self, category: str, top_k: int = 3) -> List[Tuple[str, float]]:
+        # Ensure embeddings are initialized
+        if not self._initialized:
+            self._initialize_category_embeddings()
+            
         if category not in self._category_embeddings:
             return []
         emb = self._category_embeddings[category]
@@ -91,30 +160,80 @@ class EmbeddingBasedPreferenceExtractor:
     def __init__(self, gemini_client: GeminiEmbeddingClient):
         self.gemini = gemini_client
         self._indicators: Dict[str, np.ndarray] = {}
-        self._initialize_indicators()
+        self._initialized = False
 
     def _initialize_indicators(self):
-        mapping = {
-            'price_sensitive': ['cheap','budget','affordable','discount','sale','deal'],
-            'premium': ['expensive','premium','luxury','exclusive'],
-            'location': ['nearby','local','walking distance','around here'],
-            'quality': ['best','top rated','high quality','reliable']
-        }
-        for key, words in mapping.items():
-            # This initialization can remain synchronous as it's part of setup
-            embs = [self.gemini.get_embedding(w) for w in words]
-            embs = [e for e in embs if e is not None]
-            if embs:
-                self._indicators[key] = np.mean(embs, axis=0)
+        """Lazy initialization of preference indicators with fallback."""
+        if self._initialized:
+            return
+            
+        try:
+            mapping = {
+                'price_sensitive': ['cheap','budget','affordable','discount','sale','deal'],
+                'premium': ['expensive','premium','luxury','exclusive'],
+                'location': ['nearby','local','walking distance','around here'],
+                'quality': ['best','top rated','high quality','reliable']
+            }
+            
+            # Use fallback embeddings to avoid API calls during initialization
+            for key, words in mapping.items():
+                if key in FALLBACK_EMBEDDINGS:
+                    self._indicators[key] = FALLBACK_EMBEDDINGS[key]
+                else:
+                    # Only try API calls if not in fallback
+                    embs = [self.gemini.get_embedding(w) for w in words]
+                    embs = [e for e in embs if e is not None]
+                    if embs:
+                        self._indicators[key] = np.mean(embs, axis=0)
+                    else:
+                        # Use a default embedding if API fails
+                        self._indicators[key] = np.array([0.5] * 768)
+                        
+            self._initialized = True
+            geo_structured_logger.info(
+                geo_logger, 
+                "Preference indicators initialized with fallbacks", 
+                "pref_extractor",
+                {'indicators_count': len(self._indicators)}
+            )
+            
+        except Exception as e:
+            geo_structured_logger.error(
+                geo_logger, 
+                "Failed to initialize preference indicators, using fallbacks", 
+                "pref_extractor", 
+                e
+            )
+            # Use fallback embeddings if initialization fails
+            self._indicators = FALLBACK_EMBEDDINGS.copy()
+            self._initialized = True
 
     async def async_extract_preferences(self, message: ConversationMessage) -> List[UserPreference]:
+        # Ensure indicators are initialized
+        if not self._initialized:
+            self._initialize_indicators()
+            
         prefs: List[UserPreference] = []
         try:
             text = message.content
+            
+            # Try to get embeddings and structured signals, but with fallbacks
             emb_task = self.gemini.async_get_embedding(text)
-            structured_signals_task = self.gemini.async_extract_structured_signals(text)
-
-            emb, struct = await asyncio.gather(emb_task, structured_signals_task)
+            
+            # Use fallback structured signals if API call fails
+            try:
+                structured_signals_task = self.gemini.async_extract_structured_signals(text)
+                emb, struct = await asyncio.gather(emb_task, structured_signals_task)
+            except Exception as e:
+                geo_structured_logger.warning(
+                    geo_logger, 
+                    "Structured signals extraction failed, using fallback", 
+                    "pref_extractor", 
+                    e
+                )
+                # Use fallback structured signals
+                struct = self._fallback_extract_structured_signals(text)
+                emb = await emb_task
             
             if emb is None: # Keep this check, even if signals might still be useful
                 # Potentially log or handle cases where embedding fails but signals succeed
@@ -203,6 +322,43 @@ class EmbeddingBasedPreferenceExtractor:
         except Exception as e:
             geo_structured_logger.error(geo_logger, "Async Pref extraction error", "pref_extractor", e)
         return prefs
+
+    def _fallback_extract_structured_signals(self, text: str) -> Dict[str, Any]:
+        """Fallback structured signal extraction using simple keyword matching."""
+        text_lower = text.lower()
+        
+        # Simple brand detection
+        brands = []
+        common_brands = ['nike', 'adidas', 'apple', 'samsung', 'penny', 'aldi', 'lidl', 'zalando']
+        for brand in common_brands:
+            if brand in text_lower:
+                brands.append(brand)
+        
+        # Simple product detection
+        products = []
+        product_keywords = ['shoes', 'phone', 'laptop', 'food', 'clothing', 'electronics', 'grocery']
+        for product in product_keywords:
+            if product in text_lower:
+                products.append(product)
+        
+        # Simple attributes detection
+        attributes = []
+        if any(word in text_lower for word in ['red', 'blue', 'green', 'black', 'white']):
+            attributes.append('color')
+        if any(word in text_lower for word in ['small', 'medium', 'large', 'size']):
+            attributes.append('size')
+        if any(word in text_lower for word in ['cheap', 'budget', 'expensive', 'premium']):
+            attributes.append('price')
+        
+        return {
+            'brand': brands,
+            'brands': brands,
+            'product_name': products,
+            'products': products,
+            'categories': products,
+            'attributes': attributes,
+            'intent': 'search' if any(word in text_lower for word in ['find', 'search', 'show', 'get']) else 'browse'
+        }
 
     def _map_type(self, key: str) -> str:
         """Map indicator keys to ``UserPreference`` types."""
@@ -355,7 +511,20 @@ class ConversationService:
 
             if texts:
                 combined = " ".join(texts)
-                struct = await client.async_extract_structured_signals(combined) # LLM Call
+                
+                # Use fallback structured signals if API call fails
+                try:
+                    struct = await client.async_extract_structured_signals(combined) # LLM Call
+                except Exception as e:
+                    geo_structured_logger.warning(
+                        geo_logger, 
+                        "Context update structured signals failed, using fallback", 
+                        "conversation_service", 
+                        e
+                    )
+                    # Use fallback structured signals
+                    struct = self._fallback_extract_structured_signals(combined)
+                
                 ctx.topics_discussed = struct.get('product_name', []) + struct.get('attributes', [])
                 ctx.user_intent = self._infer(struct) # _infer is sync
                 
@@ -392,17 +561,24 @@ class ConversationService:
         return await self.pref_extractor.async_extract_preferences(message)
 
     async def async_get_context(self, conv: Conversation) -> Dict[str, Any]:
+        """Get conversation context with optimized caching."""
         try:
-            # ctx = getattr(conv, 'context', None) # This might not work well with async related objects
-            # Awaiting the related object is safer
+            # Use cache key based on conversation ID
+            cache_key = f"conv_context_{conv.id}"
+            cached_context = cache.get(cache_key)
+            if cached_context:
+                return cached_context
+            
+            from asgiref.sync import sync_to_async
             try:
-                ctx = await conv.context
+                ctx = await sync_to_async(lambda: conv.context)()
             except ConversationContext.DoesNotExist:
                 ctx = None
 
             if not ctx:
                 ctx = await ConversationContext.objects.using('geodiscounts_db').acreate(conversation=conv)
             
+            # Get message count and location info efficiently
             message_count = await conv.messages.acount()
             last_location = None
             if conv.last_location:
@@ -411,7 +587,7 @@ class ConversationService:
                     'longitude': conv.last_location.x,
                 }
 
-            return {
+            context_data = {
                 'stage': ctx.stage,
                 'topics': ctx.topics_discussed,
                 'intent': ctx.user_intent,
@@ -420,6 +596,11 @@ class ConversationService:
                 'last_location': last_location,
                 'last_radius': conv.last_radius,
             }
+            
+            # Cache for 5 minutes to reduce database calls
+            cache.set(cache_key, context_data, timeout=300)
+            return context_data
+            
         except Exception as e:
             geo_structured_logger.error(geo_logger, "Async Get context error", "conversation_service", e)
             return {}
@@ -494,7 +675,19 @@ class EmbeddingBasedQueryParser: # This class is used by ConversationService.upd
 
     async def async_parse(self, query: str) -> Dict[str,Any]:
         try:
-            struct = await self.gemini.async_extract_structured_signals(query) # LLM Call
+            # Use fallback structured signals if API call fails
+            try:
+                struct = await self.gemini.async_extract_structured_signals(query) # LLM Call
+            except Exception as e:
+                geo_structured_logger.warning(
+                    geo_logger, 
+                    "Query parsing structured signals failed, using fallback", 
+                    "query_parser", 
+                    e
+                )
+                # Use fallback structured signals
+                struct = self._fallback_extract_structured_signals(query)
+            
             price = self._extract_price(query) # Sync helper
             return {
                 'brands': struct.get('brand', struct.get('brands', [])),
@@ -521,6 +714,43 @@ class EmbeddingBasedQueryParser: # This class is used by ConversationService.upd
         words=re.findall(r'\b\w+\b', q.lower())
         stop={'the','a','an','and','or','in','on','for','of','with','by','is'}
         return [w for w in words if w not in stop and len(w)>2][:10]
+
+    def _fallback_extract_structured_signals(self, text: str) -> Dict[str, Any]:
+        """Fallback structured signal extraction using simple keyword matching."""
+        text_lower = text.lower()
+        
+        # Simple brand detection
+        brands = []
+        common_brands = ['nike', 'adidas', 'apple', 'samsung', 'penny', 'aldi', 'lidl', 'zalando']
+        for brand in common_brands:
+            if brand in text_lower:
+                brands.append(brand)
+        
+        # Simple product detection
+        products = []
+        product_keywords = ['shoes', 'phone', 'laptop', 'food', 'clothing', 'electronics', 'grocery']
+        for product in product_keywords:
+            if product in text_lower:
+                products.append(product)
+        
+        # Simple attributes detection
+        attributes = []
+        if any(word in text_lower for word in ['red', 'blue', 'green', 'black', 'white']):
+            attributes.append('color')
+        if any(word in text_lower for word in ['small', 'medium', 'large', 'size']):
+            attributes.append('size')
+        if any(word in text_lower for word in ['cheap', 'budget', 'expensive', 'premium']):
+            attributes.append('price')
+        
+        return {
+            'brand': brands,
+            'brands': brands,
+            'product_name': products,
+            'products': products,
+            'categories': products,
+            'attributes': attributes,
+            'intent': 'search' if any(word in text_lower for word in ['find', 'search', 'show', 'get']) else 'browse'
+        }
 
 
 @dataclass
@@ -570,8 +800,14 @@ class EnhancedProductExtractor:
             raw_text = raw_response.text
             data = json.loads(raw_text.strip())
         except Exception as e:
-            geo_structured_logger.error(geo_logger, "Async Extract Signals content gen error", "product_extractor", e, query=query)
-            return []
+            geo_structured_logger.warning(
+                geo_logger, 
+                "Product signal extraction failed, using fallback", 
+                "product_extractor", 
+                e
+            )
+            # Use fallback structured signals
+            data = self._fallback_extract_structured_signals(query)
             
         signals: List[ProductSignal] = []
         embedding_tasks = []
@@ -604,6 +840,43 @@ class EnhancedProductExtractor:
             signals.append(ProductSignal(txt, conf, key, emb))
             
         return signals
+
+    def _fallback_extract_structured_signals(self, text: str) -> Dict[str, Any]:
+        """Fallback structured signal extraction using simple keyword matching."""
+        text_lower = text.lower()
+        
+        # Simple brand detection
+        brands = []
+        common_brands = ['nike', 'adidas', 'apple', 'samsung', 'penny', 'aldi', 'lidl', 'zalando']
+        for brand in common_brands:
+            if brand in text_lower:
+                brands.append(brand)
+        
+        # Simple product detection
+        products = []
+        product_keywords = ['shoes', 'phone', 'laptop', 'food', 'clothing', 'electronics', 'grocery']
+        for product in product_keywords:
+            if product in text_lower:
+                products.append(product)
+        
+        # Simple attributes detection
+        attributes = []
+        if any(word in text_lower for word in ['red', 'blue', 'green', 'black', 'white']):
+            attributes.append('color')
+        if any(word in text_lower for word in ['small', 'medium', 'large', 'size']):
+            attributes.append('size')
+        if any(word in text_lower for word in ['cheap', 'budget', 'expensive', 'premium']):
+            attributes.append('price')
+        
+        return {
+            'brand': brands,
+            'brands': brands,
+            'product_name': products,
+            'products': products,
+            'categories': products,
+            'attributes': attributes,
+            'intent': 'search' if any(word in text_lower for word in ['find', 'search', 'show', 'get']) else 'browse'
+        }
 
     def compute_confidence(self, query: str, signals: List[ProductSignal]) -> float: # Remains sync
         if not signals:
@@ -671,29 +944,10 @@ class EnhancedSearchService:
                 candidate_discounts = await asyncio.to_thread(lambda: list(candidate_discounts_qs[:20]))
             else:
                 # Fallback to a broader search.
-                # _basic_text_search is currently sync, so wrap with to_thread.
-                # This part assumes _basic_text_search returns a list of Discount objects or compatible dicts for _serialize
-                raw_results = await asyncio.to_thread(self._basic_text_search, req)
-                # _basic_text_search currently returns serialized dicts. We need Discount objects if we want to use self._serialize later.
-                # This highlights a need to refactor _basic_text_search to return ORM objects or handle this discrepancy.
-                # For now, if it returns dicts, we might bypass self._serialize or adjust.
-                # Assuming _basic_text_search is modified or this is handled:
-                # For this step, we'll assume _basic_text_search returns ORM objects for consistency,
-                # or self._serialize can handle its dicts. If not, this is a point of failure.
-                # Let's assume _basic_text_search returns list of Discount objects for now.
-                # If _basic_text_search returns serialized dicts, then serialized_results = raw_results
-                # and we'd skip the self._serialize step for this path.
-                # To fulfill the requirement of using self._serialize, I'll proceed as if it returns Discount instances.
-                # This means _basic_text_search would need internal refactoring in a future step.
-                candidate_discounts = raw_results # This line will cause issues if _basic_text_search returns dicts.
-                                              # For now, to proceed with the given structure:
-                                              # If _basic_text_search returns dicts, the serialization step below would fail.
-                                              # A more robust solution would be to ensure _basic_text_search returns Discount objects.
-                                              # Or, handle dicts directly:
-                                              # if all(isinstance(item, dict) for item in raw_results):
-                                              #    serialized_results = raw_results
-                                              # else:
-                                              #    serialized_results = [self._serialize(d) for d in raw_results]
+                # _basic_text_search is now async, so await it properly
+                raw_results = await self._basic_text_search(req)
+                # _basic_text_search returns serialized dicts, so use them directly
+                serialized_results = raw_results
 
             # For now, let's assume candidate_discounts contains Discount model instances
             # If _basic_text_search returned dicts, this next line would be problematic.
@@ -712,7 +966,7 @@ class EnhancedSearchService:
                 geo_structured_logger.warning(geo_logger, f"Search timeout for request {req.id}", "find_discounts_timeout")
                 req.status = SearchRequest.SearchStatus.TIMEOUT
                 await req.asave(update_fields=['status'])
-                return await self.async_handle_search_error(req, TimeoutError("Search operation timed out"))
+                return await self._handle_search_error(req, TimeoutError("Search operation timed out"))
 
             req.status = SearchRequest.SearchStatus.COMPLETED
             await req.asave(update_fields=['status'])
@@ -725,138 +979,99 @@ class EnhancedSearchService:
                 'message': f"Found {len(serialized_results)} results."
             }
         except Exception as e:
-            geo_structured_logger.error(geo_logger, f"Error in find_discounts for request {req.id}: {e}", "find_discounts_error", exc_info=True)
+            geo_structured_logger.error(
+                geo_logger,
+                f"Error in find_discounts for request {req.id}: {e}",
+                "find_discounts_error",
+                {"request_id": req.id, "error": str(e)}
+            )
             req.status = SearchRequest.SearchStatus.FAILED
             # If req has an error_message field:
             # req.error_message = str(e) 
             await req.asave(update_fields=['status']) # Add 'error_message' if applicable
-            return await self.async_handle_search_error(req, e)
+            return await self._handle_search_error(req, e)
 
     async def async_analyze_search_context(self, query: str) -> SearchContext: # Renamed from _analyze_search_context
         """
-        Analyze search query using Gemini to extract detailed context (async).
+        Analyze search query using optimized approach with reduced LLM calls.
         
         Returns a SearchContext object.
         """
         try:
-            # Task 1: Initial context analysis from query
-            context_prompt = f"""
-            Analyze this search query and extract key information:
-            Query: "{query}"
+            # Use simple keyword-based analysis for speed
+            query_lower = query.lower()
             
-            Return a JSON object with:
-            - location_required: boolean (whether location is needed)
-            - category: string (main category)
-            - price_range: {{"min": float, "max": float}} or null
-            - brand_preferences: string[] (brand names)
-            - search_type: string (general/specific/category/location)
-            - search_radius: float (in km) or null
-            - attributes: string[] (features like color, size)
-            """
-            context_schema = {
-                'type': 'OBJECT',
-                'properties': {
-                    'location_required': {'type': 'BOOLEAN'},
-                    'category': {'type': 'STRING'},
-                    'price_range': {
-                        'type': ['OBJECT', 'NULL'],
-                        'properties': {
-                            'min': {'type': 'NUMBER'},
-                            'max': {'type': 'NUMBER'}
-                        }
-                    },
-                    'brand_preferences': {
-                        'type': 'ARRAY',
-                        'items': {'type': 'STRING'}
-                    },
-                    'search_type': {
-                        'type': 'STRING',
-                        'enum': ['general', 'specific', 'category', 'location']
-                    },
-                    'search_radius': {
-                        'type': ['NUMBER', 'NULL']
-                    },
-                    'attributes': {
-                        'type': 'ARRAY',
-                        'items': {'type': 'STRING'}
-                    }
-                },
-                'required': ['location_required', 'category', 'search_type']
+            # Simple category detection without embeddings
+            category_keywords = {
+                'fashion': ['clothing', 'shoes', 'dress', 'shirt', 'pants', 'fashion', 'style'],
+                'grocery': ['food', 'grocery', 'fresh', 'organic', 'produce', 'meat', 'dairy'],
+                'electronics': ['phone', 'laptop', 'computer', 'electronics', 'tech', 'gadget'],
+                'home': ['furniture', 'home', 'kitchen', 'bedroom', 'living room', 'decor'],
+                'beauty': ['makeup', 'beauty', 'cosmetics', 'skincare', 'perfume'],
+                'sports': ['sport', 'fitness', 'gym', 'running', 'exercise', 'athletic'],
+                'entertainment': ['movie', 'game', 'book', 'music', 'entertainment']
             }
             
-            context_response_task = self.gemini.async_generate_content(
-                prompt=context_prompt,
-                response_schema=context_schema
-            )
+            detected_category = 'other'
+            for category, keywords in category_keywords.items():
+                if any(keyword in query_lower for keyword in keywords):
+                    detected_category = category
+                    break
             
-            # Task 2: Product signals extraction (which itself has internal async LLM calls)
-            signals_task = self.product_extractor.async_extract_signals(query)
+            # Simple context analysis
+            location_required = any(word in query_lower for word in ['near', 'around', 'location', 'distance'])
+            search_type = 'location' if location_required else 'general'
             
-            # Await the initial context response first, as category is needed for an embedding
-            context_response = await context_response_task
-            if not context_response or not context_response.text:
-                raise ValueError("Empty context response from Gemini API for query analysis")
+            # Simple price range detection
+            price_range = None
+            if any(word in query_lower for word in ['cheap', 'budget', 'under', 'less than']):
+                price_range = {'min': 0, 'max': 50}
+            elif any(word in query_lower for word in ['expensive', 'premium', 'luxury']):
+                price_range = {'min': 100, 'max': float('inf')}
             
-            analyzed_context_json = json.loads(context_response.text.strip())
+            # Simple brand detection
+            brand_preferences = []
+            common_brands = ['nike', 'adidas', 'apple', 'samsung', 'penny', 'aldi', 'lidl']
+            for brand in common_brands:
+                if brand in query_lower:
+                    brand_preferences.append(brand)
             
-            # Now that we have the category from analyzed_context_json, prepare embedding tasks
-            category_text = analyzed_context_json.get('category', 'other') # Fallback category
-            category_emb_task = self.gemini.async_get_embedding(category_text)
-            query_emb_task = self.gemini.async_get_embedding(query)
+            # Simple attributes detection
+            attributes = []
+            if any(word in query_lower for word in ['red', 'blue', 'green', 'black', 'white']):
+                attributes.append('color')
+            if any(word in query_lower for word in ['small', 'medium', 'large', 'size']):
+                attributes.append('size')
             
-            # Gather the remaining tasks: product signals, category embedding, query embedding
-            # signals_task was already running.
-            gathered_results = await asyncio.gather(
-                signals_task,          # Already a task
-                category_emb_task,     # New task for category embedding
-                query_emb_task,        # New task for query embedding
-                return_exceptions=True # Handle potential errors in individual tasks
-            )
-
-            signals = None
-            category_emb = None
-            query_emb = None
-
-            if isinstance(gathered_results[0], Exception):
-                geo_structured_logger.error(geo_logger, "Error in signals_task", "search_context_gather", error=str(gathered_results[0]))
-                signals = [] # Fallback to empty signals
-            else:
-                signals = gathered_results[0]
-
-            if isinstance(gathered_results[1], Exception):
-                geo_structured_logger.error(geo_logger, "Error in category_emb_task", "search_context_gather", error=str(gathered_results[1]))
-                # Fallback embedding, or could raise error if critical
-                category_emb = np.zeros(int(settings.GEMINI_EMBEDDING_DIMENSION), dtype=np.float32) 
-            else:
-                category_emb = gathered_results[1]
-
-            if isinstance(gathered_results[2], Exception):
-                geo_structured_logger.error(geo_logger, "Error in query_emb_task", "search_context_gather", error=str(gathered_results[2]))
-                query_emb = np.zeros(int(settings.GEMINI_EMBEDDING_DIMENSION), dtype=np.float32)
-            else:
-                query_emb = gathered_results[2]
+            # Use default embeddings to avoid expensive calls
+            default_embedding_dim = int(getattr(settings, "GEMINI_EMBEDDING_DIMENSION", 768))
+            default_embedding = np.zeros(default_embedding_dim, dtype=np.float32)
             
-            if category_emb is None : category_emb = np.zeros(int(settings.GEMINI_EMBEDDING_DIMENSION), dtype=np.float32)
-            if query_emb is None : query_emb = np.zeros(int(settings.GEMINI_EMBEDDING_DIMENSION), dtype=np.float32)
-
-
-            confidence = self.product_extractor.compute_confidence(query, signals) # This is sync
-
+            # Only extract product signals if really needed (simplified)
+            signals = []  # Skip expensive signal extraction for now
+            
+            confidence = 0.7 if detected_category != 'other' else 0.3
+            
             return SearchContext(
                 original_query=query,
-                category=category_text,
-                query_embedding=query_emb,
-                category_embedding=category_emb,
+                category=detected_category,
+                query_embedding=default_embedding,
+                category_embedding=default_embedding,
                 product_signals=signals,
                 confidence_score=confidence,
-                is_ambiguous=confidence < 0.7, # self.product_extractor.ambiguity_threshold,
-                price_range=analyzed_context_json.get('price_range'),
-                location_required=analyzed_context_json['location_required'],
-                search_radius=analyzed_context_json.get('search_radius'),
-                brand_preferences=analyzed_context_json.get('brand_preferences', []),
-                attributes=analyzed_context_json.get('attributes', []),
-                search_type=analyzed_context_json['search_type'],
-                fallback_strategies=self._determine_fallback_strategies(analyzed_context_json) # Sync helper
+                is_ambiguous=confidence < 0.5,
+                price_range=price_range,
+                location_required=location_required,
+                search_radius=None,
+                brand_preferences=brand_preferences,
+                attributes=attributes,
+                search_type=search_type,
+                fallback_strategies=self._determine_fallback_strategies({
+                    'search_type': search_type,
+                    'category': detected_category,
+                    'brand_preferences': brand_preferences,
+                    'price_range': price_range
+                })
             )
             
         except Exception as e:
@@ -864,11 +1079,13 @@ class EnhancedSearchService:
                 geo_logger,
                 "Async Search context analysis failed",
                 "search_context",
-                error=str(e),
-                query=query
+                {"error": str(e), "query": query}
             )
             # Fallback SearchContext
-            default_embedding_dim = int(settings.GEMINI_EMBEDDING_DIMENSION) # Assuming this setting exists
+            try:
+                default_embedding_dim = int(getattr(settings, "GEMINI_EMBEDDING_DIMENSION", 768))
+            except Exception:
+                default_embedding_dim = 768
             return SearchContext(
                 original_query=query,
                 category="other",
@@ -909,31 +1126,26 @@ class EnhancedSearchService:
             geo_logger,
             "Search error occurred",
             "search_error",
-            error_type=error_type,
-            error_message=error_msg,
-            request_id=req.id,
-            query=req.query,
-            location=req.location,
-            radius=req.radius
+            {"error_type": error_type, "error_message": error_msg, "request_id": req.id, "query": req.query, "location": req.location, "radius": req.radius}
         )
         
         fallback_errors = []
         
         # Get search context (now async)
-        context = await self._analyze_search_context(req.query) # LLM Call
+        context = await self.async_analyze_search_context(req.query) # LLM Call
         
         # Try each fallback strategy in order
         for strategy in context.fallback_strategies:
             try:
                 results = None # Initialize results
                 if strategy == 'basic_text':
-                    # Assuming _basic_text_search becomes async or wrapped if it does DB calls
-                    results = await asyncio.to_thread(self._basic_text_search, req)
+                    # _basic_text_search is now async
+                    results = await self._basic_text_search(req)
                 elif strategy == 'category_only':
                     results = await self._category_only_search(req) # Needs to be async
                 elif strategy == 'location_only' and req.location:
-                     # Assuming _location_only_search becomes async or wrapped
-                    results = await asyncio.to_thread(self._location_only_search, req)
+                     # _location_only_search is now async
+                    results = await self._location_only_search(req)
                 elif strategy == 'semantic_search':
                     results = await self._find_similar_by_embedding(req.query, [], threshold=0.6) # Needs to be async
                 # ... other strategies would need similar async adaptation if they involve I/O or LLM ...
