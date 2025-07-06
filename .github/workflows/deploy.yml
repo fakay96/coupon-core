@@ -101,6 +101,13 @@ jobs:
             echo "FRONTEND_REPO=fakay96/coupon-frontend" >> $GITHUB_ENV
           fi
 
+      - name: List files for debug
+        run: |
+          pwd
+          ls -la
+          ls -la ./k8s
+          ls -la ./k8s/backend
+
       - name: Deploy Backend & Celery
         run: |
           helm upgrade --install coupon-service ./k8s/backend \
