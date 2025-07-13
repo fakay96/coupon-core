@@ -129,3 +129,9 @@ spec:
 
         - name: CELERY_APP_NAME
           value: "coupon_core"
+
+        - name: GEMINI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: GEMINI_API_KEY
