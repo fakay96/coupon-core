@@ -16,5 +16,10 @@ google-cloud-storage>=2.14.0  # For GCS operations
 google-auth>=2.27.0  # For authentication
 google-api-core>=2.18.0  # Core Google API client library
 
+# Firecrawl Integration
+aiohttp>=3.9.1  # For async HTTP requests
+dataclasses-json>=0.6.0  # For dataclass serialization
+tenacity>=8.2.0  # For retry logic
+
 
 
