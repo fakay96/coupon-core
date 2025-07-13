@@ -28,7 +28,7 @@ on:
 
 env:
   DOCKER_REGISTRY: fakay96
-  SERVICES: coupon-core,coupon-celery,coupon-inference,coupon-frontend,coupon-frontend-staging
+  SERVICES: coupon-core,coupon-celery,coupon-frontend,coupon-frontend-staging
 
 jobs:
   build:
@@ -74,7 +74,6 @@ jobs:
           tags: |
             ${{ env.DOCKER_REGISTRY }}/coupon-core:${{ env.VERSION_TAG }}
             ${{ env.DOCKER_REGISTRY }}/coupon-celery:${{ env.VERSION_TAG }}
-            ${{ env.DOCKER_REGISTRY }}/coupon-inference:${{ env.VERSION_TAG }}
           labels: |
             org.opencontainers.image.version=${{ env.VERSION_TAG }}
             org.opencontainers.image.created=${{ github.event.repository.updated_at }}
@@ -335,40 +334,10 @@ jobs:
             --atomic --force --cleanup-on-fail --history-max 5 \
             --timeout 5m0s
 
-      - name: Debug before Inference deployment
-        run: |
-          echo "=== Debug before Inference deployment ==="
-          echo "Current directory: $(pwd)"
-          echo "=== k8s/backend directory contents ==="
-          ls -la ./k8s/backend || echo "k8s/backend directory not found!"
-          echo "=== Environment variables ==="
-          echo "NAMESPACE: $NAMESPACE"
-          echo "VERSION_TAG: $VERSION_TAG"
-
-      - name: Deploy Inference Service
-        run: |
-          # Validate VERSION_TAG is not empty
-          if [ -z "$VERSION_TAG" ]; then
-            echo "Error: VERSION_TAG is empty"
-            exit 1
-          fi
-          
-          echo "Deploying inference with VERSION_TAG: $VERSION_TAG"
-          
-          helm upgrade --install inference ./k8s/backend \
-            --set inference.enabled=true \
-            --set inference.image.repository=fakay96/coupon-inference \
-            --set inference.image.tag=$VERSION_TAG \
-            --namespace $NAMESPACE --create-namespace \
-            -f ./k8s/backend/values/$NAMESPACE-values.yaml \
-            --atomic --force --cleanup-on-fail --history-max 5 \
-            --timeout 5m0s
-
       - name: Verify service endpoints
         run: |
           kubectl get endpoints coupon-service -n $NAMESPACE || echo "Backend service endpoint not found!"
           kubectl get endpoints frontend -n $NAMESPACE || echo "Frontend service endpoint not found!"
-          kubectl get endpoints inference -n $NAMESPACE || echo "Inference service endpoint not found!"
 
       - name: Debug pod logs on failure
         if: failure()
@@ -376,7 +345,6 @@ jobs:
           echo "Fetching logs for failed pods..."
           kubectl logs -l app=backend -n $NAMESPACE || echo "No logs found for backend"
           kubectl logs -l app=frontend -n $NAMESPACE || echo "No logs found for frontend"
-          kubectl logs -l app=inference -n $NAMESPACE || echo "No logs found for inference"
 
       - name: Rollback on failure
         if: failure()
@@ -384,8 +352,6 @@ jobs:
           echo "Rolling back deployments..."
           LAST_BACKEND_REVISION=$(helm history coupon-service -n $NAMESPACE | tail -n 2 | head -n 1 | awk '{print $1}')
           LAST_FRONTEND_REVISION=$(helm history frontend -n $NAMESPACE | tail -n 2 | head -n 1 | awk '{print $1}')
-          LAST_INFERENCE_REVISION=$(helm history inference -n $NAMESPACE | tail -n 2 | head -n 1 | awk '{print $1}')
           
           helm rollback coupon-service $LAST_BACKEND_REVISION -n $NAMESPACE || echo "Failed to rollback backend"
           helm rollback frontend $LAST_FRONTEND_REVISION -n $NAMESPACE || echo "Failed to rollback frontend"
-          helm rollback inference $LAST_INFERENCE_REVISION -n $NAMESPACE || echo "Failed to rollback inference"
