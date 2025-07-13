@@ -55,10 +55,24 @@ jobs:
         id: set_version
         run: |
           if [ -z "${{ inputs.version_tag }}" ]; then
-            VERSION_TAG=$(cat ./artifact/version.txt)
+            if [ -f "./artifact/version.txt" ]; then
+              VERSION_TAG=$(cat ./artifact/version.txt)
+            else
+              echo "Warning: version.txt not found in artifact directory"
+              echo "Available files in artifact directory:"
+              ls -la ./artifact/ || echo "Artifact directory not found"
+              echo "Using git commit SHA as fallback version tag"
+              VERSION_TAG=$(git rev-parse --short HEAD)
+            fi
           else
             VERSION_TAG="${{ inputs.version_tag }}"
           fi
+          
+          if [ -z "$VERSION_TAG" ]; then
+            echo "Error: VERSION_TAG is empty"
+            exit 1
+          fi
+          
           echo "VERSION_TAG=$VERSION_TAG" >> $GITHUB_ENV
           echo "Version tag is $VERSION_TAG"
 
@@ -66,6 +80,8 @@ jobs:
         run: |
           echo "NAMESPACE is: $NAMESPACE"
           echo "VERSION_TAG is: $VERSION_TAG"
+          echo "Current working directory: $(pwd)"
+          echo "GITHUB_WORKSPACE: $GITHUB_WORKSPACE"
 
       - name: Configure kubectl for DigitalOcean
         run: |
@@ -104,6 +120,42 @@ jobs:
             echo "FRONTEND_REPO=fakay96/coupon-frontend" >> $GITHUB_ENV
           fi
 
+      - name: Validate required directories
+        run: |
+          cd $GITHUB_WORKSPACE
+          echo "Validating required k8s directories..."
+          
+          # Check if k8s directory exists
+          if [ ! -d "./k8s" ]; then
+            echo "Error: k8s directory not found"
+            exit 1
+          fi
+          
+          # Check if backend directory exists
+          if [ ! -d "./k8s/backend" ]; then
+            echo "Error: k8s/backend directory not found"
+            exit 1
+          fi
+          
+          # Check if frontend directory exists
+          if [ ! -d "./k8s/frontend" ]; then
+            echo "Error: k8s/frontend directory not found"
+            exit 1
+          fi
+          
+          # Check if values files exist
+          if [ ! -f "./k8s/backend/values/$NAMESPACE-values.yaml" ]; then
+            echo "Error: k8s/backend/values/$NAMESPACE-values.yaml not found"
+            exit 1
+          fi
+          
+          if [ ! -f "./k8s/frontend/values/$NAMESPACE-values.yaml" ]; then
+            echo "Error: k8s/frontend/values/$NAMESPACE-values.yaml not found"
+            exit 1
+          fi
+          
+          echo "All required directories and files found!"
+
       - name: List files for debug
         run: |
           echo "=== Current working directory ==="
@@ -114,6 +166,8 @@ jobs:
           ls -la ./k8s || echo "k8s directory not found!"
           echo "=== k8s/backend directory contents ==="
           ls -la ./k8s/backend || echo "k8s/backend directory not found!"
+          echo "=== k8s/frontend directory contents ==="
+          ls -la ./k8s/frontend || echo "k8s/frontend directory not found!"
           echo "=== Git status ==="
           git status
           echo "=== Git log (last 3 commits) ==="
@@ -124,6 +178,9 @@ jobs:
 
       - name: Deploy Backend & Celery
         run: |
+          # Ensure we're in the correct working directory
+          cd $GITHUB_WORKSPACE
+          
           # Try to find the k8s/backend directory
           if [ -d "./k8s/backend" ]; then
             echo "Found k8s/backend directory using relative path"
@@ -138,6 +195,15 @@ jobs:
             ls -la
             exit 1
           fi
+          
+          # Validate VERSION_TAG is not empty
+          if [ -z "$VERSION_TAG" ]; then
+            echo "Error: VERSION_TAG is empty"
+            exit 1
+          fi
+          
+          echo "Deploying with VERSION_TAG: $VERSION_TAG"
+          echo "Using helm chart path: $HELM_CHART_PATH"
           
           helm upgrade --install coupon-service $HELM_CHART_PATH \
             --set backend.image.repository=fakay96/coupon-core \
@@ -166,6 +232,17 @@ jobs:
 
       - name: Deploy Frontend
         run: |
+          # Ensure we're in the correct working directory
+          cd $GITHUB_WORKSPACE
+          
+          # Validate VERSION_TAG is not empty
+          if [ -z "$VERSION_TAG" ]; then
+            echo "Error: VERSION_TAG is empty"
+            exit 1
+          fi
+          
+          echo "Deploying frontend with VERSION_TAG: $VERSION_TAG"
+          
           helm upgrade --install frontend ./k8s/frontend \
             --set frontend.image.repository=$FRONTEND_REPO \
             --set frontend.image.tag=$VERSION_TAG \
@@ -186,6 +263,17 @@ jobs:
 
       - name: Deploy Inference Service
         run: |
+          # Ensure we're in the correct working directory
+          cd $GITHUB_WORKSPACE
+          
+          # Validate VERSION_TAG is not empty
+          if [ -z "$VERSION_TAG" ]; then
+            echo "Error: VERSION_TAG is empty"
+            exit 1
+          fi
+          
+          echo "Deploying inference with VERSION_TAG: $VERSION_TAG"
+          
           helm upgrade --install inference ./k8s/backend \
             --set inference.enabled=true \
             --set inference.image.repository=fakay96/coupon-inference \
@@ -195,34 +283,11 @@ jobs:
             --atomic --force --cleanup-on-fail --history-max 5 \
             --timeout 5m0s
 
-      - name: Debug before Crawler deployment
-        run: |
-          echo "=== Debug before Crawler deployment ==="
-          echo "Current directory: $(pwd)"
-          echo "=== k8s/crawler directory contents ==="
-          ls -la ./k8s/crawler || echo "k8s/crawler directory not found!"
-          echo "=== Environment variables ==="
-          echo "NAMESPACE: $NAMESPACE"
-          echo "VERSION_TAG: $VERSION_TAG"
-
-      - name: Deploy Crawler
-        run: |
-          helm upgrade --install crawler ./k8s/crawler \
-            --set crawler.image.repository=fakay96/discount-crawler \
-            --set crawler.image.tag=$VERSION_TAG \
-            --set crawler.operator.image.repository=fakay96/crawler-resource-operator \
-            --set crawler.operator.image.tag=$VERSION_TAG \
-            --namespace $NAMESPACE --create-namespace \
-            -f ./k8s/crawler/values/$NAMESPACE-values.yaml \
-            --atomic --force --cleanup-on-fail --history-max 5 \
-            --timeout 5m0s
-
       - name: Verify service endpoints
         run: |
           kubectl get endpoints coupon-service -n $NAMESPACE || echo "Backend service endpoint not found!"
           kubectl get endpoints frontend -n $NAMESPACE || echo "Frontend service endpoint not found!"
           kubectl get endpoints inference -n $NAMESPACE || echo "Inference service endpoint not found!"
-          kubectl get endpoints crawler -n $NAMESPACE || echo "Crawler service endpoint not found!"
 
       - name: Debug pod logs on failure
         if: failure()
@@ -231,7 +296,6 @@ jobs:
           kubectl logs -l app=backend -n $NAMESPACE || echo "No logs found for backend"
           kubectl logs -l app=frontend -n $NAMESPACE || echo "No logs found for frontend"
           kubectl logs -l app=inference -n $NAMESPACE || echo "No logs found for inference"
-          kubectl logs -l app=crawler -n $NAMESPACE || echo "No logs found for crawler"
 
       - name: Rollback on failure
         if: failure()
@@ -240,9 +304,7 @@ jobs:
           LAST_BACKEND_REVISION=$(helm history coupon-service -n $NAMESPACE | tail -n 2 | head -n 1 | awk '{print $1}')
           LAST_FRONTEND_REVISION=$(helm history frontend -n $NAMESPACE | tail -n 2 | head -n 1 | awk '{print $1}')
           LAST_INFERENCE_REVISION=$(helm history inference -n $NAMESPACE | tail -n 2 | head -n 1 | awk '{print $1}')
-          LAST_CRAWLER_REVISION=$(helm history crawler -n $NAMESPACE | tail -n 2 | head -n 1 | awk '{print $1}')
           
           helm rollback coupon-service $LAST_BACKEND_REVISION -n $NAMESPACE || echo "Failed to rollback backend"
           helm rollback frontend $LAST_FRONTEND_REVISION -n $NAMESPACE || echo "Failed to rollback frontend"
           helm rollback inference $LAST_INFERENCE_REVISION -n $NAMESPACE || echo "Failed to rollback inference"
-          helm rollback crawler $LAST_CRAWLER_REVISION -n $NAMESPACE || echo "Failed to rollback crawler"
