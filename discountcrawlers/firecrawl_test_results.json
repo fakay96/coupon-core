@@ -1,0 +1,1084 @@
+{
+  "spar": {
+    "success": true,
+    "products_count": 5,
+    "sample_product": {
+      "name": "Cantaloupemelone BIO per St\u00fcck",
+      "brand": "SPAR Natur*pur",
+      "sale_price": "2",
+      "original_price": "statt\u00a0\u20ac\u00a03,99",
+      "price_per_unit": "(2,99 \u20ac/St\u00fcck)",
+      "url": "/shop/lebensmittel/spar-naturpur-cantaloupemelone-bio-per-stueck/p/2020003476334"
+    },
+    "all_products": [
+      {
+        "name": "Cantaloupemelone BIO per St\u00fcck",
+        "brand": "SPAR Natur*pur",
+        "sale_price": "2",
+        "original_price": "statt\u00a0\u20ac\u00a03,99",
+        "price_per_unit": "(2,99 \u20ac/St\u00fcck)",
+        "url": "/shop/lebensmittel/spar-naturpur-cantaloupemelone-bio-per-stueck/p/2020003476334"
+      },
+      {
+        "name": "Bio-Basilikum im Topf",
+        "brand": "SPAR Natur*pur",
+        "sale_price": "1",
+        "original_price": "statt\u00a0\u20ac\u00a02,49",
+        "price_per_unit": "(1,79 \u20ac/St\u00fcck)",
+        "url": "/shop/lebensmittel/spar-naturpur-bio-basilikum-im-topf/p/2020002852269"
+      },
+      {
+        "name": "Bio-Mini Wassermelone s\u00fc\u00df, kernarm per St\u00fcck",
+        "brand": "SPAR Natur*pur",
+        "sale_price": "3",
+        "original_price": "statt\u00a0\u20ac\u00a03,99",
+        "price_per_unit": "(3,29 \u20ac/St\u00fcck)",
+        "url": "/shop/lebensmittel/spar-naturpur-bio-mini-wassermelone-suess-kernarm-per-stueck/p/2020000613978"
+      },
+      {
+        "name": "Prosciutto Crudo",
+        "brand": "SPAR PREMIUM",
+        "sale_price": "4",
+        "original_price": "statt\u00a0\u20ac\u00a05,29",
+        "price_per_unit": "(59,88 \u20ac/kg)",
+        "url": "/shop/lebensmittel/spar-premium-prosciutto-crudo/p/1243369"
+      },
+      {
+        "name": "Condimento Bianco",
+        "brand": "SPAR PREMIUM",
+        "sale_price": "7",
+        "original_price": "statt\u00a0\u20ac\u00a08,99",
+        "price_per_unit": "(31,96 \u20ac/l)",
+        "url": "/shop/lebensmittel/spar-premium-condimento-bianco/p/2020000521662"
+      }
+    ]
+  },
+  "penny": {
+    "success": true,
+    "products_count": 5,
+    "sample_product": {
+      "name": "Manner T\u00f6rtchen",
+      "size": "400 g Packung",
+      "validity_dates": "von\u00a0Mo\u00a014.07.2025bis\u00a0Mi\u00a016.07.2025",
+      "url": "https://www.penny.at/produkte/manner-toertchen-78102243"
+    },
+    "all_products": [
+      {
+        "name": "Manner T\u00f6rtchen",
+        "size": "400 g Packung",
+        "validity_dates": "von\u00a0Mo\u00a014.07.2025bis\u00a0Mi\u00a016.07.2025",
+        "url": "https://www.penny.at/produkte/manner-toertchen-78102243"
+      },
+      {
+        "name": "Pepsi",
+        "size": "0,5 liter Flasche",
+        "validity_dates": "von\u00a0Do\u00a010.07.2025bis\u00a0Mi\u00a016.07.2025",
+        "url": "https://www.penny.at/produkte/pepsi-78104816"
+      },
+      {
+        "name": "Rama Culinesse",
+        "size": "500 ml Flasche",
+        "validity_dates": "von\u00a0Do\u00a010.07.2025bis\u00a0Mi\u00a016.07.2025",
+        "url": "https://www.penny.at/produkte/rama-culinesse-78108431"
+      },
+      {
+        "name": "Manner Schnitten*",
+        "size": "400 g Packung",
+        "validity_dates": "von\u00a0Mo\u00a014.07.2025bis\u00a0Mi\u00a016.07.2025",
+        "url": "https://www.penny.at/produkte/manner-schnitten-78109397"
+      },
+      {
+        "name": "Sch\u00e4rdinger Gouda*",
+        "size": "1 kg Packung",
+        "validity_dates": "von\u00a0Do\u00a010.07.2025bis\u00a0Mi\u00a016.07.2025",
+        "url": "https://www.penny.at/produkte/schaerdinger-gouda-78110986"
+      }
+    ]
+  },
+  "mueller": {
+    "success": true,
+    "products_count": 71,
+    "sample_product": {
+      "type": "page_summary",
+      "content": "Parf\u00fcmerieDrogerieSpielwarenMulti-Med\u00edaSchreibwarenNaturshopHaushaltTiershopB\u00fccherStr\u00fcmpfeHandarbeitFotoUnsere VielfaltDas Beste f\u00fcr die ganze Familie!LinziclipStyling f\u00fcr jeden Haartyp!laveraF\u00fcr nat\u00fc...",
+      "store": "mueller"
+    },
+    "all_products": [
+      {
+        "type": "page_summary",
+        "content": "Parf\u00fcmerieDrogerieSpielwarenMulti-Med\u00edaSchreibwarenNaturshopHaushaltTiershopB\u00fccherStr\u00fcmpfeHandarbeitFotoUnsere VielfaltDas Beste f\u00fcr die ganze Familie!LinziclipStyling f\u00fcr jeden Haartyp!laveraF\u00fcr nat\u00fc...",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "SALE bei M\u00fcllerEntdecken Sie Top-Qualit\u00e4t zum besonders g\u00fcnstigen Preis!",
+        "element_type": "div",
+        "store": "mueller",
+        "related_links": [
+          "https://www.mueller.at/c/sonntagsknueller/?itm_content=kw28&itm_medium=slideshow&itm_campaign=sonntagsknueller&itm_position=startseite",
+          "https://www.mueller.at/b/lego/lego-girls/?itm_content=kw28&itm_medium=slideshow&itm_campaign=lego-girls&itm_position=startseite",
+          "https://www.foto.mueller.at/"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "SALE bei M\u00fcllerEntdecken Sie Top-Qualit\u00e4t zum besonders g\u00fcnstigen Preis!",
+        "element_type": "div",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "SALE bei M\u00fcller",
+        "element_type": "div",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "SALE bei M\u00fcller",
+        "element_type": "span",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "Entdecken Sie Top-Qualit\u00e4t zum besonders g\u00fcnstigen Preis!",
+        "element_type": "span",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "SaleHappy People - Faltbarer Bollerwagen69,99 \u20ac/1Stk.99,95 \u20acLieferung nach HauseIn die Filiale lieferbar",
+        "element_type": "div",
+        "store": "mueller",
+        "related_links": [
+          "https://www.mueller.at/p/happy-people-faltbarer-bollerwagen-PPN3133321/",
+          "https://www.mueller.at/p/happy-people-faltbarer-bollerwagen-PPN3133321/"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "Happy People - Faltbarer Bollerwagen69,99 \u20ac/1Stk.99,95 \u20acLieferung nach HauseIn die Filiale lieferbar",
+        "element_type": "div",
+        "store": "mueller",
+        "related_links": [
+          "https://www.mueller.at/p/happy-people-faltbarer-bollerwagen-PPN3133321/",
+          "https://www.mueller.at/p/happy-people-faltbarer-bollerwagen-PPN3133321/"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "69,99 \u20ac/1Stk.99,95 \u20ac",
+        "element_type": "div",
+        "store": "mueller",
+        "related_links": [
+          "https://www.mueller.at/p/happy-people-faltbarer-bollerwagen-PPN3133321/"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "69,99 \u20ac/1Stk.99,95 \u20ac",
+        "element_type": "div",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "69,99 \u20ac/1Stk.99,95 \u20ac",
+        "element_type": "div",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "69,99 \u20ac/1Stk.",
+        "element_type": "div",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "SaleSCOUT Walkie Talkie \u2013 Abenteuerliche Kommunikation f\u00fcr Kinder20,00 \u20ac/1Stk.69,99 \u20acLieferung nach HauseIn die Filiale lieferbar",
+        "element_type": "div",
+        "store": "mueller",
+        "related_links": [
+          "https://www.mueller.at/p/scout-walkie-talkie-abenteuerliche-kommunikation-fuer-kinder-PPN3130045/",
+          "https://www.mueller.at/p/scout-walkie-talkie-abenteuerliche-kommunikation-fuer-kinder-PPN3130045/"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "SCOUT Walkie Talkie \u2013 Abenteuerliche Kommunikation f\u00fcr Kinder20,00 \u20ac/1Stk.69,99 \u20acLieferung nach HauseIn die Filiale lieferbar",
+        "element_type": "div",
+        "store": "mueller",
+        "related_links": [
+          "https://www.mueller.at/p/scout-walkie-talkie-abenteuerliche-kommunikation-fuer-kinder-PPN3130045/",
+          "https://www.mueller.at/p/scout-walkie-talkie-abenteuerliche-kommunikation-fuer-kinder-PPN3130045/"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "20,00 \u20ac/1Stk.69,99 \u20ac",
+        "element_type": "div",
+        "store": "mueller",
+        "related_links": [
+          "https://www.mueller.at/p/scout-walkie-talkie-abenteuerliche-kommunikation-fuer-kinder-PPN3130045/"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "20,00 \u20ac/1Stk.69,99 \u20ac",
+        "element_type": "div",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "20,00 \u20ac/1Stk.69,99 \u20ac",
+        "element_type": "div",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "20,00 \u20ac/1Stk.",
+        "element_type": "div",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "SaleSCOUT Kindermesser \u2013 Das erste Multifunktionsmesser f\u00fcr kleine Entdecker2,00 \u20ac/1Stk.7,99 \u20acLieferung nach HauseIn die Filiale lieferbar",
+        "element_type": "div",
+        "store": "mueller",
+        "related_links": [
+          "https://www.mueller.at/p/scout-kindermesser-das-erste-multifunktionsmesser-fuer-kleine-entdecker-PPN3130043/",
+          "https://www.mueller.at/p/scout-kindermesser-das-erste-multifunktionsmesser-fuer-kleine-entdecker-PPN3130043/"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "SCOUT Kindermesser \u2013 Das erste Multifunktionsmesser f\u00fcr kleine Entdecker2,00 \u20ac/1Stk.7,99 \u20acLieferung nach HauseIn die Filiale lieferbar",
+        "element_type": "div",
+        "store": "mueller",
+        "related_links": [
+          "https://www.mueller.at/p/scout-kindermesser-das-erste-multifunktionsmesser-fuer-kleine-entdecker-PPN3130043/",
+          "https://www.mueller.at/p/scout-kindermesser-das-erste-multifunktionsmesser-fuer-kleine-entdecker-PPN3130043/"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "2,00 \u20ac/1Stk.7,99 \u20ac",
+        "element_type": "div",
+        "store": "mueller",
+        "related_links": [
+          "https://www.mueller.at/p/scout-kindermesser-das-erste-multifunktionsmesser-fuer-kleine-entdecker-PPN3130043/"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "2,00 \u20ac/1Stk.7,99 \u20ac",
+        "element_type": "div",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "2,00 \u20ac/1Stk.7,99 \u20ac",
+        "element_type": "div",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "2,00 \u20ac/1Stk.",
+        "element_type": "div",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "SaleSCOUT Kindermesser braun \u2013 Sicher schnitzen f\u00fcr kleine Abenteurer4,00 \u20ac/1Stk.24,99 \u20acLieferung nach HauseIn die Filiale lieferbar",
+        "element_type": "div",
+        "store": "mueller",
+        "related_links": [
+          "https://www.mueller.at/p/scout-kindermesser-braun-sicher-schnitzen-fuer-kleine-abenteurer-PPN3130041/",
+          "https://www.mueller.at/p/scout-kindermesser-braun-sicher-schnitzen-fuer-kleine-abenteurer-PPN3130041/"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "SCOUT Kindermesser braun \u2013 Sicher schnitzen f\u00fcr kleine Abenteurer4,00 \u20ac/1Stk.24,99 \u20acLieferung nach HauseIn die Filiale lieferbar",
+        "element_type": "div",
+        "store": "mueller",
+        "related_links": [
+          "https://www.mueller.at/p/scout-kindermesser-braun-sicher-schnitzen-fuer-kleine-abenteurer-PPN3130041/",
+          "https://www.mueller.at/p/scout-kindermesser-braun-sicher-schnitzen-fuer-kleine-abenteurer-PPN3130041/"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "4,00 \u20ac/1Stk.24,99 \u20ac",
+        "element_type": "div",
+        "store": "mueller",
+        "related_links": [
+          "https://www.mueller.at/p/scout-kindermesser-braun-sicher-schnitzen-fuer-kleine-abenteurer-PPN3130041/"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "4,00 \u20ac/1Stk.24,99 \u20ac",
+        "element_type": "div",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "4,00 \u20ac/1Stk.24,99 \u20ac",
+        "element_type": "div",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "4,00 \u20ac/1Stk.",
+        "element_type": "div",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "SaleBicycle\u00ae Disney Vaiana9,99 \u20ac/1Stk.11,99 \u20acLieferung nach HauseIn die Filiale lieferbar",
+        "element_type": "div",
+        "store": "mueller",
+        "related_links": [
+          "https://www.mueller.at/p/bicycle-disney-vaiana-PPN3109860/",
+          "https://www.mueller.at/p/bicycle-disney-vaiana-PPN3109860/"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "Bicycle\u00ae Disney Vaiana9,99 \u20ac/1Stk.11,99 \u20acLieferung nach HauseIn die Filiale lieferbar",
+        "element_type": "div",
+        "store": "mueller",
+        "related_links": [
+          "https://www.mueller.at/p/bicycle-disney-vaiana-PPN3109860/",
+          "https://www.mueller.at/p/bicycle-disney-vaiana-PPN3109860/"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "9,99 \u20ac/1Stk.11,99 \u20ac",
+        "element_type": "div",
+        "store": "mueller",
+        "related_links": [
+          "https://www.mueller.at/p/bicycle-disney-vaiana-PPN3109860/"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "9,99 \u20ac/1Stk.11,99 \u20ac",
+        "element_type": "div",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "9,99 \u20ac/1Stk.11,99 \u20ac",
+        "element_type": "div",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "9,99 \u20ac/1Stk.",
+        "element_type": "div",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "SaleBicycle\u00ae AC/DC12,99 \u20ac/1Stk.14,99 \u20acLieferung nach HauseIn die Filiale lieferbar",
+        "element_type": "div",
+        "store": "mueller",
+        "related_links": [
+          "https://www.mueller.at/p/bicycle-ac-dc-PPN3109869/",
+          "https://www.mueller.at/p/bicycle-ac-dc-PPN3109869/"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "Bicycle\u00ae AC/DC12,99 \u20ac/1Stk.14,99 \u20acLieferung nach HauseIn die Filiale lieferbar",
+        "element_type": "div",
+        "store": "mueller",
+        "related_links": [
+          "https://www.mueller.at/p/bicycle-ac-dc-PPN3109869/",
+          "https://www.mueller.at/p/bicycle-ac-dc-PPN3109869/"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "12,99 \u20ac/1Stk.14,99 \u20ac",
+        "element_type": "div",
+        "store": "mueller",
+        "related_links": [
+          "https://www.mueller.at/p/bicycle-ac-dc-PPN3109869/"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "12,99 \u20ac/1Stk.14,99 \u20ac",
+        "element_type": "div",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "12,99 \u20ac/1Stk.14,99 \u20ac",
+        "element_type": "div",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "12,99 \u20ac/1Stk.",
+        "element_type": "div",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "SaleBicycle\u00ae Guns N\u00b4Roses12,99 \u20ac/1Stk.14,99 \u20acLieferung nach HauseIn die Filiale lieferbar",
+        "element_type": "div",
+        "store": "mueller",
+        "related_links": [
+          "https://www.mueller.at/p/bicycle-guns-n-roses-PPN3109865/",
+          "https://www.mueller.at/p/bicycle-guns-n-roses-PPN3109865/"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "Bicycle\u00ae Guns N\u00b4Roses12,99 \u20ac/1Stk.14,99 \u20acLieferung nach HauseIn die Filiale lieferbar",
+        "element_type": "div",
+        "store": "mueller",
+        "related_links": [
+          "https://www.mueller.at/p/bicycle-guns-n-roses-PPN3109865/",
+          "https://www.mueller.at/p/bicycle-guns-n-roses-PPN3109865/"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "12,99 \u20ac/1Stk.14,99 \u20ac",
+        "element_type": "div",
+        "store": "mueller",
+        "related_links": [
+          "https://www.mueller.at/p/bicycle-guns-n-roses-PPN3109865/"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "12,99 \u20ac/1Stk.14,99 \u20ac",
+        "element_type": "div",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "12,99 \u20ac/1Stk.14,99 \u20ac",
+        "element_type": "div",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "12,99 \u20ac/1Stk.",
+        "element_type": "div",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "SaleBicycle\u00ae 140th Anniversary12,99 \u20ac/1Stk.14,99 \u20acLieferung nach HauseIn die Filiale lieferbar",
+        "element_type": "div",
+        "store": "mueller",
+        "related_links": [
+          "https://www.mueller.at/p/bicycle-140th-anniversary-PPN3109856/",
+          "https://www.mueller.at/p/bicycle-140th-anniversary-PPN3109856/"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "Bicycle\u00ae 140th Anniversary12,99 \u20ac/1Stk.14,99 \u20acLieferung nach HauseIn die Filiale lieferbar",
+        "element_type": "div",
+        "store": "mueller",
+        "related_links": [
+          "https://www.mueller.at/p/bicycle-140th-anniversary-PPN3109856/",
+          "https://www.mueller.at/p/bicycle-140th-anniversary-PPN3109856/"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "12,99 \u20ac/1Stk.14,99 \u20ac",
+        "element_type": "div",
+        "store": "mueller",
+        "related_links": [
+          "https://www.mueller.at/p/bicycle-140th-anniversary-PPN3109856/"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "12,99 \u20ac/1Stk.14,99 \u20ac",
+        "element_type": "div",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "12,99 \u20ac/1Stk.14,99 \u20ac",
+        "element_type": "div",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "12,99 \u20ac/1Stk.",
+        "element_type": "div",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "M\u00fcller FotoserviceIhre Fotos, Ihre Momente \u2013 jetzt mit unserer Fotoaktion sparen!",
+        "element_type": "div",
+        "store": "mueller",
+        "related_links": [
+          "https://www.mueller.at/c/sonntagsknueller/?itm_content=kw28&itm_medium=slideshow&itm_campaign=sonntagsknueller&itm_position=startseite",
+          "https://www.mueller.at/b/lego/lego-girls/?itm_content=kw28&itm_medium=slideshow&itm_campaign=lego-girls&itm_position=startseite",
+          "https://www.foto.mueller.at/"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "M\u00fcller FotoserviceIhre Fotos, Ihre Momente \u2013 jetzt mit unserer Fotoaktion sparen!",
+        "element_type": "div",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "Ihre Fotos, Ihre Momente \u2013 jetzt mit unserer Fotoaktion sparen!",
+        "element_type": "span",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "M\u00fcller AppSammeln, sparen & mobil bezahlen!Lassen Sie sich inspirieren!Tipps, Tricks, DIY-Ideen & mehr!BabyClubAnmelden & Vorteile sichern!NewsletterAngebote & Neuigkeiten bei M\u00fcller!ProspekteTolle Angebote entdecken!",
+        "element_type": "div",
+        "store": "mueller",
+        "related_links": [
+          "https://www.mueller.at/c/sonntagsknueller/?itm_content=kw28&itm_medium=slideshow&itm_campaign=sonntagsknueller&itm_position=startseite",
+          "https://www.mueller.at/b/lego/lego-girls/?itm_content=kw28&itm_medium=slideshow&itm_campaign=lego-girls&itm_position=startseite",
+          "https://www.foto.mueller.at/"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "M\u00fcller AppSammeln, sparen & mobil bezahlen!Lassen Sie sich inspirieren!Tipps, Tricks, DIY-Ideen & mehr!BabyClubAnmelden & Vorteile sichern!NewsletterAngebote & Neuigkeiten bei M\u00fcller!ProspekteTolle Angebote entdecken!",
+        "element_type": "div",
+        "store": "mueller",
+        "related_links": [
+          "https://www.mueller.at/service/app/",
+          "https://www.mueller.at/service/app/",
+          "https://www.mueller.at/aktuelles/lifestyle/"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "M\u00fcller AppSammeln, sparen & mobil bezahlen!Lassen Sie sich inspirieren!Tipps, Tricks, DIY-Ideen & mehr!BabyClubAnmelden & Vorteile sichern!NewsletterAngebote & Neuigkeiten bei M\u00fcller!ProspekteTolle Angebote entdecken!",
+        "element_type": "div",
+        "store": "mueller",
+        "related_links": [
+          "https://www.mueller.at/service/app/",
+          "https://www.mueller.at/service/app/",
+          "https://www.mueller.at/aktuelles/lifestyle/"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "M\u00fcller AppSammeln, sparen & mobil bezahlen!Lassen Sie sich inspirieren!Tipps, Tricks, DIY-Ideen & mehr!BabyClubAnmelden & Vorteile sichern!NewsletterAngebote & Neuigkeiten bei M\u00fcller!ProspekteTolle Angebote entdecken!",
+        "element_type": "div",
+        "store": "mueller",
+        "related_links": [
+          "https://www.mueller.at/service/app/",
+          "https://www.mueller.at/service/app/",
+          "https://www.mueller.at/aktuelles/lifestyle/"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "M\u00fcller AppSammeln, sparen & mobil bezahlen!",
+        "element_type": "div",
+        "store": "mueller",
+        "related_links": [
+          "https://www.mueller.at/service/app/",
+          "https://www.mueller.at/service/app/",
+          "https://www.mueller.at/aktuelles/lifestyle/"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "M\u00fcller AppSammeln, sparen & mobil bezahlen!",
+        "element_type": "div",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "Sammeln, sparen & mobil bezahlen!",
+        "element_type": "span",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "NewsletterAngebote & Neuigkeiten bei M\u00fcller!",
+        "element_type": "div",
+        "store": "mueller",
+        "related_links": [
+          "https://www.mueller.at/service/app/",
+          "https://www.mueller.at/service/app/",
+          "https://www.mueller.at/aktuelles/lifestyle/"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "NewsletterAngebote & Neuigkeiten bei M\u00fcller!",
+        "element_type": "div",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "Angebote & Neuigkeiten bei M\u00fcller!",
+        "element_type": "span",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "ProspekteTolle Angebote entdecken!",
+        "element_type": "div",
+        "store": "mueller",
+        "related_links": [
+          "https://www.mueller.at/service/app/",
+          "https://www.mueller.at/service/app/",
+          "https://www.mueller.at/aktuelles/lifestyle/"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "ProspekteTolle Angebote entdecken!",
+        "element_type": "div",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "Tolle Angebote entdecken!",
+        "element_type": "span",
+        "store": "mueller"
+      },
+      {
+        "type": "promotional_content",
+        "content": "Der Onlineshop von M\u00fcller: Entdecken Sie eine gro\u00dfe Auswahl an Produkten und Aktionen",
+        "element_type": "h1",
+        "store": "mueller"
+      }
+    ]
+  },
+  "xxxlutz": {
+    "success": true,
+    "products_count": 13,
+    "sample_product": {
+      "type": "page_summary",
+      "content": "Seite nicht gefunden - M\u00f6bel online kaufen bei XXXLutz | XXXLutz.atSeite nicht gefundenEs tut uns leid, die gew\u00fcnschte Seite wurde m\u00f6glicherweise verschoben oder gel\u00f6scht. Nutzen Sie die Suche oder st...",
+      "store": "xxxlutz"
+    },
+    "all_products": [
+      {
+        "type": "page_summary",
+        "content": "Seite nicht gefunden - M\u00f6bel online kaufen bei XXXLutz | XXXLutz.atSeite nicht gefundenEs tut uns leid, die gew\u00fcnschte Seite wurde m\u00f6glicherweise verschoben oder gel\u00f6scht. Nutzen Sie die Suche oder st...",
+        "store": "xxxlutz"
+      },
+      {
+        "type": "promotional_content",
+        "content": "XXXL ProduktvielfaltAbschnitt \u00fcberspringenWohnzimmerSchlafzimmerGartenm\u00f6belEsszimmerKochen & EssenFreizeit & CoLampen & LeuchtenHeimtextilienZu den AngebotenXXXL Topseller",
+        "element_type": "div",
+        "store": "xxxlutz",
+        "related_links": [
+          "https://www.xxxlutz.at/angebote#skip-section-Liste-cmsitem_00002702",
+          "https://www.xxxlutz.at/wohnzimmer-C1",
+          "https://www.xxxlutz.at/schlafzimmer-C3"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "XXXL ProduktvielfaltAbschnitt \u00fcberspringenWohnzimmerSchlafzimmerGartenm\u00f6belEsszimmerKochen & EssenFreizeit & CoLampen & LeuchtenHeimtextilienZu den AngebotenXXXL Topseller",
+        "element_type": "div",
+        "store": "xxxlutz",
+        "related_links": [
+          "https://www.xxxlutz.at/angebote#skip-section-Liste-cmsitem_00002702",
+          "https://www.xxxlutz.at/wohnzimmer-C1",
+          "https://www.xxxlutz.at/schlafzimmer-C3"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "Zu den AngebotenXXXL Topseller",
+        "element_type": "div",
+        "store": "xxxlutz",
+        "related_links": [
+          "https://www.xxxlutz.at/angebote#skip-section-Liste-cmsitem_00002702",
+          "https://www.xxxlutz.at/wohnzimmer-C1",
+          "https://www.xxxlutz.at/schlafzimmer-C3"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "Zu den AngebotenXXXL Topseller",
+        "element_type": "div",
+        "store": "xxxlutz",
+        "related_links": [
+          "https://www.xxxlutz.at/c/angebote-des-monats",
+          "https://www.xxxlutz.at/c/topseller"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "Zu den Angeboten",
+        "element_type": "div",
+        "store": "xxxlutz",
+        "related_links": [
+          "https://www.xxxlutz.at/c/angebote-des-monats",
+          "https://www.xxxlutz.at/c/topseller"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "Zu den Angeboten",
+        "element_type": "div",
+        "store": "xxxlutz",
+        "related_links": [
+          "https://www.xxxlutz.at/c/angebote-des-monats"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "Zu den Angeboten",
+        "element_type": "div",
+        "store": "xxxlutz",
+        "related_links": [
+          "https://www.xxxlutz.at/c/angebote-des-monats"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "Zu den Angeboten",
+        "element_type": "div",
+        "store": "xxxlutz",
+        "related_links": [
+          "https://www.xxxlutz.at/c/angebote-des-monats"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "Zu den Angeboten",
+        "element_type": "div",
+        "store": "xxxlutz"
+      },
+      {
+        "type": "promotional_content",
+        "content": "Zu den Angeboten",
+        "element_type": "div",
+        "store": "xxxlutz"
+      },
+      {
+        "type": "promotional_content",
+        "content": "Zu den Angeboten",
+        "element_type": "div",
+        "store": "xxxlutz"
+      },
+      {
+        "type": "product_link",
+        "text": "Abschnitt \u00fcberspringen",
+        "url": "https://www.xxxlutz.at/angebote#skip-section-Liste-cmsitem_00002702",
+        "store": "xxxlutz"
+      }
+    ]
+  },
+  "zalando": {
+    "success": true,
+    "products_count": 22,
+    "sample_product": {
+      "type": "page_title",
+      "content": "Vorheriges Bild",
+      "store": "zalando"
+    },
+    "all_products": [
+      {
+        "type": "page_title",
+        "content": "Vorheriges Bild",
+        "store": "zalando"
+      },
+      {
+        "type": "page_summary",
+        "content": "Zum Hauptinhalt \u00fcberspringenWeiter zur SucheNur f\u00fcr kurze Zeit: -15% EXTRA auf bereits bis zu -70% reduzierte Artikel. Code: SUMMER\u00dcberspringe ein ProduktkarussellVorheriges BildN\u00e4chstes BildWo m\u00f6chte...",
+        "store": "zalando"
+      },
+      {
+        "type": "promotional_content",
+        "content": "Nur f\u00fcr kurze Zeit: -15% EXTRA auf bereits bis zu -70% reduzierte Artikel. Code: SUMMER",
+        "element_type": "div",
+        "store": "zalando",
+        "related_links": [
+          "https://www.zalando.at/#main-content",
+          "https://www.zalando.at/#header-search-input",
+          "https://www.zalando.at/outlet/?camp=at_cw28_eoss_summer_wave3"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "Nur f\u00fcr kurze Zeit: -15% EXTRA auf bereits bis zu -70% reduzierte Artikel. Code: SUMMER",
+        "element_type": "div",
+        "store": "zalando",
+        "related_links": [
+          "https://www.zalando.at/outlet/?camp=at_cw28_eoss_summer_wave3"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "Nur f\u00fcr kurze Zeit: -15% EXTRA auf bereits bis zu -70% reduzierte Artikel. Code: SUMMER",
+        "element_type": "div",
+        "store": "zalando",
+        "related_links": [
+          "https://www.zalando.at/outlet/?camp=at_cw28_eoss_summer_wave3"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "Nur f\u00fcr kurze Zeit: -15% EXTRA auf bereits bis zu -70% reduzierte Artikel. Code: SUMMER",
+        "element_type": "div",
+        "store": "zalando",
+        "related_links": [
+          "https://www.zalando.at/outlet/?camp=at_cw28_eoss_summer_wave3"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "Nur f\u00fcr kurze Zeit: -15% EXTRA auf bereits bis zu -70% reduzierte Artikel. Code: SUMMER",
+        "element_type": "p",
+        "store": "zalando",
+        "related_links": [
+          "https://www.zalando.at/outlet/?camp=at_cw28_eoss_summer_wave3"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "Deals, Drops und TrendsDirekt in deinen PosteingangFinde Neuheiten, Style-Inspirationen und Sales in unserem Newsletter.",
+        "element_type": "div",
+        "store": "zalando",
+        "related_links": [
+          "https://www.zalando.at/messages",
+          "https://www.zalando.at/zalando-privacy-policy#chapter-06",
+          "https://www.zalando.at/faq/what-should-i-know-about-the-newsletter.html"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "Deals, Drops und TrendsDirekt in deinen PosteingangFinde Neuheiten, Style-Inspirationen und Sales in unserem Newsletter.",
+        "element_type": "div",
+        "store": "zalando"
+      },
+      {
+        "type": "promotional_content",
+        "content": "Deals, Drops und TrendsDirekt in deinen PosteingangFinde Neuheiten, Style-Inspirationen und Sales in unserem Newsletter.",
+        "element_type": "div",
+        "store": "zalando"
+      },
+      {
+        "type": "promotional_content",
+        "content": "Finde Neuheiten, Style-Inspirationen und Sales in unserem Newsletter.",
+        "element_type": "div",
+        "store": "zalando"
+      },
+      {
+        "type": "promotional_content",
+        "content": "Finde Neuheiten, Style-Inspirationen und Sales in unserem Newsletter.",
+        "element_type": "span",
+        "store": "zalando"
+      },
+      {
+        "type": "promotional_content",
+        "content": "InhalteArtikel-BenachrichtigungenFashion-UpdatesDeine Marken und ExpertenEmpfehlungenBest\u00e4tigung deiner Gr\u00f6\u00dfen-BenachrichtigungStorysAngebote und SalesUmfragenErfahre mehr (Login erforderlich)",
+        "element_type": "div",
+        "store": "zalando",
+        "related_links": [
+          "https://www.zalando.at/messages"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "InhalteArtikel-BenachrichtigungenFashion-UpdatesDeine Marken und ExpertenEmpfehlungenBest\u00e4tigung deiner Gr\u00f6\u00dfen-BenachrichtigungStorysAngebote und SalesUmfragenErfahre mehr (Login erforderlich)",
+        "element_type": "div",
+        "store": "zalando",
+        "related_links": [
+          "https://www.zalando.at/messages"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "Artikel-BenachrichtigungenFashion-UpdatesDeine Marken und ExpertenEmpfehlungenBest\u00e4tigung deiner Gr\u00f6\u00dfen-BenachrichtigungStorysAngebote und SalesUmfragenErfahre mehr (Login erforderlich)",
+        "element_type": "div",
+        "store": "zalando",
+        "related_links": [
+          "https://www.zalando.at/messages"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "Artikel-BenachrichtigungenFashion-UpdatesDeine Marken und ExpertenEmpfehlungenBest\u00e4tigung deiner Gr\u00f6\u00dfen-BenachrichtigungStorysAngebote und SalesUmfragenErfahre mehr (Login erforderlich)",
+        "element_type": "div",
+        "store": "zalando",
+        "related_links": [
+          "https://www.zalando.at/messages"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "Artikel-BenachrichtigungenFashion-UpdatesDeine Marken und ExpertenEmpfehlungenBest\u00e4tigung deiner Gr\u00f6\u00dfen-BenachrichtigungStorysAngebote und SalesUmfragenErfahre mehr (Login erforderlich)",
+        "element_type": "div",
+        "store": "zalando",
+        "related_links": [
+          "https://www.zalando.at/messages"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "Artikel-BenachrichtigungenFashion-UpdatesDeine Marken und ExpertenEmpfehlungenBest\u00e4tigung deiner Gr\u00f6\u00dfen-BenachrichtigungStorysAngebote und SalesUmfragenErfahre mehr (Login erforderlich)",
+        "element_type": "div",
+        "store": "zalando",
+        "related_links": [
+          "https://www.zalando.at/messages"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "Angebote und Sales",
+        "element_type": "div",
+        "store": "zalando",
+        "related_links": [
+          "https://www.zalando.at/messages"
+        ]
+      },
+      {
+        "type": "promotional_content",
+        "content": "Angebote und Sales",
+        "element_type": "div",
+        "store": "zalando"
+      },
+      {
+        "type": "promotional_content",
+        "content": "Angebote und Sales",
+        "element_type": "span",
+        "store": "zalando"
+      },
+      {
+        "type": "product_link",
+        "text": "Nur f\u00fcr kurze Zeit: -15% EXTRA auf bereits bis zu -70% reduzierte Artikel. Code: SUMMER",
+        "url": "https://www.zalando.at/outlet/?camp=at_cw28_eoss_summer_wave3",
+        "store": "zalando"
+      }
+    ]
+  },
+  "ikea": {
+    "success": true,
+    "products_count": 1,
+    "sample_product": {
+      "name": "KNOXHULTHochschrank mit T\u00fcren",
+      "url": "https://www.ikea.com/at/de/new/new-products/",
+      "image_urls": "https://www.ikea.com/at/de/images/products/knoxhult-hochschrank-mit-tueren__1399344_pe968346_s5.jpg?f=xxs"
+    },
+    "all_products": [
+      {
+        "name": "KNOXHULTHochschrank mit T\u00fcren",
+        "url": "https://www.ikea.com/at/de/new/new-products/",
+        "image_urls": "https://www.ikea.com/at/de/images/products/knoxhult-hochschrank-mit-tueren__1399344_pe968346_s5.jpg?f=xxs"
+      }
+    ]
+  },
+  "mediamarkt": {
+    "success": true,
+    "products_count": 4,
+    "sample_product": {
+      "name": "Produktempfehlungen zulassen"
+    },
+    "all_products": [
+      {
+        "name": "Produktempfehlungen zulassen"
+      },
+      {
+        "name": "Produktempfehlungen zulassen"
+      },
+      {
+        "name": "Produktempfehlungen zulassen"
+      },
+      {
+        "name": "Produktempfehlungen zulassen"
+      }
+    ]
+  },
+  "hm": {
+    "success": true,
+    "products_count": 1,
+    "sample_product": {
+      "type": "page_summary",
+      "content": "CURRENTLY UNAVAILABLEWe are currently carrying out maintenance work to ensure that you enjoy the best fashion experience possible. We apologise for any inconvenience. Please try again later. Thank you...",
+      "store": "hm"
+    },
+    "all_products": [
+      {
+        "type": "page_summary",
+        "content": "CURRENTLY UNAVAILABLEWe are currently carrying out maintenance work to ensure that you enjoy the best fashion experience possible. We apologise for any inconvenience. Please try again later. Thank you...",
+        "store": "hm"
+      }
+    ]
+  },
+  "adidas": {
+    "success": false,
+    "error": "500, message='Internal Server Error', url='https://api.firecrawl.dev/v1/scrape'"
+  },
+  "billa": {
+    "success": true,
+    "products_count": 5,
+    "sample_product": {
+      "name": "Ja! Nat\u00fcrlich Zucchini",
+      "url": "https://shop.billa.at/produkte/ja-natuerlich-zucchini-00402495",
+      "image_urls": "https://assets-eu-01.kc-usercontent.com/d5bbd8c1-f776-012f-71ae-f309933a3006/9b69a6f8-f016-43b8-8d67-6fb27a782603/badge_badge_bio_FINAL_thin.png?w=185&fm=webp&lossless=0&q=80"
+    },
+    "all_products": [
+      {
+        "name": "Ja! Nat\u00fcrlich Zucchini",
+        "url": "https://shop.billa.at/produkte/ja-natuerlich-zucchini-00402495",
+        "image_urls": "https://assets-eu-01.kc-usercontent.com/d5bbd8c1-f776-012f-71ae-f309933a3006/9b69a6f8-f016-43b8-8d67-6fb27a782603/badge_badge_bio_FINAL_thin.png?w=185&fm=webp&lossless=0&q=80"
+      },
+      {
+        "name": "Ottakringer Helles",
+        "url": "https://shop.billa.at/produkte/ottakringer-helles-00769927",
+        "image_urls": "https://assets-eu-01.kc-usercontent.com/d5bbd8c1-f776-012f-71ae-f309933a3006/dd17e883-cfd0-4515-89ed-222e57756623/Icon_Regionalitaet_rund_Final_thin.png?w=172&fm=webp&lossless=0&q=80"
+      },
+      {
+        "name": "V\u00f6slauer Prickelnd",
+        "url": "https://shop.billa.at/produkte/voeslauer-prickelnd-00769493",
+        "image_urls": "https://assets-eu-01.kc-usercontent.com/d5bbd8c1-f776-012f-71ae-f309933a3006/dd17e883-cfd0-4515-89ed-222e57756623/Icon_Regionalitaet_rund_Final_thin.png?w=172&fm=webp&lossless=0&q=80"
+      },
+      {
+        "name": "G\u00f6sser M\u00e4rzen",
+        "url": "https://shop.billa.at/produkte/goesser-maerzen-00770444",
+        "image_urls": "https://assets-eu-01.kc-usercontent.com/d5bbd8c1-f776-012f-71ae-f309933a3006/dd17e883-cfd0-4515-89ed-222e57756623/Icon_Regionalitaet_rund_Final_thin.png?w=172&fm=webp&lossless=0&q=80"
+      },
+      {
+        "name": "\u00d6lz Super Soft Sandwich",
+        "url": "https://shop.billa.at/produkte/oelz-super-soft-sandwich-00403275",
+        "image_urls": "https://assets-eu-01.kc-usercontent.com/d5bbd8c1-f776-012f-71ae-f309933a3006/dd17e883-cfd0-4515-89ed-222e57756623/Icon_Regionalitaet_rund_Final_thin.png?w=172&fm=webp&lossless=0&q=80"
+      }
+    ]
+  },
+  "bipa": {
+    "success": false,
+    "error": "Cannot connect to host api.firecrawl.dev:443 ssl:default [None]"
+  },
+  "lidl": {
+    "success": false,
+    "error": "Cannot connect to host api.firecrawl.dev:443 ssl:default [None]"
+  },
+  "ca": {
+    "success": false,
+    "error": "Cannot connect to host api.firecrawl.dev:443 ssl:default [None]"
+  },
+  "moebelix": {
+    "success": false,
+    "error": "Cannot connect to host api.firecrawl.dev:443 ssl:default [None]"
+  },
+  "moemax": {
+    "success": false,
+    "error": "Cannot connect to host api.firecrawl.dev:443 ssl:default [nodename nor servname provided, or not known]"
+  }
+}
