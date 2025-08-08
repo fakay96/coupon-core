@@ -41,7 +41,9 @@ class S3Service:
         self.endpoint_url = endpoint_url or getattr(settings, "AWS_S3_ENDPOINT_URL", None)
         self.bucket_name = bucket_name or getattr(settings, "AWS_STORAGE_BUCKET_NAME")
         self.region_name = (
-            _infer_region_from_endpoint(self.endpoint_url)
+            region_name
+            or getattr(settings, "AWS_S3_REGION_NAME", None)
+            or _infer_region_from_endpoint(self.endpoint_url)
         )
         self.client = boto3.client(
             "s3",
