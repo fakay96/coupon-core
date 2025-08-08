@@ -4,9 +4,8 @@ This module provides a SearchService class for searching and filtering discount 
 using Redis as a backend.
 """
 
-from typing import List, Optional, Dict, Any
-from datetime import datetime
-import json
+from typing import List, Optional
+from rapidfuzz import fuzz
 
 from discountcrawlers.utils.redis_utils import RedisUtils
 from discountcrawlers.services.storage_service import StorageService
@@ -60,12 +59,17 @@ class SearchService:
         # Get all items from storage
         all_items = await self.storage_service.list_items()
         
-        # Filter items
+        # Filter items using fuzzy matching for more robust queries
         filtered_items = []
         for item in all_items:
-            if query.lower() not in item["title"].lower():
-                continue
-                
+            title = item["title"].lower()
+            # Basic substring match for quick wins
+            if query:
+                q_lower = query.lower()
+                similarity = fuzz.token_set_ratio(q_lower, title)
+                if q_lower not in title and similarity < 60:
+                    continue
+
             if store and item["store_name"] != store:
                 continue
                 

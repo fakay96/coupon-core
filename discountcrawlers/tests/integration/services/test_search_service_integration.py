@@ -195,4 +195,15 @@ async def test_search_cache(search_service, storage_service, sample_items):
     assert all(
         first["url"] == second["url"]
         for first, second in zip(first_results, second_results)
-    ) 
+    )
+
+
+@pytest.mark.asyncio
+async def test_fuzzy_search(search_service, storage_service, sample_items):
+    """Search should handle typos and partial matches."""
+    for item in sample_items:
+        await storage_service.store_item(item)
+
+    results = await search_service.search("Tst Itm")
+    assert len(results) > 0
+    assert any("Test Item" in item["title"] for item in results)
